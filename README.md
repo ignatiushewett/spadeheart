@@ -1,5 +1,7 @@
 # Spadeheart
 
+NPC-driven zombie survival prototype.
+
 A singleplayer voxel sandbox FPS set on Manhattan, 41 days after the outbreak. Think Ace of Spades / OpenSpades
 destruction and look, with very dense zombie hordes, and Fallout-style trading and looting with no levels or XP.
 
