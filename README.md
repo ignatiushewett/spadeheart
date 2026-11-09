@@ -4,3 +4,5 @@ Prototype built with Claude:
 https://ignatiushewett.github.io/spadeheart/
 
 <img src="shpreview.png" alt="Preview">
+<img src="shpreview2.png" alt="Preview">
+<img src="shpreview3.png" alt="Preview">
