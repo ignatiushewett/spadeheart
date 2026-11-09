@@ -2768,8 +2768,14 @@ class Game {
   flushLights(px, pz) {
     const q = this.lightQ;
     if (!q || !q.length) return;
-    q.sort((a, b) => Math.hypot(a.x - px, a.z - pz) - Math.hypot(b.x - px, b.z - pz));
-    for (const l of q.slice(0, 7)) this.renderer.addLight(l.x, l.y, l.z, l.rad, l.cr, l.cg, l.cb);
+    // Only so many can light the world at once, so the ones that light the most of it get to: how bright and how far it reaches,
+    // against how far off it is. Nearest-first let a scatter of little fires from a blast push a burning car's glow out of the street.
+    for (const l of q) {
+      const d = Math.hypot(l.x - px, l.z - pz);
+      l.score = (l.cr + l.cg + l.cb) * l.rad * l.rad / (d + l.rad * .5 + 1);
+    }
+    q.sort((a, b) => b.score - a.score);
+    for (const l of q.slice(0, 11)) this.renderer.addLight(l.x, l.y, l.z, l.rad, l.cr, l.cg, l.cb);
     q.length = 0;
   }
 

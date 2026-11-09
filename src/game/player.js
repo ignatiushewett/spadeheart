@@ -491,19 +491,20 @@ export class Player {
       this.x = nx; this.z = nz; this.y = stepY;
       return;
     }
-    // Clipped by a corner or an edge (the rim of the floor above a stair, a doorframe): ease a little sideways round it rather than stop
-    // dead. Only a short way, so a real wall still stops you, and only when that bit of sideways is clear on its own.
+    // Clipped by a corner or an edge (the rim of the floor above a stair, a doorframe): ease sideways round it rather than stop dead.
+    // Only if a short way to one side the move is clear, so a real wall still stops you. And it is a slide, no faster than you were
+    // walking: taking the whole sideways step at once read as a little teleport every time you clipped a corner.
     if (this.onGround || this.swim) {
+      const most = Math.abs(d);
       for (const o of [.1, -.1, .2, -.2, .32, -.32]) {
         const sx = axis === 2 ? this.x + o : this.x, sz = axis === 0 ? this.z + o : this.z;
         const ax = axis === 0 ? nx : sx, az = axis === 2 ? nz : sz;
         if (this.collides(sx, this.y, sz, this.height)) continue;
-        if (!this.collides(ax, this.y, az, this.height)) { this.x = ax; this.z = az; return; }
-        if (canStep && !this.collides(ax, stepY, az, this.height) && !this.collides(sx, stepY, sz, this.height)) {
-          this.eyeSmooth -= stepY - this.y;
-          this.x = ax; this.z = az; this.y = stepY;
-          return;
-        }
+        const clear = !this.collides(ax, this.y, az, this.height) || (canStep && !this.collides(ax, stepY, az, this.height) && !this.collides(sx, stepY, sz, this.height));
+        if (!clear) continue;
+        const step = Math.sign(o) * Math.min(Math.abs(o), most);
+        if (axis === 2) this.x += step; else this.z += step;
+        return;   // keep the way you are going: the next frames carry on round it
       }
     }
     if (axis === 0) this.vx = 0; else this.vz = 0;

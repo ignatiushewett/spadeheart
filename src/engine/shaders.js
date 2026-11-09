@@ -1,6 +1,6 @@
 // GLSL sources. LIGHTING is shared by every lit surface so the world, zombies and debris
 // all sit in the same atmosphere.
-export const MAX_LIGHTS = 12;
+export const MAX_LIGHTS = 16;
 export const MAX_SPOTS = 4;
 
 const COMMON = /* glsl */`#version 300 es
