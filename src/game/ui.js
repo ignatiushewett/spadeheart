@@ -314,6 +314,7 @@ export class UI {
     // After any change: what has to happen beyond storing the value.
     const after = {
       minimap: () => $('hud').classList.toggle('no-map', !s.minimap),
+      chatterNoHud: () => $('hud').classList.toggle('keep-chatter', !!s.chatterNoHud),
       uiScale: () => document.documentElement.style.setProperty('--ui-scale', s.uiScale),
       drips: () => { if (!s.drips) g.drips.clear(); },
       view: () => g.applySettings(false), scale: () => g.applySettings(false), motion: () => g.applySettings(false), dof: () => g.applySettings(false),
@@ -343,7 +344,7 @@ export class UI {
       $('s-fps').value = String(s.fpsCap);
       clock24 = !!s.clock24;
       $('s-clock').value = clock24 ? '24' : '12';
-      for (const k in after) if (k === 'minimap' || k === 'uiScale') after[k]();
+      for (const k in after) if (k === 'minimap' || k === 'uiScale' || k === 'chatterNoHud') after[k]();
     };
     this.fillSettings = fill;
     fill();

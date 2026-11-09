@@ -113,7 +113,7 @@ class Game {
   }
 
   defaultSettings() {
-    return { quality: 'high', view: 320, scale: 1, cap: 24000, fov: 105, sens: 1, volume: .8, motion: false, dof: true, fpsCap: 0, muteSiren: false, uiScale: 1, clock24: false, drips: true, grain: .3, minimap: false, hitmarker: false, crosshair: true,
+    return { quality: 'high', view: 320, scale: 1, cap: 24000, fov: 105, sens: 1, volume: .8, motion: false, dof: true, fpsCap: 0, muteSiren: false, uiScale: 1, clock24: false, drips: true, grain: .3, minimap: false, chatterNoHud: true, hitmarker: false, crosshair: true,
       brightness: 1, bob: 1, shake: 1, music: 1, adsSens: 1, invertY: false, toggleAim: false, toggleCrouch: false, showFps: false, defaultsV: 3 };
   }
 
@@ -1661,7 +1661,8 @@ class Game {
   async refreshContinue() {
     const slots = await this.slotInfo();
     this.sandboxSave = slots.find((s) => s.n === 'sandbox');
-    const best = slots.filter((s) => !s.empty && !s.dead).sort((a, b) => b.savedAt - a.savedAt)[0] || null;
+    // Continue is for your characters: the latest survival save. The sandbox is picked up from its own screen.
+    const best = slots.filter((s) => s.n !== 'sandbox' && !s.empty && !s.dead).sort((a, b) => b.savedAt - a.savedAt)[0] || null;
     this.continueSlot = best ? best.n : 0;
     this.ui.setContinue(best);
   }

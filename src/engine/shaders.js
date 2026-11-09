@@ -844,8 +844,10 @@ void main(){
   vSlot=int(aBone.y+.5);
   float phase=iAnim.x, state=iAnim.y;
   int variant=int(iAnim.z+.5);
-  vVariant=variant&255;
-  int flags=int(texelFetch(uVariants,ivec2(10,variant&255),0).a*255.+.5);
+  vVariant=variant&511;
+  int flags=int(texelFetch(uVariants,ivec2(10,variant&511),0).a*255.+.5);
+  // Armour: the whole torso is the vest (a carrier, not a shirt with panels down the sides).
+  if((flags&8)!=0&&vSlot==1&&bone==0) vSlot=7;
   int extra=int(iAnim.w+.5);
   int weapon=(extra>>1)&15;
   bool child=(extra&32)!=0;
@@ -863,6 +865,8 @@ void main(){
   if(wpn>0&&wpn!=weapon) hide=true;
   if(vSlot==15&&vFaction==0) hide=true;            // armband: camp members only
   vec3 p=aPos, n=aNormal;
+  // Heavy armour fills the chest out: wider, and deeper front to back.
+  if((flags&16)!=0&&bone==0&&vSlot!=14&&p.y>1.2&&p.y<2.12){ p.x*=1.09; p.z*=1.22; }
   if(!dog){
   float seed=float(variant)*.37;
   float swing=sin(phase);

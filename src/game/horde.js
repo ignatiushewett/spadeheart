@@ -1966,7 +1966,18 @@ export class Horde {
       else if (w.walk[(ix >> 1) + (nz >> 1) * w.walkW]) this.vx[i] = 0;
       else { this.vx[i] *= -.25; this.vz[i] *= -.25; }
     }
-    this.py[i] = terrain;
+    // Stand on what is actually there: rubble, a car, the bottom of a stair, a crater. The street map alone puts a body on a pile of rubble
+    // down inside it, which is plain to see from up on a roof. Only within a few blocks of the street, where the map and the world can
+    // differ, and only once the world is loaded there.
+    let top = terrain;
+    // From two blocks up at most, so nobody lands somewhere the 'upstairs' rule above would then freeze them.
+    const fy = terrain + 1;
+    if (w.isLoaded(ix, fy, iz)) {
+      for (let yy = fy; yy >= terrain - 4; yy--) {
+        if (w.solid(ix, yy, iz)) { if (!w.solid(ix, yy + 1, iz) && !w.solid(ix, yy + 2, iz)) top = yy + 1; break; }
+      }
+    }
+    this.py[i] = top;
   }
 
   // --- Combat -------------------------------------------------------------------------------------

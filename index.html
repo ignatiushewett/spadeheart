@@ -190,7 +190,10 @@ select { background: #1c1b18; color: var(--ink); border: 1px solid var(--line); 
 #right-col { position: absolute; right: 22px; top: 222px; width: 270px; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
 #hud.no-map #minimap { display: none; }
 /* F1: nothing on screen but the world and what you are holding. The screen fade and a scope still show. */
-#hud.hud-off > :not(#sleep-veil):not(#scope) { visibility: hidden !important; }
+#hud.hud-off > :not(#sleep-veil):not(#scope):not(#overhead) { visibility: hidden !important; }
+/* ...and what people are saying only if the setting keeps it: the words over their heads, never the marks. */
+#hud.hud-off:not(.keep-chatter) > #overhead { visibility: hidden !important; }
+#hud.hud-off #overhead .npc-mark { visibility: hidden !important; }
 #hud.no-map #right-col { top: 16px; }
 #tracker { display: flex; flex-direction: column; gap: 5px; }
 .trk { padding: 4px 9px 5px; background: rgba(0,0,0,.42); border-left: 2px solid #6ec6ff; font-size: 12px; text-shadow: 0 1px 2px #000; }
@@ -523,6 +526,7 @@ body.talking #hud > *:not(#caption) { visibility: hidden; }
         <div class="row" data-hint="How many of the dead are simulated around you at once. Mostly a cost on the processor."><label>Max active zombies</label><input type="range" id="s-cap" data-k="cap" min="2000" max="60000" step="1000"><output id="s-cap-o"></output></div>
         <div class="row" data-hint="Blurs what is far from where you are looking."><label>Depth of field</label><input type="checkbox" id="s-dof" data-k="dof"><span></span></div>
         <div class="row" data-hint="Water running off roofs, ledges and people after rain."><label>Dripping water</label><input type="checkbox" id="s-drips" data-k="drips"><span></span></div>
+        <div class="row" data-hint="With the HUD hidden (F1), still show what people around you are saying."><label>Chatter with HUD hidden</label><input type="checkbox" id="s-chatter" data-k="chatterNoHud"><span></span></div>
       </div>
       <div class="s-page" data-page="audio">
         <div class="row" data-hint="Everything you hear."><label>Master volume</label><input type="range" id="s-vol" data-k="volume" min="0" max="1" step="0.05"><output id="s-vol-o"></output></div>

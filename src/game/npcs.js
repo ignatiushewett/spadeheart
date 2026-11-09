@@ -313,7 +313,7 @@ export class NPCs {
     }
     // The gate watch. Every gate has someone on it, day and night.
     for (const s of c.sentries) {
-      add(new NPC('sentry', s.x, STREET_Y, s.z, { weapon: pickOf(c.guardWeapons), variant: row(c.wardrobe), hp: 400, yaw: s.yaw, title: 'Gate watch' }));
+      add(new NPC('sentry', s.x, STREET_Y, s.z, { weapon: pickOf(c.guardWeapons), variant: row(['light']), hp: 400, yaw: s.yaw, title: 'Gate watch' }));
     }
     // The wall. Only those still alive stand their posts.
     st.guards = [];
@@ -356,7 +356,7 @@ export class NPCs {
 
   postGuard(c, st, s) {
     const weapon = s.sniper ? 'sniper' : pickOf(c.guardWeapons);
-    const n = new NPC('guard', s.x, s.y, s.z, { name: pickName(), weapon, variant: wardrobeRow(c.wardrobe), hp: 620, yaw: s.yaw, title: 'on watch' });
+    const n = new NPC('guard', s.x, s.y, s.z, { name: pickName(), weapon, variant: wardrobeRow(['light']), hp: 620, yaw: s.yaw, title: 'on watch' });
     n.camp = c.id; n.campKey = c.key; n.campName = c.name;
     n.post = s;
     st.npcs.push(n);
@@ -999,8 +999,12 @@ export class NPCs {
     const want = n.slot;
     const tx = P.x + Math.cos(want) * 3.5, tz = P.z + Math.sin(want) * 3.5;
     const dx = tx - n.x, dz = tz - n.z, d = Math.hypot(dx, dz);
-    if (d > 1.2) {
-      const speed = Math.min(6.8, 2.4 + d);
+    // Set off once they are properly behind, and keep going until they are properly there. One line for both had them stopping and
+    // starting every frame while you walked, legs flicking between a stride and standing still.
+    if (n.following ? d < .7 : d > 1.9) n.following = !n.following;
+    if (n.following) {
+      // Slowing into their place rather than arriving at a run.
+      const speed = Math.min(6.8, 2.4 + d, Math.max(1.4, d * 3));
       const ux = dx / d, uz = dz / d;
       const nx = n.x + ux * speed * dt, nz = n.z + uz * speed * dt;
       const fy = Math.floor(n.y + .05);
@@ -1165,7 +1169,7 @@ export class NPCs {
     for (let i = 0; i < n; i++) {
       const nx = x + (rand() - .5) * 6, nz = z + (rand() - .5) * 6;
       const weapon = pickOf(near.guardWeapons);
-      const m = new NPC('roamer', nx, w.terrainTop(nx, nz), nz, { weapon, variant: wardrobeRow(near.wardrobe), hp: 320, title: `${near.name} patrol`, campName: near.name, campKey: near.key });
+      const m = new NPC('roamer', nx, w.terrainTop(nx, nz), nz, { weapon, variant: wardrobeRow(trader && i === 0 ? near.wardrobe : ['medium']), hp: 320, title: `${near.name} patrol`, campName: near.name, campKey: near.key });
       m.factionId = near.id + 1;
       m.squad = squad;
       m.flank = rand() * 6.283;
@@ -1190,7 +1194,7 @@ export class NPCs {
       // They count against the patrols the city can have around you, so there are that many fewer out on the wider beats.
       const squad = { camp: c, gate: q, ox, oz, ring: 0, th: 0, turn: 1, wx: x, wz: z, t: 0, members: [] };
       for (let i = have; i < 2; i++) {
-        const m = new NPC('roamer', x + (rand() - .5) * 3, STREET_Y, z + (rand() - .5) * 3, { weapon: pickOf(c.guardWeapons), variant: wardrobeRow(c.wardrobe), hp: 320, title: `${c.name} gate watch`, campName: c.name, campKey: c.key });
+        const m = new NPC('roamer', x + (rand() - .5) * 3, STREET_Y, z + (rand() - .5) * 3, { weapon: pickOf(c.guardWeapons), variant: wardrobeRow(['heavy']), hp: 320, title: `${c.name} gate watch`, campName: c.name, campKey: c.key });
         m.factionId = c.id + 1;
         m.squad = squad;
         m.flank = i * Math.PI;
@@ -1477,7 +1481,7 @@ export class NPCs {
     n.yaw = n.ys = Math.atan2(dx, dz); n.aim = 1.2; n.busyT = 3;
     const st0 = shot.start ?? 2.2;
     g.player.projectiles.push({ kind: 'rocket', hostile: true, loud: true, x: sx + ux * st0, y: sy + uy * st0, z: sz + uz * st0, vx: ux * 58, vy: uy * 58, vz: uz * 58, t: 0, fuse: 6, radius: 7, strength: 40, dmg: 380 });
-    g.audio.gun('rocket', sx, sy, sz, true);
+    g.audio.rocketLaunch(sx, sy, sz);
     g.particles.sprite(1, sx + ux * 1.6, sy + uy * 1.6, sz + uz * 1.6, 0, 0, 0, .6, 3, 9, 5, 2, 1, .08);
     g.ui.floatSay(n, pickOf(['Rocket out!', 'Backblast clear!', 'Heads down, rocket!', 'Eat this!']), 2);
   }

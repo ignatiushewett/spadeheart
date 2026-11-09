@@ -5,7 +5,9 @@ import { makeRng } from '../shared/rng.js';
 const STRIDE = 8; // floats per instance
 export const SLOT = { SKIN: 0, SHIRT: 1, SHIRT2: 2, PANTS: 3, SHOES: 4, HAIR: 5, HAT: 6, VEST: 7, EYE: 8, MOUTH: 9, GUN: 10, WOOD: 11, BLADE: 12, MIL: 13, PACK: 14, BAND: 15 };
 export const HUMAN_VARIANT_START = 192;
-export const WARDROBE = { civ: [192, 16], mil: [208, 16], scrap: [224, 8], raider: [232, 8], med: [240, 16] };
+// heavy, medium and light are armour for the watch, by how far out they work: the pair in front of each gate, the patrols, and the
+// people on the gates and walls. Only how they look: what armour actually does is the same for all of them.
+export const WARDROBE = { civ: [192, 16], mil: [208, 16], scrap: [224, 8], raider: [232, 8], med: [240, 16], heavy: [256, 16], medium: [272, 16], light: [288, 16] };
 // Carried weapons, drawn from the actor mesh. The id travels in the instance data.
 export const NPC_WEAPON = { pistol: 1, rifle: 2, shotgun: 3, smg: 4, sniper: 5, lmg: 6, crossbow: 7, bat: 8, machete: 9, katana: 10, axe: 11, spear: 12 };
 const SCALE = .1;
@@ -238,7 +240,7 @@ const dogBody = (part, box) => {
 
 // One row per variant. Rows below HUMAN_VARIANT_START are infected.
 function buildVariantTexture(gl) {
-  const W = 16, H = 256;
+  const W = 16, H = 304;
   const tex = new Uint8Array(W * H * 4);
   const rng = makeRng(90210);
   const SKINS = [[230, 190, 160], [200, 150, 115], [150, 100, 70], [100, 68, 48], [70, 48, 36]];
@@ -274,8 +276,15 @@ function buildVariantTexture(gl) {
     scrap: (o) => { const s = rng.pick(LEATHER); o.shirt = rng.pick(WORN); o.vest = s; o.shirt2 = rng.pick(WORN); o.pants = rng.pick([[30, 30, 34], [50, 44, 40], [66, 46, 36]]); o.shoes = [24, 20, 18]; if (rng() < .7) o.flags |= 4; },
     raider: (o) => { const s = rng.pick([[28, 26, 26], [42, 36, 32], [34, 38, 34]]); o.shirt = s; o.vest = rng.pick(LEATHER); o.shirt2 = [20, 18, 18]; o.pants = rng.pick([[30, 30, 34], [44, 38, 34]]); o.shoes = [20, 18, 16]; if (rng() < .5) o.hair = s; if (rng() < .5) o.flags |= 4; },   // no hats: half of them have a hood up instead
     med: (o) => { const s = rng.pick([[150, 148, 138], [92, 112, 108], [138, 136, 128]]); o.shirt = s; o.vest = s; o.shirt2 = [118, 56, 50]; o.pants = rng.pick([[84, 102, 98], [60, 66, 72]]); o.shoes = [72, 68, 62]; if (rng() < .3) o.flags |= 4; },
+    // Plate carriers and helmets: the best the camp has, on the people standing out in front of it. Flag 8: the whole torso is the
+    // carrier, not a shirt. Flag 16: bulked out under it.
+    heavy: (o) => { const plate = rng.pick([[40, 44, 36], [30, 32, 36], [66, 62, 50], [48, 52, 40]]); o.vest = plate; o.shirt = plate; o.shirt2 = rng.pick(CAMO); o.pants = rng.pick(CAMO); o.shoes = [24, 22, 20]; o.hat = plate.map((v) => v * 1.08); o.flags |= 1 | 8 | 16; if (rng() < .6) o.flags |= 4; },
+    // A proper vest and, mostly, a helmet: patrols walk the streets and dress for it.
+    medium: (o) => { const vest = rng.pick([[58, 62, 48], [70, 64, 50], [44, 46, 50], [84, 78, 60]]); o.vest = vest; o.shirt = vest; o.shirt2 = rng.pick([...CAMO, ...FLANNEL]); o.pants = rng.pick([...CAMO, [50, 44, 40]]); o.shoes = [30, 26, 22]; if (rng() < .75) { o.hat = rng.pick(CAMO); o.flags |= 1; } o.flags |= 8; if (rng() < .7) o.flags |= 4; },
+    // Whatever stops a bite: a padded jacket or a cut-down vest over everyday clothes, maybe a cap. The ones behind the wall.
+    light: (o) => { o.shirt = rng.pick([...FLANNEL, ...WORN]); o.vest = rng.pick([[74, 70, 58], [58, 54, 48], [88, 76, 56], ...LEATHER]); o.shirt2 = rng.pick(WORN); o.pants = rng.pick([...JEANS, ...CAMO]); o.shoes = [44, 34, 26]; if (rng() < .45) { o.hat = rng.pick([...WORN, ...CAMO]); o.flags |= 1; } if (rng() < .4) o.flags |= 4; },
   };
-  const wardrobeOf = (row) => (row < 208 ? 'civ' : row < 224 ? 'mil' : row < 232 ? 'scrap' : row < 240 ? 'raider' : 'med');
+  const wardrobeOf = (row) => (row < 208 ? 'civ' : row < 224 ? 'mil' : row < 232 ? 'scrap' : row < 240 ? 'raider' : row < 256 ? 'med' : row < 272 ? 'heavy' : row < 288 ? 'medium' : 'light');
   for (let row = 0; row < H; row++) {
     const zombie = row < HUMAN_VARIANT_START;
     const base = rng.pick(SKINS);

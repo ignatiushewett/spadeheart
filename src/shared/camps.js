@@ -748,7 +748,12 @@ export function stampCamp(c, ctx) {
         for (const row of [5, 6]) for (let y = YB; y < YB + k; y++) P(t, y, row, M.PLANK);
       }
     };
-    for (const g of gates) { flight(g.tc + 8, 1); flight(g.tc - 8, -1); }
+    for (const g of gates) {
+      flight(g.tc + 8, 1); flight(g.tc - 8, -1);
+      // Over the gate, the two flights meet: planks across from the top of one to the top of the other, so you can cross at the
+      // height you came up at instead of stepping back onto the walkway. Nothing holds it up in the gateway itself.
+      for (let t = g.tc - 7; t <= g.tc + 7; t++) for (const row of [5, 6]) P(t, YB + hc - 1, row, M.PLANK);
+    }
     if (!gates.length) { const mid = (a0 + a1) >> 1; flight(mid + 3, 1); flight(mid - 3, -1); }
   };
   if (oz <= z0 + 8 && oz + CS >= z0 - 6) side(z0, 1, true, 'N');

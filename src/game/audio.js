@@ -339,6 +339,19 @@ export class Audio2 {
     if (s.dist < 120) for (let i = 0; i < 7; i++) setTimeout(() => { if (this.ctx) this.noiseBurst(dest, .2, 'bandpass', 900 + rand() * 1800, 300, 2, .12); }, 180 + rand() * 1500);
   }
 
+  // A launcher going off on a wall: a hard thump and the tearing rush of the motor, heard across the yard and down the streets round it.
+  // Loud, but well short of what it does when it lands.
+  rocketLaunch(x, y, z) {
+    if (!this.ctx) return;
+    const s = this.spatial(x, y, z, 70);
+    if (s.gain < .01) return;
+    const dest = this.out(Math.min(1, s.gain * 1.05), s.pan, .6);
+    this.noiseBurst(dest, .35, 'lowpass', 900, 70, .6, .9, .003);
+    this.tone(dest, .4, 'sine', 120, 38, .7);
+    this.noiseBurst(dest, .9, 'bandpass', 500, 2600, .9, .55, .05);
+    this.noiseBurst(dest, 1.4, 'highpass', 1800, 900, .4, .22, .12);
+  }
+
   collapse(x, y, z, size) {
     if (!this.ctx) return;
     const s = this.spatial(x, y, z, 70);

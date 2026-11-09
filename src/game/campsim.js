@@ -1251,7 +1251,9 @@ export class CampSim {
     // Operations are planned off what the scouts report. Only a hole knocked in the wall by a really big crowd, one nobody saw coming,
     // makes an emergency of it; a smaller hole is patched and fought like any other bad afternoon.
     const crowd = (s.atWall || 0) + (s.inside || 0) + (s.pool || 0), big = 380 * Math.max(.6, this.g.horde.settings.horde || 1);
-    if (this.now() >= (s.opGapUntil || 0) && (s.opNext || crowd >= big)) this.emergencyOp(c, s);
+    // Only a hole knocked in now, in front of somebody. Holes put back in the wall after a load, or caught up on while nobody was there
+    // (silent), are old news: they must not bring forward an operation that is due later, or call one the moment a save loads.
+    if (!silent && this.now() >= (s.opGapUntil || 0) && (s.opNext || crowd >= big)) this.emergencyOp(c, s);
     const g = this.g, W = g.world;
     const horiz = side === 'N' || side === 'S';
     const lo = (horiz ? c.x0 : c.z0) + 7, hi = (horiz ? c.x1 : c.z1) - 7;
@@ -1796,7 +1798,8 @@ export class CampSim {
       if (s.status === 'overrun' && this.g.horde.fillRuin) this.g.horde.fillRuin(this.g.layout.camps[id], true);
       s.inside = 0; s.real = false; s.segs = {}; s.openGates = 0;
       // A save from before there were operations: a big fight already under way is one now.
-      if (!s.op && s.status === 'holding' && ((s.drawing && s.major) || s.breaches.length || s.evac || s.fatal)) this.openOp(this.g.layout.camps[id], s, true);
+      // (Only saves that old: they have no operation names. In anything newer a breach with no operation is just a breach.)
+      if (d.opNames === undefined && !s.op && s.status === 'holding' && ((s.drawing && s.major) || s.breaches.length || s.evac || s.fatal)) this.openOp(this.g.layout.camps[id], s, true);
       // The crowd takes a few seconds to walk back up to the wall. Nobody gets to brick up the holes in that time.
       s.repairHold = s.pool > 0 || s.resumeInside > 0 ? 12 : 0;
       if (s.raid) s.raid.spawned = false;
