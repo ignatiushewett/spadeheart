@@ -1491,6 +1491,8 @@ class Game {
     const v = document.getElementById('boot-veil');
     v.classList.add('on');
     const go = (e) => {
+      // The function keys are the browser's (F5 reload, F11 full screen, F12 tools): they pass straight through and do not start it.
+      if (e && e.type === 'keydown' && /^F\d+$/.test(e.code)) return;
       // Only the first click or key, and it does nothing else: no menu button pressed through it, no key reaching the game.
       if (e) { e.preventDefault(); e.stopPropagation(); }
       // The click that follows the press would land on whatever menu button is under the fading screen.
