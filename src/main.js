@@ -395,6 +395,8 @@ class Game {
       if (!I.keys[e.code]) I.pressed[e.code] = true;
       I.keys[e.code] = true;
       if (e.code === 'F3') { e.preventDefault(); this.showFPS = !this.showFPS; }
+      // F1, out in the corner where nothing else is: the whole HUD off for a clean view, and back. Not saved: a new session has it on.
+      if (e.code === 'F1') { e.preventDefault(); if (this.state === 'play') document.getElementById('hud').classList.toggle('hud-off'); }
       // The dev tools stay hidden until someone types the word, in each game: a new or loaded game locks them again.
       if (this.state === 'play' && !this.devUnlocked && e.code.startsWith('Key')) {
         this.devTyped = ((this.devTyped || '') + e.code.slice(3)).slice(-5);
