@@ -1,2 +1,2 @@
 # spadeheart
-NPC-driven zombie survival
+NPC-driven zombie survival prototype
