@@ -1,0 +1,11 @@
+# Claude Code's local settings for this folder
+.claude/
+
+# Editor and OS clutter
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
+.DS_Store
+*.log
+node_modules/
