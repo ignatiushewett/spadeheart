@@ -1994,10 +1994,17 @@ export class NPCs {
     const best = exits.filter((e) => !e.hole).sort((a, b) => (b.lean || 0) - (a.lean || 0))[0] || exits[0];
     const ux = best.ox - best.ix, uz = best.oz - best.iz, ul = Math.hypot(ux, uz) || 1;
     st.rally = { x: best.ox + ux / ul * 16, z: best.oz + uz / ul * 16, to: refuge ? refuge.id : -1, toName: refuge ? refuge.name : '', from: c.id, members: [], at: 0, gone: false, t0: this.g.time, expect: 6 };
+    // Everyone goes out on that side, the side towards the next settlement: the gate by the meeting place, one round the corner from
+    // it, or a hole near it. Out of the far gate they would only have to come back in and through the place again, whether they mean
+    // to meet the others or to strike out on their own.
+    const toRally = (e) => Math.hypot(e.ox - st.rally.x, e.oz - st.rally.z);
+    const nearest = Math.min(...exits.map(toRally));
+    const rallyExits = exits.filter((e) => toRally(e) <= nearest + 60);
     for (const n of st.npcs) {
       if (n.kind === 'guard' || n.kind === 'sentry' || n.kind === 'follower') continue;
-      this.startFleeing(n, c, exits);
-      if (rand() < .9) { n.rallyTo = st.rally; st.rally.expect++; }
+      const joins = rand() < .9;
+      this.startFleeing(n, c, rallyExits);
+      if (joins) { n.rallyTo = st.rally; st.rally.expect++; }
     }
     // A handful of the watch come down to go with them. They are what makes it a group worth being in.
     const free = st.guards.filter((n) => !n.dead && n.armed && !(n.post && n.post.gate));

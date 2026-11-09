@@ -405,6 +405,13 @@ body.talking #hud > *:not(#caption) { visibility: hidden; }
 #load-brand { display: none; margin: 0 0 18px; }
 #loading.boot #load-brand { display: flex; }
 #loading.boot #load-title, #loading.boot #load-sub { display: none; }
+/* After the first load: the mark, and one click to wake the sound up before the menu fades in. */
+#boot-veil { position: fixed; inset: 0; z-index: 100; display: none; flex-direction: column; align-items: center; justify-content: center; background: #000; cursor: pointer; opacity: 1; transition: opacity 1.6s ease; }
+#boot-veil.on { display: flex; }
+#boot-veil.out { opacity: 0; pointer-events: none; }
+#boot-veil .menu-title { margin: 0 0 26px; }
+#boot-veil .click { color: var(--dim); font-size: 14px; letter-spacing: .32em; text-transform: uppercase; animation: veil-pulse 2.2s ease-in-out infinite; }
+@keyframes veil-pulse { 0%, 100% { opacity: .35; } 50% { opacity: 1; } }
 #death { flex-direction: column; align-items: center; justify-content: center; background: radial-gradient(circle at center, rgba(60,0,0,.2), rgba(0,0,0,.82)); }
 #death h1 { font-size: 66px; color: var(--red); font-weight: 700; }
 #death p { color: var(--dim); max-width: 520px; text-align: center; }
@@ -651,6 +658,8 @@ body.talking #hud > *:not(#caption) { visibility: hidden; }
   <div id="load-bar"><i></i></div>
   <div id="load-sub"></div>
 </div>
+
+<div id="boot-veil"><div class="menu-title"><svg viewBox="0 0 15 14" aria-hidden="true" shape-rendering="crispEdges"><path fill="#e9e4d8" d="M7 0h1v1h-1zM6 1h3v1h-3zM5 2h5v1h-5zM4 3h7v1h-7zM3 4h9v1h-9zM2 5h3v1h-3zM7 5h1v1h-1zM10 5h3v1h-3zM1 6h3v1h-3zM11 6h3v1h-3zM0 7h4v1h-4zM11 7h4v1h-4zM0 8h5v1h-5zM10 8h5v1h-5zM0 9h6v1h-6zM9 9h6v1h-6zM1 10h6v1h-6zM8 10h6v1h-6zM2 11h4v1h-4zM7 11h1v1h-1zM9 11h4v1h-4zM6 12h3v1h-3zM5 13h5v1h-5z"/><path fill="#d8493b" d="M5 5h2v1h-2zM8 5h2v1h-2zM4 6h7v1h-7zM4 7h7v1h-7zM5 8h5v1h-5zM6 9h3v1h-3zM7 10h1v1h-1z"/></svg><h1>Spadeheart</h1></div><div class="click">Click to start</div></div>
 
 <div id="error" class="screen"><h2>The game could not start</h2><pre id="error-text"></pre></div>
 

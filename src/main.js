@@ -228,15 +228,10 @@ class Game {
     this.horde.settings.activeCap = Math.min(this.settings.cap, 14000);
     this.horde.resetPopulation();
     this.refreshCityLights();
+    // Browsers keep quiet until you touch something. So the menu comes up behind a black screen and one click: that touch starts
+    // the sound, and the menu fades in with its music already playing. Behind the screen, the city around it gets loaded meanwhile.
+    this.bootVeil();
     this.enterMenu();
-    // Browsers keep quiet until you touch something, so the first touch is what starts the music.
-    const firstTouch = () => {
-      window.removeEventListener('pointerdown', firstTouch);
-      window.removeEventListener('keydown', firstTouch);
-      if (this.state === 'menu') this.audio.init();
-    };
-    window.addEventListener('pointerdown', firstTouch);
-    window.addEventListener('keydown', firstTouch);
     await this.refreshContinue();
     this.last = performance.now();
     this.schedule();
@@ -533,6 +528,8 @@ class Game {
       }
       if (e.code === 'Space' || e.code === 'Enter') { ui.finishLine(); return; }
     }
+    // Dead: the only way on is one of the buttons on that screen. Escape closing it left you dead with nothing to press.
+    if (ui.modal === 'death') return;
     // Done at the counter: back to the person, in case there is anything else.
     if (e.code === 'Escape' && ui.modal === 'trade' && ui.dlgNpc && !ui.dlgNpc.dead) { ui.backToDialog(); return; }
     if (e.code === 'Escape' && ui.modal && ui.modal !== 'pause') { this.resume(); return; }
@@ -575,6 +572,8 @@ class Game {
   }
 
   resume() {
+    // Nothing to go back to while you are dead: once the death screen is up, it stays up.
+    if (this.state === 'play' && !this.player.alive) { if (this.deathShown) this.ui.open('death', false); return; }
     this.ui.closeAll();
     this.ui.showHUD(true);
     this.input.mouse = [false, false, false];
@@ -1488,6 +1487,24 @@ class Game {
     }
   }
 
+  bootVeil() {
+    const v = document.getElementById('boot-veil');
+    v.classList.add('on');
+    const go = (e) => {
+      // Only the first click or key, and it does nothing else: no menu button pressed through it, no key reaching the game.
+      if (e) { e.preventDefault(); e.stopPropagation(); }
+      // The click that follows the press would land on whatever menu button is under the fading screen.
+      if (e && e.type === 'pointerdown') window.addEventListener('click', (c) => { c.preventDefault(); c.stopPropagation(); }, { capture: true, once: true });
+      v.removeEventListener('pointerdown', go);
+      window.removeEventListener('keydown', go, true);
+      this.audio.init();
+      v.classList.add('out');
+      setTimeout(() => v.remove(), 1700);
+    };
+    v.addEventListener('pointerdown', go);
+    window.addEventListener('keydown', go, true);
+  }
+
   // --- Game flow ---------------------------------------------------------------------------------------
   enterMenu() {
     this.state = 'menu';
@@ -1815,6 +1832,7 @@ class Game {
 
   onPlayerDeath() {
     const P = this.player;
+    this.deathShown = false;
     document.exitPointerLock();
     const survival = P.loadout === 'survival';
     document.querySelector('#death h1').textContent = survival ? `${P.charName} is dead` : 'Overrun';
@@ -1827,6 +1845,7 @@ class Game {
       setTimeout(() => {
         if (this.state !== 'play') return;
         document.getElementById('death-text').textContent = `${days === 1 ? 'One day' : `${days} days`} in the city, ${P.kills.toLocaleString('en-US')} infected down. Nobody is coming back from this one, but the city carries on without them.`;
+        this.deathShown = true;
         this.ui.open('death', false);
       }, 1800);
       return;
@@ -1837,6 +1856,7 @@ class Game {
     const papers = Object.keys(CITIZENSHIP).filter((key) => P.count(papersFor(key))).map((key) => this.layout.camps.find((k) => k.key === key).name);
     setTimeout(() => {
       if (this.state !== 'play') return;
+      this.deathShown = true;
       document.getElementById('death-text').textContent = `Someone dragged you out of the street before you turned. They kept ${lost} spades for the trouble. ${P.kills.toLocaleString('en-US')} infected down so far.${papers.length ? ` On the books you died, so your papers for ${papers.join(' and ')} are gone.` : ''}`;
       this.ui.open('death', false);
     }, 1800);
