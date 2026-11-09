@@ -175,10 +175,10 @@ const bodyDetail = (part, box) => {
   });
   part(-4, 28, -4, 4, 29, 5, 6, () => SLOT.HAT);
   part(-3, 29, -3, 3, 30, 3, 6, () => SLOT.HAT);
-  // A helmet, for the armoured watch: a shell down over the top and sides of the head, eyes clear. Bone 7 is drawn as the hat's bone (6)
-  // but only on rows with the helmet flag, which hides the cap.
-  part(-4, 25, -4, 4, 29, 4, 7, () => SLOT.HAT);
-  part(-3, 29, -3, 3, 30, 3, 7, () => SLOT.HAT);
+  // A helmet, for the armoured watch: a shell down over the top and sides of the head, eyes clear. On the hat's bone (6), marked as
+  // 'weapon' 15 so the shader shows it only on rows with the helmet flag, which hides the cap.
+  part(-4, 25, -4, 4, 29, 4, 156, () => SLOT.HAT);
+  part(-3, 29, -3, 3, 30, 3, 156, () => SLOT.HAT);
   part(-3, 13, -4, 3, 20, -2, 0, () => SLOT.PACK);
   // A faction armband on each sleeve, just proud of the arm on every side so it never z-fights.
   box(-7.2, 17, -1.2, -3.8, 19, 2.2, 2, SLOT.BAND);
@@ -207,10 +207,10 @@ const bodyMid = (part, box) => {
   part(-3, 21, -3, 3, 28, 3, 1, headSlot);
   part(-4, 28, -4, 4, 29, 5, 6, () => SLOT.HAT);
   part(-3, 29, -3, 3, 30, 3, 6, () => SLOT.HAT);
-  // A helmet, for the armoured watch: a shell down over the top and sides of the head, eyes clear. Bone 7 is drawn as the hat's bone (6)
-  // but only on rows with the helmet flag, which hides the cap.
-  part(-4, 25, -4, 4, 29, 4, 7, () => SLOT.HAT);
-  part(-3, 29, -3, 3, 30, 3, 7, () => SLOT.HAT);
+  // A helmet, for the armoured watch: a shell down over the top and sides of the head, eyes clear. On the hat's bone (6), marked as
+  // 'weapon' 15 so the shader shows it only on rows with the helmet flag, which hides the cap.
+  part(-4, 25, -4, 4, 29, 4, 156, () => SLOT.HAT);
+  part(-3, 29, -3, 3, 30, 3, 156, () => SLOT.HAT);
   part(-3, 13, -4, 3, 20, -2, 0, () => SLOT.PACK);
   box(-7.2, 16, -1.2, -3.8, 19, 2.2, 2, SLOT.BAND);
   box(3.8, 16, -1.2, 7.2, 19, 2.2, 3, SLOT.BAND);

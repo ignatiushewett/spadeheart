@@ -860,12 +860,12 @@ void main(){
   bool human=vVariant>=192;
   bool hide=false;
   // The helmet (bone 7) and the cap (bone 6) are both the hat: one or the other, by the flag. Posed the same way from here on.
-  if(bone==7){ if((flags&32)==0) hide=true; bone=6; }
+  if(wpn==15){ if((flags&32)==0) hide=true; }
   else if(bone==6&&(flags&32)!=0) hide=true;
   if(vSlot==6&&(flags&1)==0) hide=true;            // hat
   if(vSlot==14&&(flags&4)==0) hide=true;           // backpack
   if((extra&1)==1&&(bone==1||bone==6)) hide=true;  // head destroyed
-  if(wpn>0&&wpn!=weapon) hide=true;
+  if(wpn>0&&wpn<15&&wpn!=weapon) hide=true;
   if(vSlot==15&&vFaction==0) hide=true;            // armband: camp members only
   vec3 p=aPos, n=aNormal;
   // Heavy armour fills the chest out: wider, and deeper front to back.
@@ -979,14 +979,14 @@ void main(){
   if(bone==7||bone==8){ vec3 k=vec3(bone==7?-.2:.2,.6,0.); p=rotX(joint)*(p-k)+k; n=rotX(joint)*n; }
   else if(bone==9){ vec3 k=vec3(sideX*.55,1.6,.05); p=rotX(-joint)*(p-k)+k; n=rotX(-joint)*n; }
   // A long gun in both hands turns at the grip to lie the way the hands hold it, and goes with the bend of the arm holding it.
-  if(wpn>0&&held){
+  if(wpn>0&&wpn<15&&held){
     mat3 C=aiming?rotX(1.1)*rotZ(1.3)*rotX(-1.8):rotX(-1.7)*rotZ(-1.2);
     vec3 grip=vec3(.55,1.1,.05);
     p=C*(p-grip)+grip; n=C*n;
     vec3 k=vec3(.55,1.6,.05);
     mat3 J=rotX(-(aiming?1.1:.4));
     p=J*(p-k)+k; n=J*n;
-  } else if(wpn>0&&chop){
+  } else if(wpn>0&&wpn<15&&chop){
     // Mid-swing the blade or bat runs on out along the arm, and follows the bend of the elbow.
     mat3 C=rotX(-.35+.3*hit);
     vec3 grip=vec3(.55,1.1,.05);
@@ -994,7 +994,7 @@ void main(){
     vec3 k=vec3(.55,1.6,.05);
     mat3 J=rotX(-(.9*wind+.15));
     p=J*(p-k)+k; n=J*n;
-  } else if(wpn>0&&state<10.&&state!=3.&&!(aiming&&weapon>0&&weapon<8)){
+  } else if(wpn>0&&wpn<15&&state<10.&&state!=3.&&!(aiming&&weapon>0&&weapon<8)){
     float carry=weapon==1?-.4:(weapon<=7?-.86:(weapon==12?-1.:-1.1));
     float across=weapon<=7?-.26:-.1;
     mat3 C=rotX(carry)*rotZ(across);
