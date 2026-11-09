@@ -366,6 +366,7 @@ export class Player {
     } else {
       this.moveAxis(0, this.vx * dt);
       this.moveAxis(2, this.vz * dt);
+      if (this.onGround && this.vy <= 0 && !this.swim) this.stepDown();
       this.moveAxis(1, this.vy * dt);
     }
     this.x = clamp(this.x, 2, WX - 2);
@@ -483,15 +484,41 @@ export class Player {
       return;
     }
     // Auto-step up one voxel, so kerbs and stairs just work.
+    const stepY = Math.floor(this.y) + 1 + (this.y - Math.floor(this.y) > .01 ? 1 : 0);
+    const canStep = (this.onGround || this.swim) && stepY - this.y <= 1.05;
+    if (canStep && !this.collides(nx, stepY, nz, this.height) && !this.collides(this.x, stepY, this.z, this.height)) {
+      this.eyeSmooth -= stepY - this.y;
+      this.x = nx; this.z = nz; this.y = stepY;
+      return;
+    }
+    // Clipped by a corner or an edge (the rim of the floor above a stair, a doorframe): ease a little sideways round it rather than stop
+    // dead. Only a short way, so a real wall still stops you, and only when that bit of sideways is clear on its own.
     if (this.onGround || this.swim) {
-      const stepY = Math.floor(this.y) + 1 + (this.y - Math.floor(this.y) > .01 ? 1 : 0);
-      if (stepY - this.y <= 1.05 && !this.collides(nx, stepY, nz, this.height) && !this.collides(this.x, stepY, this.z, this.height)) {
-        this.eyeSmooth -= stepY - this.y;
-        this.x = nx; this.z = nz; this.y = stepY;
-        return;
+      for (const o of [.1, -.1, .2, -.2, .32, -.32]) {
+        const sx = axis === 2 ? this.x + o : this.x, sz = axis === 0 ? this.z + o : this.z;
+        const ax = axis === 0 ? nx : sx, az = axis === 2 ? nz : sz;
+        if (this.collides(sx, this.y, sz, this.height)) continue;
+        if (!this.collides(ax, this.y, az, this.height)) { this.x = ax; this.z = az; return; }
+        if (canStep && !this.collides(ax, stepY, az, this.height) && !this.collides(sx, stepY, sz, this.height)) {
+          this.eyeSmooth -= stepY - this.y;
+          this.x = ax; this.z = az; this.y = stepY;
+          return;
+        }
       }
     }
     if (axis === 0) this.vx = 0; else this.vz = 0;
+  }
+
+  // Down a step: onto it, the way you walk down stairs, not off it like a ledge. Falling the block took long enough for the head to still
+  // be up at the old height as the body moved on, and on a stair under a landing it caught on the floor above: a bump at the bottom of
+  // every flight. The camera eases down after the body so it does not jolt.
+  stepDown() {
+    if (this.collides(this.x, this.y - .05, this.z, this.height)) return;   // still standing on something
+    const base = Math.floor(this.y + .001), ty = this.y - base < .01 ? base - 1 : base;
+    if (this.y - ty > 1.05 || this.collides(this.x, ty, this.z, this.height) || !this.collides(this.x, ty - .05, this.z, this.height)) return;
+    this.eyeSmooth += this.y - ty;
+    this.y = ty;
+    this.vy = 0;
   }
 
   // --- Damage --------------------------------------------------------------------------------------------
