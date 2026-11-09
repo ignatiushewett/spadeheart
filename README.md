@@ -1,4 +1,4 @@
 # Spadeheart: NPC-driven voxel zombie survival
 
-Prototype build with Claude:
+Prototype built with Claude:
 https://ignatiushewett.github.io/spadeheart/
