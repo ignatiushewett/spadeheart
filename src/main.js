@@ -1573,13 +1573,13 @@ class Game {
     this.nameCharacter();
     P.x = c.boss.x + .5; P.y = STREET_Y; P.z = c.boss.z + 9.5;
     P.yaw = 0;
-    // A survivor comes round whenever they come round, under whatever sky there is, as often as that sky turns up.
-    // A survivor comes round whenever they come round, under whatever sky there is.
+    // A survivor wakes before dawn, about an hour before the day report goes out at six, under whatever sky there is, as often as that
+    // sky turns up.
     if (kit === 'survival') this.weather.randomise(); else this.weather.clearSky();
     this.freshStart();
     const bed = kit === 'survival' ? this.placeInBed(c) : null;
     P.discovered[c.id] = true;
-    this.tod = kit === 'survival' ? rand() : .33;
+    this.tod = kit === 'survival' ? .201 + rand() * .016 : .33;
     this.day = 1;
     this.time = 0;
     this.pickups = [];
@@ -2277,7 +2277,7 @@ class Game {
     }
     this.audio.setListener(cam.x, cam.y, cam.z, cam.yaw);
     const w = this.weather, H = this.horde;
-    this.audio.tick(dt, { nearZombies: H.nearCount, chasers: Math.min(H.chasers, 500), rain: w.rain * .25, wind: Math.hypot(w.windX, w.windZ), gust: w.gust, height: 20, night: this.renderer.sky.night, insects: .2 * Math.max(0, 1 - k / .55) });
+    this.audio.tick(dt, { nearZombies: H.nearCount, chasers: Math.min(H.chasers, 500), rain: w.rain * .18, wind: Math.hypot(w.windX, w.windZ), gust: w.gust, height: 20, night: this.renderer.sky.night, insects: .2 * Math.max(0, 1 - k / .55) });
     this.particles.update(dt);
     this.tickAtmosphere(dt, cam.x, cam.z);
     this.flareSun();

@@ -18,6 +18,9 @@ const GUNS = {
   rocket: { crack: .2, bodyT: .5, bright: 900, sub: 48, subT: .4, drive: 2.4, mech: 0, gain: 1 },
 };
 
+// Interface sounds: heard as they are whatever else is going on (see uiOut).
+const UI_SOUNDS = new Set(['ui', 'uiOver', 'coin', 'bonk', 'beep', 'pickup', 'crate']);
+
 export class Audio2 {
   constructor() {
     this.ctx = null;
@@ -58,6 +61,11 @@ export class Audio2 {
     this.musicLevel.gain.value = this.volume * .55 * (this.musicShare ?? 1);
     this.musicLevel.connect(comp);
     this.music = new MenuMusic(ctx, this.musicLevel);
+    // The interface, and the voice of whoever you are talking to, go round the muffle too: a menu being up is exactly when they need
+    // to be heard, not when they should sound like they are through a wall.
+    this.uiLevel = ctx.createGain();
+    this.uiLevel.gain.value = this.volume;
+    this.uiLevel.connect(comp);
     if (this.wantMusic) this.music.play();
     // Long slapback impulse: the sound of gunfire between Manhattan towers.
     const len = ctx.sampleRate * 2.6;
@@ -94,6 +102,15 @@ export class Audio2 {
     this.musicShare = music;
     if (this.master) this.master.gain.value = v;
     if (this.musicLevel) this.musicLevel.gain.value = v * .55 * music;
+    if (this.uiLevel) this.uiLevel.gain.value = v;
+  }
+
+  // Straight to the speakers past the pause muffle: menu clicks, coins, and dialogue.
+  uiOut(gain) {
+    const g = this.ctx.createGain();
+    g.gain.value = gain;
+    g.connect(this.uiLevel);
+    return g;
   }
 
   // On in the menu, and a long slow fade once you leave it. Browsers will not make a sound until you have touched something, so it may have to wait for that.
@@ -258,12 +275,24 @@ export class Audio2 {
     if (!this.ctx) return;
     if (!this.voiceBus) {
       const lp = this.ctx.createBiquadFilter();
-      lp.type = 'lowpass'; lp.frequency.value = 2400;
-      lp.connect(this.out(.16, 0, 0));
+      lp.type = 'lowpass'; lp.frequency.value = 2600;
+      lp.connect(this.uiOut(.75));
       this.voiceBus = lp;
     }
     const f = freq * (.95 + Math.random() * .1);
-    this.tone(this.voiceBus, .05, 'square', f, f * .96, .55);
+    this.tone(this.voiceBus, .065, 'square', f, f * .96, .6);
+  }
+
+  // The same, overheard: quieter, from where they stand, and gone in a few steps.
+  voiceAt(freq, x, y, z) {
+    if (!this.ctx) return;
+    const s = this.spatial(x, y, z, 9);
+    if (s.gain < .05) return;
+    const lp = this.ctx.createBiquadFilter();
+    lp.type = 'lowpass'; lp.frequency.value = 2100;
+    lp.connect(this.out(s.gain * 1.05, s.pan, .1));
+    const f = freq * (.95 + Math.random() * .1);
+    this.tone(lp, .075, 'square', f, f * .96, .6);
   }
 
   tone(dest, dur, type, f0, f1, peak) {
@@ -364,7 +393,8 @@ export class Audio2 {
     if (!this.ctx) return;
     const s = x === undefined ? { gain: 1, pan: 0 } : this.spatial(x, y, z, 20);
     if (s.gain < .01) return;
-    const d = (g, w = .1) => this.out(s.gain * g, s.pan, w);
+    const ui = x === undefined && UI_SOUNDS.has(kind);
+    const d = (g, w = .1) => (ui ? this.uiOut(s.gain * g) : this.out(s.gain * g, s.pan, w));
     const later = (ms, fn) => setTimeout(() => { if (this.ctx) fn(); }, ms);
     switch (kind) {
       case 'step': this.noiseBurst(d(.1, .02), .07, 'lowpass', 500 + rand() * 300, 160, 1, .7); break;
@@ -381,19 +411,21 @@ export class Audio2 {
         break;
       }
       case 'bonk': this.tone(d(.35, .08), .1, 'triangle', 320, 120, .7); break;
-      case 'click': this.noiseBurst(d(.3, 0), .025, 'highpass', 2600, 2000, 1, .8); break;
+      case 'click': this.noiseBurst(d(.5, 0), .025, 'highpass', 2600, 2000, 1, .8); break;
       case 'reload': {
         // Magazine out, magazine in, bolt forward.
-        this.noiseBurst(d(.3, .02), .05, 'bandpass', 1500, 900, 3, 1);
-        later(330, () => { const o = d(.36, .02); this.noiseBurst(o, .06, 'bandpass', 1050, 700, 3, 1); this.tone(o, .04, 'square', 200, 120, .1); });
-        later(620, () => { const o = d(.42, .03); this.noiseBurst(o, .05, 'bandpass', 2000, 1200, 2.5, 1); later(70, () => this.noiseBurst(o, .06, 'bandpass', 1200, 700, 2.5, 1)); });
+        this.noiseBurst(d(.9, .02), .05, 'bandpass', 1500, 900, 3, 1);
+        later(330, () => { const o = d(1, .02); this.noiseBurst(o, .06, 'bandpass', 1050, 700, 3, 1); this.tone(o, .04, 'square', 200, 120, .1); });
+        later(620, () => { const o = d(1.15, .03); this.noiseBurst(o, .05, 'bandpass', 2000, 1200, 2.5, 1); later(70, () => this.noiseBurst(o, .06, 'bandpass', 1200, 700, 2.5, 1)); });
         break;
       }
-      case 'pump': { this.noiseBurst(d(.48, .03), .07, 'bandpass', 800, 450, 2, 1); later(150, () => this.noiseBurst(d(.5, .03), .07, 'bandpass', 1400, 800, 2, 1)); break; }
+      case 'pump': { this.noiseBurst(d(.75, .03), .07, 'bandpass', 800, 450, 2, 1); later(150, () => this.noiseBurst(d(.8, .03), .07, 'bandpass', 1400, 800, 2, 1)); break; }
       case 'pickup': { const o = d(.18, .05); this.tone(o, .09, 'triangle', 620, 840, .5); later(60, () => this.tone(d(.18, .05), .1, 'triangle', 920, 1160, .4)); break; }
-      case 'coin': { const o = d(.2, .06); this.tone(o, .14, 'square', 1500, 1400, .12); later(70, () => this.tone(d(.2, .06), .22, 'square', 2000, 1900, .12)); break; }
-      case 'ui': { const o = d(.72, 0); this.tone(o, .06, 'triangle', 640, 430, .7); this.noiseBurst(o, .022, 'bandpass', 2400, 1300, 1.4, .45); break; }
-      case 'uiOver': this.tone(d(.3, 0), .026, 'triangle', 1180, 940, .5); break;
+      case 'coin': { const o = d(1, .06); this.tone(o, .14, 'square', 1500, 1400, .3); later(70, () => this.tone(d(1, .06), .22, 'square', 2000, 1900, .3)); break; }
+      case 'ui': { const o = d(1.2, 0); this.tone(o, .06, 'triangle', 640, 430, .7); this.noiseBurst(o, .022, 'bandpass', 2400, 1300, 1.4, .45); break; }
+      case 'uiOver': this.tone(d(.45, 0), .026, 'triangle', 1180, 940, .5); break;
+      // A blow landing on a body that stays up: a dull, heavy thud you feel more than hear.
+      case 'thump': { const o = d(.9, .04); this.tone(o, .16, 'sine', 110, 46, .9); this.noiseBurst(o, .09, 'lowpass', 700, 120, 1.4, .9); break; }
       case 'hurt': { const o = d(.7, .05); this.noiseBurst(o, .22, 'lowpass', 900, 220, 2, .8); this.tone(o, .2, 'sawtooth', 150, 70, .25); break; }
       case 'crate': this.noiseBurst(d(.3, .08), .2, 'bandpass', 500, 900, 2.5, .8, .04); break;
       case 'place': this.tone(d(.3, .06), .08, 'square', 140, 90, .4); break;

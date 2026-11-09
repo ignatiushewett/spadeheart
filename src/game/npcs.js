@@ -4183,7 +4183,8 @@ export class Jobs {
     // enough out that there is something left to cull.
     const first = g.stats.jobs < 3;
     // Raiders keep well clear of a wall full of rifles, so a bounty is further out than the rest.
-    const near = type === 'bounty' ? 130 : type === 'kill' ? 90 : 70, far = type === 'bounty' ? (first ? 240 : 300) : first ? 170 : 280;
+    // The first few are close enough to see the wall from, and paid like it.
+    const near = type === 'bounty' ? (first ? 85 : 130) : type === 'kill' ? (first ? 50 : 90) : first ? 40 : 70, far = type === 'bounty' ? (first ? 160 : 300) : first ? 105 : 280;
     const hx = (c.x1 - c.x0) / 2, hz = (c.z1 - c.z0) / 2;
     for (let t = 0; t < 120; t++) {
       const a = rand() * 6.283, ca = Math.cos(a), sa = Math.sin(a);
@@ -4198,7 +4199,7 @@ export class Jobs {
     const place = L.describe(x, z);
     const where = place.cross ? `${place.cross}, ${place.district}` : place.district;
     const title = JOB_TITLES[type][Math.floor(rand() * JOB_TITLES[type].length)];
-    const base = 140 + dist * .35;
+    const base = (140 + dist * .35) * (first ? .65 : 1);
     let job;
     if (type === 'kill') {
       const n = green ? 10 + Math.floor(rand() * 15) : 25 + Math.floor(rand() * 45);
@@ -4208,7 +4209,7 @@ export class Jobs {
     } else if (type === 'bounty') {
       const gang = green ? 1 + Math.floor(rand() * 2) : 2 + Math.floor(rand() * 6);
       const boss = pickOf(RAIDER_NAMES);
-      job = { type, title: `${title}: ${boss}`, gang, left: gang, spawned: false, reward: Math.round(90 + base * .6 + gang * 45), desc: `${boss} and ${gang - 1 > 1 ? `${gang - 1} others have` : gang > 1 ? 'one other has' : 'nobody else has'} been robbing our people around ${where}. Put a stop to it.`, where };
+      job = { type, title: `${title}: ${boss}`, gang, left: gang, spawned: false, reward: Math.round((90 + gang * 45) * (first ? .65 : 1) + base * .6), desc: `${boss} and ${gang - 1 > 1 ? `${gang - 1} others have` : gang > 1 ? 'one other has' : 'nobody else has'} been robbing our people around ${where}. Put a stop to it.`, where };
     } else {
       job = { type, title, time: 40, held: 0, reward: Math.round(base * 1.5), desc: `Run a relay at ${where} and keep within range for 40 seconds. The transmitter is loud, so expect company.`, where };
     }

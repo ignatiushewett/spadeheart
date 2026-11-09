@@ -603,11 +603,13 @@ export class UI {
     $('gate-note').className = '';
   }
 
-  hitMarker() {
+  hitMarker(heavy = false) {
     if (!this.g.settings.hitmarker) return;
     const h = $('hitmark');
     h.getAnimations().forEach((a) => a.cancel());
-    h.animate([{ opacity: .95 }, { opacity: 0 }], { duration: 140, easing: 'ease-out' });
+    // A blow that lands with a club or a blade gets a bigger, longer mark than a bullet: there is no other way to tell it from a miss.
+    if (heavy) h.animate([{ opacity: 1, transform: 'scale(1.6)' }, { opacity: 0, transform: 'scale(1)' }], { duration: 260, easing: 'ease-out' });
+    else h.animate([{ opacity: .95 }, { opacity: 0 }], { duration: 140, easing: 'ease-out' });
   }
 
   damageIndicator(dx, dz, yaw) {
@@ -1216,11 +1218,7 @@ export class UI {
     clearInterval(this.typeTimer);
     this.typeFull = text;
     const n = this.dlgNpc, g = this.g;
-    if (n && n.voice === undefined) {
-      let h = 0;
-      for (const ch of n.name || 'x') h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-      n.voice = 150 + (h % 210) + (n.kid ? 140 : 0);
-    }
+    if (n) this.voiceOf(n);
     let i = 0;
     el.textContent = '';
     this.typeTimer = setInterval(() => {
@@ -1671,6 +1669,16 @@ export class UI {
 
   // Overheard speech hangs above whoever said it, and fades with distance. Only the people
   // you are actually talking to get the panel at the bottom of the screen.
+  // Everyone's voice is their own pitch, the same every time, from their name.
+  voiceOf(n) {
+    if (n.voice === undefined) {
+      let h = 0;
+      for (const ch of n.name || `${n.kind || 'x'}${Math.round(n.x)}`) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+      n.voice = 150 + (h % 210) + (n.kid ? 140 : 0);
+    }
+    return n.voice;
+  }
+
   floatSay(n, text, seconds = 3.6) {
     if (!n) return;
     const host = $('overhead');
@@ -1681,7 +1689,10 @@ export class UI {
     el.className = 'floater';
     el.textContent = text;
     host.appendChild(el);
-    this.floaters.push({ n, el, t: seconds + text.length * .025, los: 0, seen: true });
+    // The words are up all at once, but they are said at the speed you would hear them: the same blips as someone talking to you,
+    // softer, and from where they are standing.
+    // Up at least as long as it takes them to say it.
+    this.floaters.push({ n, el, t: Math.max(seconds + text.length * .025, text.length * .042 + 1), los: 0, seen: true, text, said: n === this.dlgNpc ? text.length : 0, sayT: 0 });
   }
 
   updateFloaters(dt) {
@@ -1692,6 +1703,15 @@ export class UI {
       const f = this.floaters[i], n = f.n;
       f.t -= dt;
       if (f.t <= 0 || n.dead) { f.el.remove(); this.floaters.splice(i, 1); continue; }
+      if (f.said < f.text.length && (f.sayT -= dt) <= 0) {
+        const near = Math.hypot(n.x - P.x, n.z - P.z) < 24;
+        while (f.said < f.text.length && f.sayT <= 0) {
+          const ch = f.text[f.said++];
+          // Slower than someone talking to you: muttered, half to themselves, a beat at the end of each sentence.
+          f.sayT += ch === '.' || ch === '?' || ch === '!' ? .25 : .036;
+          if (near && f.said % 2 === 0 && /[A-Za-z0-9]/.test(ch)) g.audio.voiceAt(this.voiceOf(n), n.x, n.y + 2.4, n.z);
+        }
+      }
       const y = n.y + (n.kid ? 2.5 : 3.4) + (n.state === 5 ? -.7 : 0), x = n.x, z = n.z;
       const w = vp[3] * x + vp[7] * y + vp[11] * z + vp[15];
       const dist = Math.hypot(x - P.x, y - P.y, z - P.z);

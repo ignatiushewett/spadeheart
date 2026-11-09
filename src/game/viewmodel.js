@@ -395,6 +395,7 @@ export class ViewModel {
         if (u.uVM) gl.uniform1f(u.uVM, 0);
         if (u.uAdd) gl.uniform1f(u.uAdd, 0);
         if (u.uWetVM) gl.uniform1f(u.uWetVM, 0);
+        if (u.uRainVM) gl.uniform1f(u.uRainVM, 0);
         gl.uniformMatrix4fv(u.uProj, false, r.proj);
         gl.uniform3f(u.uSunView, v[0] * s[0] + v[4] * s[1] + v[8] * s[2], v[1] * s[0] + v[5] * s[1] + v[9] * s[2], v[2] * s[0] + v[6] * s[1] + v[10] * s[2]);
         gl.uniform3fv(u.uSunCol, r.sky.sunCol);
@@ -497,8 +498,11 @@ export class ViewModel {
     const rainHere = (r.rain || 0) * (r.rainVis ?? 1) * Math.max(0, Math.min(1, (sky - .35) / .4));
     const wetTo = Math.min(1, rainHere * 1.15);
     // The first few frames of a game it takes the weather it finds, rather than drying off slowly from whatever it was before.
-    if (this.settleWet > 0) { this.settleWet--; this.wet = wetTo; }
+    if (this.settleWet > 0) { this.settleWet--; this.wet = wetTo; this.rainOn = wetTo > .01 ? 1 : 0; }
     else this.wet += (wetTo - this.wet) * Math.min(1, sd * (wetTo > this.wet ? .5 : .04));
+    // Whether rain is landing on it right now, apart from how wet it still is. Under a roof the finish stays dark and shiny for a while,
+    // but nothing new lands on it, so the beads go and nothing runs.
+    this.rainOn = (this.rainOn ?? 0) + ((rainHere > .01 ? 1 : 0) - (this.rainOn ?? 0)) * Math.min(1, sd * 2.5);
     const bx = Math.cos(player.bob) * .012 * player.bobAmt, by = Math.abs(Math.sin(player.bob)) * .018 * player.bobAmt;
     const breathe = Math.sin(this.t * 1.5) * .003;
     const sightY = pose.tip !== undefined ? -pose.tip : pose.sight !== undefined ? -pose.sight - .012 : pose.pos[1];
@@ -610,6 +614,7 @@ export class ViewModel {
     if (u.uVM) gl.uniform1f(u.uVM, 1);
     if (u.uAdd) gl.uniform1f(u.uAdd, 0);
     if (u.uWetVM) gl.uniform1f(u.uWetVM, this.wet);
+    if (u.uRainVM) gl.uniform1f(u.uRainVM, this.rainOn ?? 0);
     if (u.uVMTime) gl.uniform1f(u.uVMTime, this.t % 1000);
     const split = this.split[id];
     if (split) {

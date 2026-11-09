@@ -19,6 +19,7 @@ const INF = 65535;
 
 const S_IDLE = 0, S_CHASE = 1, S_ATTACK = 2;
 const TURN2 = 220 * 220;
+const FLINCH = .42;   // seconds a body takes to recover from a blow that did not drop it
 const TURN_RATE = 4.5;     // radians a second, the fastest a body turns while walking   // within this, bodies on the coarse updates still turn smoothly frame by frame
 // Slower than they were, by a fifth, and harder for it: more to put down, a worse bite, quicker hands, sharper eyes, and walls that give
 // a little sooner under the same weight. There are no more of them. A camp still falls on about the day it used to.
@@ -43,6 +44,7 @@ export class Horde {
     this.px = F(); this.py = F(); this.pz = F(); this.vx = F(); this.vy = F(); this.vz = F();
     // Thrown by a blast: how long they are still off their feet, going where it threw them.
     this.knockT = F();
+    this.flinch = F(); this.flx = F(); this.flz = F(); this.flinchTime = FLINCH;   // reeling from a blow: how long for, and which way it came from
     this.flying = [];   // the dead a blast threw into the air, until they come down
     this.sx = F(); this.sz = F(); this.yaw = F(); this.phase = F(); this.spd = F(); this.atk = F(); this.blk = F();
     this.hp = new Int16Array(MAX);
@@ -634,6 +636,7 @@ export class Horde {
     this.variant[i] = (rand() * HUMAN_VARIANT_START) | 0;
     this.tgt[i] = -1;
     this.hurtT[i] = 0;
+    this.knockT[i] = 0; this.flinch[i] = 0;
     this.siege[i] = 0;
     this.mig[i] = 0;
     this.stuck[i] = 0; this.stuckT[i] = rand() * .5; this.lastX[i] = x; this.lastZ[i] = z; this.droppers[i] = 0; this.lure[i] = 0;
@@ -1191,6 +1194,7 @@ export class Horde {
       pz[i] += vz[i] * dt;
       const st = state[i];
       phase[i] += (Math.abs(vx[i]) + Math.abs(vz[i])) * dt * 2.1;
+      if (this.flinch[i] > 0) this.flinch[i] -= dt;
       if (st !== S_IDLE) { chasers++; if (!this.siege[i]) hunters++; }
       if (this.siege[i]) sc[this.siege[i] - 1]++;
 
@@ -1249,6 +1253,7 @@ export class Horde {
       this.siege[i] = this.siege[last];
       this.mig[i] = this.mig[last];
       this.hurtT[i] = this.hurtT[last];
+      this.knockT[i] = this.knockT[last]; this.flinch[i] = this.flinch[last]; this.flx[i] = this.flx[last]; this.flz[i] = this.flz[last];
       this.stuck[i] = this.stuck[last]; this.stuckT[i] = this.stuckT[last]; this.lastX[i] = this.lastX[last]; this.lastZ[i] = this.lastZ[last]; this.droppers[i] = this.droppers[last]; this.lure[i] = this.lure[last];
     }
     return last;
@@ -2224,7 +2229,14 @@ export class Horde {
       const lod = d2 < 28 * 28 ? 0 : d2 < 90 * 90 ? 1 : 2;
       let wet = wetBits;
       if (wet && map) { const top = map.at(px[i], pz[i]); if (top >= 0 && top >= py[i] + 2.2) wet = 0; }
-      A.push(lod, px[i], py[i], pz[i], yaw[i], phase[i], this.vy[i] < -5 ? FALLING : state[i], variant[i], wet);
+      let ox = 0, oz = 0, oy = yaw[i];
+      if (this.flinch[i] > 0) {
+        // A blow that did not drop them: the body snaps back from it and the head and shoulders wrench round, then it comes on again.
+        const k = this.flinch[i] / FLINCH, s = Math.sin(Math.min(1, (1 - k) * 3.2) * Math.PI * .5) * k;
+        ox = this.flx[i] * .32 * s; oz = this.flz[i] * .32 * s;
+        oy += (i & 1 ? .75 : -.75) * s;
+      }
+      A.push(lod, px[i] + ox, py[i], pz[i] + oz, oy, phase[i], this.vy[i] < -5 ? FALLING : state[i], variant[i], wet);
       vis++;
     }
     const c = this.corpses;

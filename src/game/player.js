@@ -791,9 +791,13 @@ export class Player {
       } else {
         // Anyone still standing reels back a step and needs a moment before they can bite. It is a shove, not a jump:
         // their own movement carries it out, and walls stop it.
-        const shove = 4 + heft * 5;
-        H.vx[i] += f[0] * shove; H.vz[i] += f[2] * shove;
+        // Then it slides back a step under the blow, not walking, before it gets its footing (knockT: drag only, walls still stop it).
+        const shove = 4.5 + heft * 5;
+        H.vx[i] = f[0] * shove; H.vz[i] = f[2] * shove;
+        H.knockT[i] = .14 + heft * .1;
+        H.flinch[i] = H.flinchTime; H.flx[i] = f[0]; H.flz[i] = f[2];
         H.hurtT[i] = .45;
+        g.audio.simple('thump', hx, hy, hz);
         H.atk[i] = Math.max(H.atk[i], .5 + heft * .5);
       }
       hits++;
@@ -810,7 +814,7 @@ export class Player {
     }
     if (hits) {
       // A lighter version of what a gunshot does to your view: the kick comes back up your arms.
-      g.ui.hitMarker();
+      g.ui.hitMarker(true);
       g.horde.noise(this.x, this.z, 8, .4);
       this.shake = Math.min(1, this.shake + .1 + heft * .1);
       this.kickY += .009 + heft * .012;

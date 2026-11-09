@@ -1360,6 +1360,7 @@ uniform vec3 uFlash;
 uniform vec3 uLocalLight;
 uniform float uVM;      // 1 for what you are holding: marks its pixels so the screen effects for the world leave it alone
 uniform float uWetVM;   // rain on it
+uniform float uRainVM;  // rain landing on it now (0 under cover: no new drops, nothing runs)
 uniform float uVMTime;  // a clock for the drops on it
 uniform float uAdd;     // the muzzle flash: light only, added on
 in vec3 vModel;
@@ -1381,17 +1382,17 @@ void main(){
   vec3 light=amb+uSunCol*ndl*uSkyVis*.8+uFlash*(.4+.6*max(n.z,0.))+uLocalLight*(.6+.4*max(n.y,0.));
   vec3 c=col*light+uSunCol*spec*(.12+.9*w)*uSkyVis+col*vGlow;
   c+=(mix(uGroundCol,uSkyCol,clamp(r.y*.5+.5,0.,1.))*mix(.25,1.,uSkyVis)+uLocalLight*.5)*fres*w*.35;
-  if(w>.01){
+  if(w>.01&&uRainVM>.01){
     // Drops, not a pattern: each spot gets a drop now and then, holds it a moment and loses it, every spot on its own clock.
     // Some of them run: down the gun a little way before they go. The rain keeps them coming.
     vec3 cell=floor(vModel*100.);
     float seed=bh(cell+17.), rate=.45+seed*.9, ph=uVMTime*rate+seed*9.;
     float life=fract(ph), gen=floor(ph);
-    bool runs=bh(cell+gen*.37+3.)<.3;
+    bool runs=bh(cell+gen*.37+3.)<.3*uRainVM;
     vec3 q=vModel*100.;
     if(runs) q.y+=life*life*2.;
     vec3 rc=floor(q);
-    float on=step(1.-.1*w,bh(rc+gen*1.13))*smoothstep(0.,.12,life)*smoothstep(1.,.6,life);
+    float on=step(1.-.1*w*uRainVM,bh(rc+gen*1.13))*smoothstep(0.,.12,life)*smoothstep(1.,.6,life);
     float bead=on*smoothstep(.35,.0,length(fract(q)-.5));
     // A bead takes some of the colour of what it sits on: water on dark metal, not a white fleck.
     c+=(light*.6+uFlash*.3+vec3(.008))*mix(vec3(1.),.35+col*2.2,.45)*bead*w*1.05;
@@ -1895,6 +1896,25 @@ void main(){
   col=mix(vec3(l),col,uSat);
   // Rain by day: cooler, a touch bluer, the warm colours washed back.
   col=mix(col,mix(vec3(l),col,.8)*vec3(.74,.89,1.18)+vec3(0.,.012,.04)*(l+.04),uRainTint);
+  // The look of the shows this city was made to feel like: shot on film, hot and tired. Part bleach bypass (contrast up, colour
+  // down), greens pushed to olive and dry yellow, blue skies and steel turned to a dull slate, green-grey in the shadows and a
+  // sallow, dusty warmth in the light. Skin and blood keep their colour.
+  {
+    float L=dot(col,vec3(.299,.587,.114));
+    vec3 ov=mix(2.*col*L,1.-2.*(1.-col)*(1.-L),step(.5,L));
+    col=mix(col,clamp(ov,0.,1.),.24);
+    float green=clamp((col.g-max(col.r,col.b))*5.,0.,1.)*(1.-smoothstep(.6,.88,L));
+    col.r+=green*(col.g-col.r)*.45;
+    col.b-=green*col.b*.12;
+    float blue=clamp((col.b-max(col.r,col.g))*4.,0.,1.);
+    L=dot(col,vec3(.299,.587,.114));
+    col=mix(col,vec3(L)*vec3(.9,1.,1.05),blue*.42);
+    // The warmth sits in the midtones and the lit faces of things; a white sky stays a hazy white, not yellow.
+    vec3 warm=mix(vec3(1.05,1.02,.88),vec3(1.,1.,.97),smoothstep(.72,.95,L));
+    col*=mix(vec3(.92,1.025,.975),warm,smoothstep(.1,.7,L));
+    col=mix(vec3(L),col,.84);
+    col=col*.962+vec3(.011,.017,.012);
+  }
   // Soft toe and shoulder.
   col=mix(col,col*col*(3.-2.*col),.42);
   col*=vec3(.985,1.,.965);
