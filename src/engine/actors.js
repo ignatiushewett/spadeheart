@@ -175,6 +175,10 @@ const bodyDetail = (part, box) => {
   });
   part(-4, 28, -4, 4, 29, 5, 6, () => SLOT.HAT);
   part(-3, 29, -3, 3, 30, 3, 6, () => SLOT.HAT);
+  // A helmet, for the armoured watch: a shell down over the top and sides of the head, eyes clear. Bone 7 is drawn as the hat's bone (6)
+  // but only on rows with the helmet flag, which hides the cap.
+  part(-4, 25, -4, 4, 29, 4, 7, () => SLOT.HAT);
+  part(-3, 29, -3, 3, 30, 3, 7, () => SLOT.HAT);
   part(-3, 13, -4, 3, 20, -2, 0, () => SLOT.PACK);
   // A faction armband on each sleeve, just proud of the arm on every side so it never z-fights.
   box(-7.2, 17, -1.2, -3.8, 19, 2.2, 2, SLOT.BAND);
@@ -203,6 +207,10 @@ const bodyMid = (part, box) => {
   part(-3, 21, -3, 3, 28, 3, 1, headSlot);
   part(-4, 28, -4, 4, 29, 5, 6, () => SLOT.HAT);
   part(-3, 29, -3, 3, 30, 3, 6, () => SLOT.HAT);
+  // A helmet, for the armoured watch: a shell down over the top and sides of the head, eyes clear. Bone 7 is drawn as the hat's bone (6)
+  // but only on rows with the helmet flag, which hides the cap.
+  part(-4, 25, -4, 4, 29, 4, 7, () => SLOT.HAT);
+  part(-3, 29, -3, 3, 30, 3, 7, () => SLOT.HAT);
   part(-3, 13, -4, 3, 20, -2, 0, () => SLOT.PACK);
   box(-7.2, 16, -1.2, -3.8, 19, 2.2, 2, SLOT.BAND);
   box(3.8, 16, -1.2, 7.2, 19, 2.2, 3, SLOT.BAND);
@@ -278,9 +286,9 @@ function buildVariantTexture(gl) {
     med: (o) => { const s = rng.pick([[150, 148, 138], [92, 112, 108], [138, 136, 128]]); o.shirt = s; o.vest = s; o.shirt2 = [118, 56, 50]; o.pants = rng.pick([[84, 102, 98], [60, 66, 72]]); o.shoes = [72, 68, 62]; if (rng() < .3) o.flags |= 4; },
     // Plate carriers and helmets: the best the camp has, on the people standing out in front of it. Flag 8: the whole torso is the
     // carrier, not a shirt. Flag 16: bulked out under it.
-    heavy: (o) => { const plate = rng.pick([[40, 44, 36], [30, 32, 36], [66, 62, 50], [48, 52, 40]]); o.vest = plate; o.shirt = plate; o.shirt2 = rng.pick(CAMO); o.pants = rng.pick(CAMO); o.shoes = [24, 22, 20]; o.hat = plate.map((v) => v * 1.08); o.flags |= 1 | 8 | 16; if (rng() < .6) o.flags |= 4; },
+    heavy: (o) => { const plate = rng.pick([[40, 44, 36], [30, 32, 36], [66, 62, 50], [48, 52, 40]]); o.vest = plate; o.shirt = plate; o.shirt2 = rng.pick(CAMO); o.pants = rng.pick(CAMO); o.shoes = [24, 22, 20]; o.hat = plate.map((v) => v * 1.08); o.flags |= 1 | 8 | 16 | 32; if (rng() < .6) o.flags |= 4; },
     // A proper vest and, mostly, a helmet: patrols walk the streets and dress for it.
-    medium: (o) => { const vest = rng.pick([[58, 62, 48], [70, 64, 50], [44, 46, 50], [84, 78, 60]]); o.vest = vest; o.shirt = vest; o.shirt2 = rng.pick([...CAMO, ...FLANNEL]); o.pants = rng.pick([...CAMO, [50, 44, 40]]); o.shoes = [30, 26, 22]; if (rng() < .75) { o.hat = rng.pick(CAMO); o.flags |= 1; } o.flags |= 8; if (rng() < .7) o.flags |= 4; },
+    medium: (o) => { const vest = rng.pick([[58, 62, 48], [70, 64, 50], [44, 46, 50], [84, 78, 60]]); o.vest = vest; o.shirt = vest; o.shirt2 = rng.pick([...CAMO, ...FLANNEL]); o.pants = rng.pick([...CAMO, [50, 44, 40]]); o.shoes = [30, 26, 22]; if (rng() < .75) { o.hat = rng.pick(CAMO); o.flags |= 1 | 32; } o.flags |= 8; if (rng() < .7) o.flags |= 4; },
     // Whatever stops a bite: a padded jacket or a cut-down vest over everyday clothes, maybe a cap. The ones behind the wall.
     light: (o) => { o.shirt = rng.pick([...FLANNEL, ...WORN]); o.vest = rng.pick([[74, 70, 58], [58, 54, 48], [88, 76, 56], ...LEATHER]); o.shirt2 = rng.pick(WORN); o.pants = rng.pick([...JEANS, ...CAMO]); o.shoes = [44, 34, 26]; if (rng() < .45) { o.hat = rng.pick([...WORN, ...CAMO]); o.flags |= 1; } if (rng() < .4) o.flags |= 4; },
   };
@@ -314,7 +322,7 @@ function buildVariantTexture(gl) {
     put(SLOT.VEST, faded(o.vest || o.shirt), 255, dirt);
     put(SLOT.EYE, zombie ? [58, 44, 36] : [30, 26, 24]);
     put(SLOT.MOUTH, zombie ? [60, 10, 12] : [130, 80, 70]);
-    // Column 10 doubles as the gun colour and the flag byte (1 hat, 4 backpack).
+    // Column 10 doubles as the gun colour and the flag byte (1 hat, 4 backpack, 8 armour vest, 16 bulk, 32 the hat is a helmet).
     put(SLOT.GUN, [30, 32, 36], o.flags);
     put(SLOT.WOOD, [96, 66, 38]);
     put(SLOT.BLADE, [176, 180, 186]);

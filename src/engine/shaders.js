@@ -859,6 +859,9 @@ void main(){
   vAhead=vec3(sin(iPos.w),0.,cos(iPos.w));
   bool human=vVariant>=192;
   bool hide=false;
+  // The helmet (bone 7) and the cap (bone 6) are both the hat: one or the other, by the flag. Posed the same way from here on.
+  if(bone==7){ if((flags&32)==0) hide=true; bone=6; }
+  else if(bone==6&&(flags&32)!=0) hide=true;
   if(vSlot==6&&(flags&1)==0) hide=true;            // hat
   if(vSlot==14&&(flags&4)==0) hide=true;           // backpack
   if((extra&1)==1&&(bone==1||bone==6)) hide=true;  // head destroyed
