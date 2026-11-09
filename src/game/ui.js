@@ -910,38 +910,40 @@ export class UI {
     x.fillRect(0, 0, W, W);
     x.translate(cx, cx);
     x.rotate(-P.yaw);
-    const scale = 1.25;
+    // Close in: about eighty blocks to the rim, the street you are on and the next few round it. Bodies are drawn at their own size in
+    // the world, so they grow with the zoom; marks that are just marks (jobs, outlines) stay the same size on screen (px).
+    const scale = 2.4, px = 1.25 / scale;
     x.scale(scale, scale);
     // Map canvas is half resolution of the world. Filtered, or the streets shimmer as it turns.
     x.imageSmoothingEnabled = true;
     x.drawImage(g.mapCanvas, -P.x / 2 * 2, -P.z / 2 * 2, g.mapCanvas.width * 2, g.mapCanvas.height * 2);
     const H = g.horde;
     const rim = cx / scale, range = rim * 1.42;
-    const step = Math.max(1, Math.floor(H.n / 2600));
-    for (let i = 0; i < H.n; i += step) {
+    // Every one of them in range: this close in there are few enough to draw, and thinning them out hid half a crowd.
+    for (let i = 0; i < H.n; i++) {
       const dx = H.px[i] - P.x, dz = H.pz[i] - P.z;
       if (Math.abs(dx) > range || Math.abs(dz) > range) continue;
       x.fillStyle = H.state[i] ? 'rgba(235,70,50,.85)' : 'rgba(190,110,90,.5)';
-      x.fillRect(dx - .5, dz - .5, 1, 1);
+      x.fillRect(dx - .42, dz - .42, .85, .85);
     }
     for (const n of g.npcs.list) {
       const dx = n.x - P.x, dz = n.z - P.z;
       if (Math.abs(dx) > range || Math.abs(dz) > range) continue;
       if (n.kind === 'raider' && !n.aggro && Math.hypot(dx, dz) > 45) continue;
       x.fillStyle = n.kind === 'raider' ? '#f0963c' : n.kind === 'wanderer' ? '#d8d2a0' : '#8fd27a';
-      x.fillRect(dx - .75, dz - .75, 1.5, 1.5);
+      x.fillRect(dx - .65, dz - .65, 1.3, 1.3);
     }
     for (const c2 of g.layout.camps) {
       const dx = c2.cx - P.x, dz = c2.cz - P.z;
-      if (Math.hypot(dx, dz) < range * 1.4) { x.strokeStyle = '#e8b04a'; x.lineWidth = 1.5; x.strokeRect(c2.x0 - P.x, c2.z0 - P.z, c2.x1 - c2.x0, c2.z1 - c2.z0); }
+      if (Math.hypot(dx, dz) < range * 1.4 + Math.max(c2.x1 - c2.x0, c2.z1 - c2.z0)) { x.strokeStyle = '#e8b04a'; x.lineWidth = 1.5 * px; x.strokeRect(c2.x0 - P.x, c2.z0 - P.z, c2.x1 - c2.x0, c2.z1 - c2.z0); }
     }
-    this.drawGates(x, (px) => px - P.x, (pz) => pz - P.z, 1, range * 1.6, P);
+    this.drawGates(x, (gx) => gx - P.x, (gz) => gz - P.z, px, range * 1.6, P);
     for (const j of g.jobs.active) {
       if (j.status !== 'active' || unpointed(j)) continue;
       const dx = j.x - P.x, dz = j.z - P.z, d = Math.hypot(dx, dz);
       const k = d > rim * .95 ? rim * .95 / d : 1;
       x.fillStyle = '#6ec6ff';
-      x.fillRect(dx * k - 3, dz * k - 3, 6, 6);
+      x.fillRect(dx * k - 3 * px, dz * k - 3 * px, 6 * px, 6 * px);
     }
     x.restore();
     x.fillStyle = '#e8b04a';
