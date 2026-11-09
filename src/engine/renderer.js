@@ -393,8 +393,12 @@ export class Renderer {
     let x = Math.cos(a) * .72, y = elev, z = .42;
     const len = Math.hypot(x, y, z);
     x /= len; y /= len; z /= len;
-    const up = elev > -.04;
+    // Through twilight the light still comes from where the sun is, just under the horizon: the sky brightens over the east before dawn
+    // and stays warm in the west after sunset. Only once it is properly dark does the moon take over. Before, the moon took over the
+    // moment the sun dipped, and the twilight glow went with it: a little orange sun setting in the west in the hour before sunrise.
+    const up = elev > -.28;
     s.sunDir = up ? [x, Math.max(y, .06), z] : [-x, Math.max(-y, .12), -z * .6];
+    s.sunUp = clamp((elev + .04) / .07, 0, 1);   // how much of the disc itself is above the horizon
     const l2 = Math.hypot(...s.sunDir);
     s.sunDir = s.sunDir.map((v) => v / l2);
     const ss = (e0, e1, v) => { const k = clamp((v - e0) / (e1 - e0), 0, 1); return k * k * (3 - 2 * k); };
@@ -432,7 +436,7 @@ export class Renderer {
     s.day = day;
     s.fogDensity = (.0021 + night * .0007) * (1 + wet * 1.5 + (this.rain || 0) * 1.2) * (this.fogK || 1);
     s.cityLightK = ss(.4, -.1, elev);
-    s.isSun = up;
+    s.isSun = elev > -.04;
     this.nightGlow = night;
   }
 
@@ -723,6 +727,7 @@ export class Renderer {
     this.frameUniforms(ps, false);
     gl.uniformMatrix4fv(ps.u.uInvViewProj, false, this.invViewProj);
     gl.uniform1f(ps.u.uNight, this.sky.night);
+    if (ps.u.uSunUp) gl.uniform1f(ps.u.uSunUp, this.sky.sunUp ?? 1);
     gl.uniform1f(ps.u.uStars, this.stars ?? 1);
     gl.uniform1f(ps.u.uCloud, 1.05 + this.rain * 1.1);
     gl.bindVertexArray(this.emptyVAO);
@@ -1042,7 +1047,8 @@ export class Renderer {
       gl.uniform1i(p.u.uDepth, 0);
       gl.uniform1i(p.u.uScene, 1);
       gl.uniform2f(p.u.uSunUV, su, sv);
-      gl.uniform1f(p.u.uStrength, .2 * sunStrength * sunVis * (1 - this.rain * .85));
+      // The sun throws real shafts, stronger the more of the view it is in. The moon's stay faint.
+      gl.uniform1f(p.u.uStrength, (this.sky.isSun ? .3 + .22 * sunVis : .2) * sunStrength * sunVis * (1 - this.rain * .85));
       fs();
     } else {
       gl.clearColor(0, 0, 0, 1);
@@ -1050,6 +1056,11 @@ export class Renderer {
     }
     // Soft flare visibility: is there sky at the sun's pixel? Sampled from depth via fx.sunOccluded.
     const flareVis = (fx.flareVis ?? 0) * sunStrength * sunVis * .35;
+    // Looking straight into the sun, with nothing in the way: it blinds. Only the sun, only near the middle of the view, worse the more
+    // directly you look, and it comes on over a moment rather than in a frame, the way eyes take it.
+    const centred = Math.max(0, 1 - Math.hypot((su - .5) * w / h, sv - .5) / .42);
+    const glareTo = this.sky.isSun && cw > 0 ? (fx.flareVis ?? 0) * centred * centred * Math.max(0, 1 - this.rain * 1.6) * Math.min(1, Math.max(0, this.sky.sunDir[1] * 6 + .2)) : 0;
+    this.glare = (this.glare ?? 0) + (glareTo - (this.glare ?? 0)) * (glareTo > (this.glare ?? 0) ? .045 : .12);
 
     // Composite to LDR
     target(f.composite);
@@ -1073,6 +1084,7 @@ export class Renderer {
       gl.uniform1f(p.u.uSat, fx.sat ?? .74);
       gl.uniform1f(p.u.uTime, this.time);
       gl.uniform1f(p.u.uFlash, fx.flash || 0);
+      if (p.u.uGlare) gl.uniform1f(p.u.uGlare, this.glare || 0);
       gl.uniform1f(p.u.uFade, fx.fade ?? 1);
       gl.uniform1f(p.u.uInfected, fx.infected || 0);
       if (p.u.uRainTint) gl.uniform1f(p.u.uRainTint, fx.rainTint || 0);

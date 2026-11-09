@@ -761,6 +761,7 @@ export const SKY_FS = COMMON + FRAME_UNIFORMS + /* glsl */`
 in vec2 vUV;
 uniform mat4 uInvViewProj;
 uniform float uNight;
+uniform float uSunUp;   // 0 while the sun is under the horizon: its glow shows, its disc does not
 uniform float uCloud;
 uniform float uStars;
 layout(location=0) out vec4 outCol;
@@ -786,7 +787,7 @@ void main(){
   float sd=max(dot(d,uSunDir),0.);
   // Sun disc and atmosphere glow. Bright enough to drive bloom and flares.
   col+=uSunCol*(pow(sd,8.)*.08+pow(sd,64.)*.18);
-  col+=uSunCol*smoothstep(.9994,.9998,sd)*14.;
+  col+=uSunCol*smoothstep(.9994,.9998,sd)*14.*uSunUp;
   // A pale moon you can see but that lights nothing. The nights here are truly dark.
   float md=max(dot(d,-uSunDir),0.);
   col+=vec3(.5,.54,.62)*smoothstep(.9992,.9996,md)*uNight*.5;
@@ -1843,6 +1844,7 @@ uniform float uHurt;
 uniform float uSat;
 uniform float uTime;
 uniform float uFlash;
+uniform float uGlare;   // staring into the sun
 uniform float uFade;
 uniform float uInfected;
 uniform float uRainTint;   // a rainy day: the whole picture goes a little cold and blue
@@ -1885,6 +1887,12 @@ void main(){
   col+=bloom*uBloomAmt;
   col+=texture(uRays,uv).rgb*uSunCol*.8*(1.-vm);
   col+=flare(uv);
+  if(uGlare>.001){
+    // A burn round the disc that swallows the edges of whatever is near it, a wide bright halo, and a milky veil over the rest.
+    vec2 sp=(uFlareData.xy-.5)*vec2(uAspect,1.), pp=(uv-.5)*vec2(uAspect,1.);
+    float d=length(pp-sp);
+    col+=uSunCol*uGlare*(exp(-d*d*55.)*1.5+exp(-d*5.)*.3+.055);
+  }
   col+=vec3(1.,.82,.6)*uFlash;
   col*=uExposure;
   col=aces(col);
