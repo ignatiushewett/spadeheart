@@ -85,6 +85,19 @@ async function dbGet(key) {
   });
 }
 
+// A grid of values softened in place: a few passes of a 3x3 average.
+function softenGrid(A, W, D, passes) {
+  const B = new Float32Array(A.length);
+  for (let p = 0; p < passes; p++) {
+    for (let z = 0; z < D; z++) for (let x = 0; x < W; x++) {
+      let s = 0, n = 0;
+      for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) { const xx = x + dx, zz = z + dz; if (xx < 0 || zz < 0 || xx >= W || zz >= D) continue; s += A[xx + zz * W]; n++; }
+      B[x + z * W] = s / n;
+    }
+    A.set(B);
+  }
+}
+
 // Smooth value noise for the maps.
 function mapNoise(a, b) {
   const hash = (p, q) => { const v = Math.sin(p * 127.1 + q * 311.7) * 43758.5453; return v - Math.floor(v); };
@@ -256,7 +269,7 @@ class Game {
     rgb = [lum + (rgb[0] - lum) * sat, lum + (rgb[1] - lum) * sat, lum + (rgb[2] - lum) * sat];
     const hk = Math.min(.5, Math.max(0, t) / 150);
     rgb = [rgb[0] + (112 - rgb[0]) * hk, rgb[1] + (108 - rgb[1]) * hk, rgb[2] + (66 - rgb[2]) * hk];
-    const fk = Math.pow(Math.max(0, f), 1.25) * .88;
+    const fv = Math.max(0, Math.min(1, f + (mapNoise(wx * .02 + 9, wz * .02) - .5) * .3)), fk = fv * fv * (3 - 2 * fv) * .72;
     return [rgb[0] + (18 - rgb[0]) * fk, rgb[1] + (34 - rgb[1]) * fk, rgb[2] + (17 - rgb[2]) * fk];
   }
 
@@ -270,6 +283,7 @@ class Game {
     const T = (wx, wz) => L.terr[Math.max(0, Math.min(WZ - 1, wz)) * WX + Math.max(0, Math.min(WX - 1, wx))];
     const FGW = (WX >> 4) + 2, FGD = (WZ >> 4) + 2, FG = new Float32Array(FGW * FGD);
     for (let gz = 0; gz < FGD; gz++) for (let gx = 0; gx < FGW; gx++) FG[gx + gz * FGW] = Math.min(1, L.forestAt(gx * 16, gz * 16) * .8 + L.trinityAt(gx * 16, gz * 16) * .35);
+    softenGrid(FG, FGW, FGD, 2);
     const FA = (wx, wz) => {
       const fx = wx / 16, fz = wz / 16, ix = Math.min(FGW - 2, fx | 0), iz = Math.min(FGD - 2, fz | 0), ux = fx - ix, uz = fz - iz, k = ix + iz * FGW;
       return (FG[k] * (1 - ux) + FG[k + 1] * ux) * (1 - uz) + (FG[k + FGW] * (1 - ux) + FG[k + FGW + 1] * ux) * uz;
@@ -301,7 +315,7 @@ class Game {
       else if (g === G.ALLEY) rgb = col(M.ALLEYWAY);
       else if (g === G.PROM) rgb = col((wx + wz) % 4 === 0 ? M.WOOD_D : M.WOOD);
       else if (g === G.CAMP) rgb = col(M.GRAVEL);
-      else if (g === G.ROCK) rgb = col(M.SCHIST);
+      else if (g === G.ROCK) { const r0 = col(M.SCHIST), gr = this.groundColour(wx, wz, L.terr[i], 0, col, hash); rgb = [r0[0] * .62 + gr[0] * .3, r0[1] * .62 + gr[1] * .3, r0[2] * .62 + gr[2] * .3]; }
       else if (g === G.PARK) {
         rgb = this.groundColour(wx, wz, L.terr[i], L.townAt(wx, wz) ? 0 : FA(wx, wz), col, hash);
       } else rgb = col(M.WALK);
@@ -370,6 +384,7 @@ class Game {
       x.strokeRect((camp.x0 >> 1) + 1, (camp.z0 >> 1) + 1, (camp.x1 - camp.x0) >> 1, (camp.z1 - camp.z0) >> 1);
     }
     this.mapCanvas = c;
+    this.makeSeaModel();
     this.mapSurround = this.makeMapSurround();
     this.mapMargin = this.makeMapMargin();
   }
@@ -377,6 +392,46 @@ class Game {
   // The country just past the edges, for the map: drawn at the map's own detail and exactly the way the map draws its own country,
   // pixel for pixel, so there is no seam where the world stops. The woods, the fields running on south, the river running on north,
   // and the two highways west carrying on out of sight.
+  makeSeaModel() {
+    const L = this.layout, G0 = L.ground;
+    const runsOf = (z) => {
+      const out = [];
+      let x = 0;
+      while (x < WX) {
+        while (x < WX && G0[z * WX + x] === G.WATER) x++;
+        const a = x;
+        while (x < WX && G0[z * WX + x] !== G.WATER) x++;
+        if (x > a + 4) out.push([a, x - 1]);
+      }
+      return out;
+    };
+    const top = runsOf(0), bot = runsOf(WZ - 1);
+    const wob = (z) => (mapNoise(z * .006 + 2, 7.7) - .5) * 60 + (mapNoise(z * .03, 1.3) - .5) * 10;
+    // A stretch of land off the edge of the world: the mainland keeps going, its shore bending the way the coast was heading (the river
+    // and the like keep their banks); a small island, like the spit, tapers away to a point.
+    const coastRun = (runs) => runs.reduce((m, r, k) => (r[1] - r[0] > 300 ? k : m), -1);
+    const landAt = (runs, wx, d, trend) => {
+      const last = coastRun(runs);
+      for (let k = 0; k < runs.length; k++) {
+        const [a, b] = runs[k];
+        if (b - a > 300) {
+          const right = k === last ? b + trend * d * Math.max(.35, 1 - d / 1600) + wob(d) - wob(0) : b;
+          if (wx >= a && wx <= right) return true;
+          continue;
+        }
+        const c = (a + b) / 2 + d * .06, hw = (b - a) / 2 - d * .28;
+        if (hw > 0 && Math.abs(wx - c) <= hw) return true;
+      }
+      return false;
+    };
+    this.seaAt = (wx, wz) => {
+      if (wx >= WX) return true;
+      if (wz < 0) return !landAt(top, wx, -wz, -.45);
+      if (wz >= WZ) return !landAt(bot, wx, wz - WZ + 1, -.11);
+      return wx > L.coastAt(wz);
+    };
+  }
+
   makeMapMargin() {
     const L = this.layout, X0 = -1408, Z0 = -768, X1 = WX, Z1 = WZ + 768, w = (X1 - X0) >> 1, h = (Z1 - Z0) >> 1;
     const c = document.createElement('canvas');
@@ -392,6 +447,7 @@ class Game {
       E[gx + gz * GW] = L.elevAt(wx, wz);
       F[gx + gz * GW] = Math.min(1, L.forestAt(wx, wz) * .8 + L.trinityAt(wx, wz) * .35);
     }
+    softenGrid(F, GW, GD, 4);
     const at = (A, wx, wz) => {
       const fx = Math.max(0, (wx - X0) / GS), fz = Math.max(0, (wz - Z0) / GS), ix = Math.min(GW - 2, fx | 0), iz = Math.min(GD - 2, fz | 0), ux = Math.min(1, fx - ix), uz = Math.min(1, fz - iz), k = ix + iz * GW;
       return (A[k] * (1 - ux) + A[k + 1] * ux) * (1 - uz) + (A[k + GW] * (1 - ux) + A[k + GW + 1] * ux) * uz;
@@ -418,7 +474,7 @@ class Game {
       if (inWorld(wx, wz)) continue;
       const o = (px + pz * w) * 4;
       let rgb, land = true;
-      if (wx > L.coastAt(wz)) {
+      if (this.seaAt(wx, wz)) {
         const shore = hash(wx * .013 + 3, wz * .013) * .15;
         rgb = [WATER.deep[0] + (WATER.shallow[0] - WATER.deep[0]) * shore, WATER.deep[1] + (WATER.shallow[1] - WATER.deep[1]) * shore, WATER.deep[2] + (WATER.shallow[2] - WATER.deep[2]) * shore];
         land = false;
@@ -434,7 +490,7 @@ class Game {
           const dot = hash(wx >> 1, wz >> 1);
           rgb = col(crop === 2 ? (dot < .6 ? M.CORN : M.LEAF3) : crop === 3 ? (dot < .35 ? M.COTTON : M.LEAF3) : crop === 4 ? (dot < .5 ? M.PEANUT : M.SOIL) : crop === 5 ? (wx % 8 < 2 ? M.LEAF2 : M.SOIL) : crop === 6 ? M.GRASS_DRY : M.SOIL);
           rgb = [rgb[0] * .88, rgb[1] * .88, rgb[2] * .88];
-        } else if ((t >= 12 && steep > 7) || t > 128 + mapNoise(wx * .02, wz * .02) * 30) rgb = col(M.SCHIST);
+        } else if ((t >= 12 && steep > 7) || t > 128 + mapNoise(wx * .02, wz * .02) * 30) { const r0 = col(M.SCHIST), gr = this.groundColour(wx, wz, t, 0, col, hash); rgb = [r0[0] * .62 + gr[0] * .3, r0[1] * .62 + gr[1] * .3, r0[2] * .62 + gr[2] * .3]; }
         else { rgb = this.groundColour(wx, wz, t, at(F, wx, wz), col, hash); park = true; }
         let shade = 1 + Math.max(-.6, Math.min(.5, ((at(E, wx + 4, wz) - at(E, wx - 4, wz)) + (at(E, wx, wz + 4) - at(E, wx, wz - 4))) * .07));
         const lift = park ? 0 : Math.max(0, Math.min(60, t)) * .2;
@@ -456,7 +512,7 @@ class Game {
     const dim = (id, k) => { const [r, g, b] = col(id); return `rgb(${r * k | 0},${g * k | 0},${b * k | 0})`; };
     const leafLv = [M.LEAF, M.LEAF2, M.LEAF].map((id, k) => [0, 1, 2, 3, 4].map((lv) => dim(id, (k === 2 ? .7 : .84) * (1 - lv * .1))));
     const tree = (tx, tz, a, f) => {
-      if (inWorld(tx, tz) || tx > L.coastAt(tz) - 4) return;
+      if (inWorld(tx, tz) || this.seaAt(tx + 4, tz) || this.seaAt(tx - 4, tz)) return;
       if (wz0(tz) && L.cropAt(tx, tz)) return;
       const [qx, qz] = P(tx, tz);
       x.fillStyle = 'rgba(6,12,6,.5)';
@@ -500,7 +556,7 @@ class Game {
     for (let pz = 0; pz < n; pz++) for (let px = 0; px < n; px++) {
       const wx = -S + px * P, wz = -S + pz * P, o = (px + pz * n) * 4;
       let rgb;
-      if (wx > L.coastAt(wz) || wx >= WX) rgb = sea;
+      if (this.seaAt(wx, wz)) rgb = sea;
       else {
         const t = at(E, px, pz), f = at(F, px, pz), h = hash(px, pz);
         const g = grass[h < .3 ? 0 : h < .65 ? 1 : 2], lf = leaf[(h * 7 | 0) % 3], k = Math.min(1, f * 1.15) * (.75 + hash(pz, px) * .5);

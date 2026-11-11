@@ -1228,7 +1228,7 @@ export function buildLayout(seed = 1609) {
       if (dw[i] < 6 && !townId[i]) t = Math.min(t, -3 + (dw[i] >> 1));
       terr[i] = t;
       // Bare rock along the tops, on the peak, and wherever the stone breaks through.
-      if (g === G.PARK && (t > 128 + noise2(x * .02, z * .02) * 30 || (t > 20 && noise2(x * .045, z * .045) > .93))) ground[i] = G.ROCK;
+      if (g === G.PARK && (t > 128 + noise2(x * .02, z * .02) * 30 || (t > 70 && noise2(x * .03, z * .03) > .9))) ground[i] = G.ROCK;
     }
   }
   for (const [i, d] of slump) terr[i] = -d;

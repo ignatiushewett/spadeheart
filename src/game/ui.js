@@ -12,6 +12,7 @@ import { MODELS as VM_MODELS, LMG_COVER, LMG_BOX } from './viewmodel.js';
 const $ = (id) => document.getElementById(id);
 // The water as the map canvas paints it, so nothing shows where the map runs out.
 const OCEAN = '#152c37';
+const SHOW_INFECTED_ON_MAP = false;   // the red wash and the dots for the dead, on the big map
 const fmt = (n) => Math.round(n).toLocaleString('en-US');
 // A camp with nothing happening at it, as the player reads it.
 // A day's patrol that is done has nothing left to point at until tomorrow, and a night shift never has one spot to point at.
@@ -1916,10 +1917,10 @@ export class UI {
     }
     x.textAlign = 'left';
     };
-    // Horde density as a soft red wash.
+    // Horde density as a soft red wash. (Off for now, along with the infected themselves: the map shows the country, not the dead.)
     const H = g.horde;
     x.fillStyle = 'rgba(230,60,40,.04)';
-    for (let cz = 0; cz < H.popD; cz++) for (let cx = 0; cx < H.popW; cx++) {
+    if (SHOW_INFECTED_ON_MAP) for (let cz = 0; cz < H.popD; cz++) for (let cx = 0; cx < H.popW; cx++) {
       const p = H.pop[cx + cz * H.popW];
       if (p < 20) continue;
       x.globalAlpha = Math.min(.2, p / 1500);
@@ -1931,7 +1932,7 @@ export class UI {
     const dot = Math.max(2, Math.min(5, s * 2.4));
     const seen = (wx, wz) => { const a = tx(wx), b = tz(wz); return a > -6 && b > -6 && a < c.width + 6 && b < c.height + 6; };
     const step = Math.max(1, Math.floor(H.n / 5000));
-    for (let i = 0; i < H.n; i += step) {
+    if (SHOW_INFECTED_ON_MAP) for (let i = 0; i < H.n; i += step) {
       if (!seen(H.px[i], H.pz[i])) continue;
       // The idle crowd stays quiet, or it would bury the streets. What is hunting you stands out.
       const size = H.state[i] ? dot : Math.max(1.2, dot * .55);
@@ -2161,7 +2162,7 @@ export class UI {
     if (last) {
       html += `<div class="list-title">${last.op ? 'Latest operation report' : 'Latest report'}</div><div class="job"><b>${last.title}</b><p>${last.camp ? `${last.camp}<br>` : ''}${last.sub ? `${last.sub}<br>` : ''}${last.rows.map(([k, v]) => `${k}: ${v}`).join('<br>')}</p></div>`;
     }
-    html += '<div class="list-title">Key</div><div class="map-key"><i style="background:#fff"></i><span>You</span><i style="background:#8fd27a"></i><span>Friendly</span><i style="background:#d8d2a0"></i><span>Wanderers</span><i style="background:#f0963c"></i><span>Raiders</span><i style="background:#eb4632"></i><span>Infected, hunting</span><i style="background:#be6e5a"></i><span>Infected, idle</span><i style="background:#6ec6ff"></i><span>Commission</span><i style="background:none;color:#6ec6ff;font-style:normal;text-align:center;line-height:10px">!</i><span>Work, zoomed in</span><i style="background:none;color:#f0b35a;font-style:normal;text-align:center;line-height:10px">W</i><span>Weapons, zoomed in</span><i style="background:none;color:#ff8a7a;font-style:normal;text-align:center;line-height:10px">+</i><span>Doctor, zoomed in</span></div>';
+    html += '<div class="list-title">Key</div><div class="map-key"><i style="background:#fff"></i><span>You</span><i style="background:#8fd27a"></i><span>Friendly</span><i style="background:#d8d2a0"></i><span>Wanderers</span><i style="background:#f0963c"></i><span>Raiders</span><i style="background:#6ec6ff"></i><span>Commission</span><i style="background:none;color:#6ec6ff;font-style:normal;text-align:center;line-height:10px">!</i><span>Work, zoomed in</span><i style="background:none;color:#f0b35a;font-style:normal;text-align:center;line-height:10px">W</i><span>Weapons, zoomed in</span><i style="background:none;color:#ff8a7a;font-style:normal;text-align:center;line-height:10px">+</i><span>Doctor, zoomed in</span></div>';
     html += '<div class="list-title">Settlements</div>';
     for (const c of g.layout.camps) {
       const known = P.discovered[c.id];
