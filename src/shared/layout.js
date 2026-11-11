@@ -777,7 +777,7 @@ export function buildLayout(seed = 1609) {
     if (m === 2) { ground[i] = G.WALK; continue; }
     if (m === 1) { ground[i] = G.DIRT; continue; }
     if (x > coastX[z] - 180 && d < 24 + noise2(x * .02, z * .02) * 14) { ground[i] = G.SAND; continue; }
-    if (x > coastX[z] && land[i] === 1 && d < 22 + noise2(x * .03, z * .03) * 10) { ground[i] = G.SAND; continue; }
+    if (x > coastX[z] && land[i] === 1 && (z > 3560 || d < 22 + noise2(x * .03, z * .03) * 10)) { ground[i] = G.SAND; continue; }
     if (land[i] !== 3 && d > 14 && plotIn(Math.floor((x + 30) / 92), Math.floor(z / 66))) {
       // Plots with a track round each: corn, cotton, peanuts, somebody's tomatoes, cut hay, and pasture left as grass. A plot is all
       // field or none of it: whether it is ploughed is down to the middle of it.

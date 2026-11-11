@@ -257,9 +257,9 @@ void main(){
   int flags=int(texelFetch(uPalette,ivec2(int(aInfo.x),0),0).a*255.+.5);
   if((flags&8)!=0&&uSway>0.){
     float t=uTime,k=uSway;
-    p.x+=(sin(t*1.7+p.x*.41+p.y*.23+p.z*.17)*.6+sin(t*2.9+p.z*.73)*.4)*.075*k;
-    p.z+=(cos(t*1.4+p.z*.37+p.y*.29+p.x*.13)*.6+sin(t*3.3+p.x*.67)*.4)*.075*k;
-    p.y+=sin(t*2.1+p.x*.5+p.z*.5)*.025*k;
+    p.x+=(sin(t*.85+p.x*.31+p.y*.19+p.z*.13)*.65+sin(t*1.45+p.z*.53)*.35)*.13*k;
+    p.z+=(cos(t*.7+p.z*.29+p.y*.23+p.x*.11)*.65+sin(t*1.6+p.x*.47)*.35)*.13*k;
+    p.y+=sin(t*1.05+p.x*.4+p.z*.4)*.035*k;
   }
   vWorld=p;
   vNormal=NORMALS[aPos.w];

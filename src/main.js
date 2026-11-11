@@ -265,12 +265,18 @@ class Game {
   groundColour(wx, wz, t, f, col, hash) {
     const n = hash(wx >> 2, wz >> 2);
     let rgb = col(n < .3 ? M.GRASS_DRY : n < .65 ? M.GRASS : M.GRASS2);
-    const ck = Math.max(0, Math.min(1, (wx - this.layout.coastAt(wz) + 1300) / 1100));
-    const lum = rgb[0] * .3 + rgb[1] * .59 + rgb[2] * .11, sat = (.72 + mapNoise(wx * .012 + 4, wz * .012) * .75 + (hash(wx >> 3, wz >> 3) - .5) * .12) * (1 + ck * .38);
+    // Richer toward the coast, over a long reach of the map; a little less rich everywhere than it was.
+    const ck = Math.max(0, Math.min(1, (wx - this.layout.coastAt(wz) + 2600) / 2400));
+    const lum = rgb[0] * .3 + rgb[1] * .59 + rgb[2] * .11, sat = (.68 + mapNoise(wx * .012 + 4, wz * .012) * .6 + (hash(wx >> 3, wz >> 3) - .5) * .1) * (1 + ck * .3);
     rgb = [lum + (rgb[0] - lum) * sat, lum + (rgb[1] - lum) * sat, lum + (rgb[2] - lum) * sat];
-    const hk = Math.min(.5, Math.max(0, t) / 150);
-    rgb = [rgb[0] + (112 - rgb[0]) * hk, rgb[1] + (108 - rgb[1]) * hk, rgb[2] + (66 - rgb[2]) * hk];
-    const fv = Math.max(0, Math.min(1, f + (mapNoise(wx * .02 + 9, wz * .02) - .5) * .22)), fk = Math.pow(fv, 1.9) * .62;
+    // Yellower from the north-west down to the south-east, and most of all round Weston's farms.
+    const diag = Math.max(0, Math.min(1, (wx / WX + wz / WZ) / 2)), wk = Math.exp(-(((wx - 2300) / 1100) ** 2 + ((wz - 2700) / 1000) ** 2));
+    const yk = diag * .22 + wk * .2;
+    rgb = [rgb[0] + (122 - rgb[0]) * yk, rgb[1] + (116 - rgb[1]) * yk, rgb[2] + (58 - rgb[2]) * yk];
+    // High ground goes a duller olive, not pale.
+    const hk = Math.min(.38, Math.max(0, t) / 180);
+    rgb = [rgb[0] + (84 - rgb[0]) * hk, rgb[1] + (84 - rgb[1]) * hk, rgb[2] + (54 - rgb[2]) * hk];
+    const fv = Math.max(0, Math.min(1, f + (mapNoise(wx * .02 + 9, wz * .02) - .5) * .18)), fk = Math.pow(fv, 2.2) * .55;
     return [rgb[0] + (18 - rgb[0]) * fk, rgb[1] + (34 - rgb[1]) * fk, rgb[2] + (17 - rgb[2]) * fk];
   }
 
@@ -362,11 +368,20 @@ class Game {
         if (a === 0) x.fillRect(px, pz, wid, len); else x.fillRect(px, pz, len, wid);
       } else if (t === PROP.TREE || t === PROP.PARKTREE) {
         const r = t === PROP.PARKTREE ? 3 : 2;
-        x.fillStyle = 'rgba(6,12,6,.5)';
+        x.fillStyle = 'rgba(6,12,6,.3)';
         x.fillRect(px - (r >> 1) + 1, pz - (r >> 1) + 1, r, r);
         x.fillStyle = leafAt(a % 3, FA(P_[k + 1], P_[k + 2]));
         x.fillRect(px - (r >> 1), pz - (r >> 1), r, r);
       }
+    }
+    for (let tz = -6; tz < WZ + 6; tz += 6) for (let tx = -6; tx < WX + 6; tx += 6) {
+      if (tx >= 6 && tx < WX - 6 && tz >= 6 && tz < WZ - 6) { tx = Math.ceil((WX - 6) / 6) * 6 - 6; continue; }
+      const j = r2(tx, tz), ax = tx + Math.floor(j * 40) % 4, az = tz + Math.floor(j * 70) % 4;
+      if (ax < 0 || az < 0 || ax >= WX || az >= WZ || L.ground[az * WX + ax] !== G.PARK || j >= L.forestAt(tx, tz) * .8) continue;
+      x.fillStyle = 'rgba(6,12,6,.3)';
+      x.fillRect((ax >> 1), (az >> 1), 3, 3);
+      x.fillStyle = leafAt(Math.floor(j * 9999) % 3, FA(ax, az));
+      x.fillRect((ax >> 1) - 1, (az >> 1) - 1, 3, 3);
     }
     // Camps, part by part.
     const partCol = { bonfire: M.FIRE, bench: M.WOOD_D, stall: M.AWN_G, crops: M.LEAF2, court: M.COURT, firepit: M.LOG, table: M.WOOD, garden: M.LEAF, flag: M.IRON, tower: M.IRON, bigtent: M.TENT_W, tent: M.TENT_G };
@@ -448,7 +463,7 @@ class Game {
     const GS = 8, GW = Math.ceil((X1 - X0) / GS) + 2, GD = Math.ceil((Z1 - Z0) / GS) + 2, E = new Float32Array(GW * GD), F = new Float32Array(GW * GD);
     for (let gz = 0; gz < GD; gz++) for (let gx = 0; gx < GW; gx++) {
       const wx = X0 + gx * GS, wz = Z0 + gz * GS;
-      if (inWorld(wx - 80, wz - 80) && inWorld(wx + 80, wz + 80)) continue;
+      if (inWorld(wx - 220, wz - 220) && inWorld(wx + 220, wz + 220)) continue;
       E[gx + gz * GW] = L.elevAt(wx, wz);
       F[gx + gz * GW] = Math.min(1, L.forestAt(wx, wz) * .8 + L.trinityAt(wx, wz) * .35);
     }
@@ -524,7 +539,7 @@ class Game {
       if (inWorld(tx, tz) || this.seaAt(tx + 4, tz) || this.seaAt(tx - 4, tz)) return;
       if (wz0(tz) && L.cropAt(tx, tz)) return;
       const [qx, qz] = P(tx, tz);
-      x.fillStyle = 'rgba(6,12,6,.5)';
+      x.fillStyle = 'rgba(6,12,6,.3)';
       x.fillRect(Math.round(qx), Math.round(qz), 3, 3);
       x.fillStyle = leafLv[a % 3][Math.max(0, Math.min(4, Math.round(f * 5)))];
       x.fillRect(Math.round(qx) - 1, Math.round(qz) - 1, 3, 3);
@@ -565,14 +580,16 @@ class Game {
     for (let pz = 0; pz < n; pz++) for (let px = 0; px < n; px++) {
       const wx = -S + px * P, wz = -S + pz * P, o = (px + pz * n) * 4;
       let rgb;
-      if (this.seaAt(wx, wz)) rgb = sea;
+      if (this.seaAt(wx, wz)) { const sh = hash(wx * .013 + 3, wz * .013) * .15; rgb = [20 + 18 * sh, 42 + 24 * sh, 54 + 20 * sh]; }
       else {
-        const t = at(E, px, pz), f = at(F, px, pz), h = hash(px, pz);
-        const g = grass[h < .3 ? 0 : h < .65 ? 1 : 2], lf = leaf[(h * 7 | 0) % 3], k = Math.min(1, f * 1.15) * (.75 + hash(pz, px) * .5);
-        rgb = [g[0] + (lf[0] - g[0]) * k, g[1] + (lf[1] - g[1]) * k, g[2] + (lf[2] - g[2]) * k];
-        const lift = Math.max(0, Math.min(60, t)) * .45, sl = (at(E, px - 1, pz - 1) - at(E, px + 1, pz + 1)) * .03;
-        const sh = (1 + Math.max(-.42, Math.min(.42, sl))) * (Math.floor(t / 16) !== Math.floor(at(E, px + 1, pz) / 16) ? .87 : 1) * (.94 + hash(px * 3, pz) * .1);
-        rgb = [(rgb[0] + lift) * sh, (rgb[1] + lift * .9) * sh, (rgb[2] + lift * .7) * sh];
+        const t = at(E, px, pz), f = at(F, px, pz);
+        rgb = this.groundColour(wx, wz, t, f, col, hash);
+        // Trees too small to draw at this scale: their canopy, as a darkening the denser the wood.
+        const lf = leaf[(hash(px, pz) * 7 | 0) % 3], k = Math.min(.55, f * .6) * (.7 + hash(pz, px) * .6);
+        rgb = [rgb[0] + (lf[0] * .8 - rgb[0]) * k, rgb[1] + (lf[1] * .8 - rgb[1]) * k, rgb[2] + (lf[2] * .8 - rgb[2]) * k];
+        const sl = ((at(E, px + .5, pz) - at(E, px - .5, pz)) + (at(E, px, pz + .5) - at(E, px, pz - .5))) * .07;
+        const sh = (1 + Math.max(-.6, Math.min(.5, sl))) * (Math.floor(t / 16) !== Math.floor(at(E, px + 1, pz) / 16) ? .87 : 1) * (.94 + hash(px * 3, pz) * .12);
+        rgb = [rgb[0] * sh, rgb[1] * sh, rgb[2] * sh];
       }
       img.data[o] = rgb[0]; img.data[o + 1] = rgb[1]; img.data[o + 2] = rgb[2]; img.data[o + 3] = 255;
     }

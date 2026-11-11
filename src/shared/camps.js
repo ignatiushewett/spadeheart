@@ -310,10 +310,11 @@ export function planCamp(def, id, r, ground) {
     c.parts.push({ t: 'lights', x0, z0, x1, z1, h: 7 });
     light(lx, lz, 11);
   };
-  for (let d = PD + 5; pz - d > r.z0 + 13; d += 22) string(px - AV, pz - d, px + AV, pz - d, px, pz - d);
-  for (let d = PD + 5; pz + d < r.z1 - 13; d += 22) string(px - AV, pz + d, px + AV, pz + d, px, pz + d);
-  for (let d = PW + 5; px - d > r.x0 + 13; d += 22) string(px - d, pz - AV, px - d, pz + AV, px - d, pz);
-  for (let d = PW + 5; px + d < r.x1 - 13; d += 22) string(px + d, pz - AV, px + d, pz + AV, px + d, pz);
+  // Each string crosses in a gap between two stalls, its poles in line with the stall fronts: nothing stands in the walkway or at a counter.
+  for (let d = PD + 9; pz - d > r.z0 + 13; d += 22) string(px - AV - 1, pz - d, px + AV + 1, pz - d, px, pz - d);
+  for (let d = PD + 9; pz + d < r.z1 - 13; d += 22) string(px - AV - 1, pz + d, px + AV + 1, pz + d, px, pz + d);
+  for (let d = PW + 9; px - d > r.x0 + 13; d += 22) string(px - d, pz - AV - 1, px - d, pz + AV + 1, px - d, pz);
+  for (let d = PW + 9; px + d < r.x1 - 13; d += 22) string(px + d, pz - AV - 1, px + d, pz + AV + 1, px + d, pz);
 
   // --- Signature buildings --------------------------------------------------------------------------
   const sig = (t, w, d, ox, oz, h, extra = {}, pad = 2) => {
