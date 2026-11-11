@@ -32,7 +32,7 @@ const rand = Math.random;
 // The timeout keeps boot moving in a background tab, where animation frames stop.
 const nextFrame = () => new Promise((r) => { requestAnimationFrame(r); setTimeout(r, 120); });
 const DAY_SECONDS = 1500;
-const GARVEY_V = 4;        // which build of Carver Yard a save's edits belong to
+const GARVEY_V = 5;        // which build of Carver Yard a save's edits belong to
 const INTRO_TIME = 7.5;    // seconds of words on black before the wake-up
 const INTRO_FADE = 1.3;    // the last of that is them fading out, and a beat of nothing
 // What a broken voxel gives back when you tear it down by hand.
@@ -44,7 +44,7 @@ const SETTINGS_KEY = 'acez.settings.v2';
 const OLD_SETTINGS_KEY = 'acez.settings.v1';
 const DB_NAME = 'acez';
 const MENU_SHOT = { angle: .62, dist: 185, height: 88, turn: .46, pitch: -.14, fov: 1.05, flight: 125, startHeight: 30, startOff: 44, startPitch: -.1 };
-const SAVE_KEY = 'slot11';  // bumped whenever the map changes: old voxel edits no longer line up
+const SAVE_KEY = 'slot12';  // bumped whenever the map changes: old voxel edits no longer line up
 export const SLOTS = 3;
 // Slot 1 keeps the plain key, so a save from before there were slots simply becomes the first character.
 const slotKey = (n) => (n === 1 ? SAVE_KEY : `${SAVE_KEY}.${n}`);   // 'sandbox' gives its own key too
@@ -265,11 +265,12 @@ class Game {
   groundColour(wx, wz, t, f, col, hash) {
     const n = hash(wx >> 2, wz >> 2);
     let rgb = col(n < .3 ? M.GRASS_DRY : n < .65 ? M.GRASS : M.GRASS2);
-    const lum = rgb[0] * .3 + rgb[1] * .59 + rgb[2] * .11, sat = .72 + mapNoise(wx * .012 + 4, wz * .012) * .75 + (hash(wx >> 3, wz >> 3) - .5) * .12;
+    const ck = Math.max(0, Math.min(1, (wx - this.layout.coastAt(wz) + 1300) / 1100));
+    const lum = rgb[0] * .3 + rgb[1] * .59 + rgb[2] * .11, sat = (.72 + mapNoise(wx * .012 + 4, wz * .012) * .75 + (hash(wx >> 3, wz >> 3) - .5) * .12) * (1 + ck * .38);
     rgb = [lum + (rgb[0] - lum) * sat, lum + (rgb[1] - lum) * sat, lum + (rgb[2] - lum) * sat];
     const hk = Math.min(.5, Math.max(0, t) / 150);
     rgb = [rgb[0] + (112 - rgb[0]) * hk, rgb[1] + (108 - rgb[1]) * hk, rgb[2] + (66 - rgb[2]) * hk];
-    const fv = Math.max(0, Math.min(1, f + (mapNoise(wx * .02 + 9, wz * .02) - .5) * .3)), fk = fv * fv * (3 - 2 * fv) * .72;
+    const fv = Math.max(0, Math.min(1, f + (mapNoise(wx * .02 + 9, wz * .02) - .5) * .22)), fk = Math.pow(fv, 1.9) * .62;
     return [rgb[0] + (18 - rgb[0]) * fk, rgb[1] + (34 - rgb[1]) * fk, rgb[2] + (17 - rgb[2]) * fk];
   }
 
@@ -280,10 +281,10 @@ class Game {
     c.width = w; c.height = h;
     const x = c.getContext('2d');
     const img = x.createImageData(w, h);
-    const T = (wx, wz) => L.terr[Math.max(0, Math.min(WZ - 1, wz)) * WX + Math.max(0, Math.min(WX - 1, wx))];
+    const T = (wx, wz) => (wx < 0 || wz < 0 || wz >= WZ ? L.elevAt(wx, wz) : L.terr[wz * WX + Math.min(WX - 1, wx)]);
     const FGW = (WX >> 4) + 2, FGD = (WZ >> 4) + 2, FG = new Float32Array(FGW * FGD);
     for (let gz = 0; gz < FGD; gz++) for (let gx = 0; gx < FGW; gx++) FG[gx + gz * FGW] = Math.min(1, L.forestAt(gx * 16, gz * 16) * .8 + L.trinityAt(gx * 16, gz * 16) * .35);
-    softenGrid(FG, FGW, FGD, 2);
+    softenGrid(FG, FGW, FGD, 5);
     const FA = (wx, wz) => {
       const fx = wx / 16, fz = wz / 16, ix = Math.min(FGW - 2, fx | 0), iz = Math.min(FGD - 2, fz | 0), ux = fx - ix, uz = fz - iz, k = ix + iz * FGW;
       return (FG[k] * (1 - ux) + FG[k + 1] * ux) * (1 - uz) + (FG[k + FGW] * (1 - ux) + FG[k + FGW + 1] * ux) * uz;
@@ -309,7 +310,11 @@ class Game {
       } else if (g === G.ROAD) rgb = col((L.mark[i] & 15) === 1 ? M.LINE_Y : L.mark[i] & 15 ? M.LINE_W : M.ASPHALT);
       else if (g === G.WALK) rgb = col(M.WALK);
       else if (g === G.PLAZA) rgb = col(L.mark[i] === 4 ? M.ASPHALT2 : M.WALK2);
-      else if (g === G.SAND) rgb = col(M.SAND);
+      else if (g === G.SAND) {
+        const s0 = col(M.SAND), gr = this.groundColour(wx, wz, Math.max(0, L.terr[i]), 0, col, hash), at2 = (dx, dz) => L.ground[Math.max(0, Math.min(WZ - 1, wz + dz)) * WX + Math.max(0, Math.min(WX - 1, wx + dx))] === G.PARK ? 1 : 0;
+        const k = Math.min(.75, (at2(-8, 0) + at2(-14, 0) + at2(0, -10) + at2(0, 10)) * .19 + (hash(wx >> 1, wz >> 1) - .5) * .15);
+        rgb = [s0[0] + (gr[0] - s0[0]) * Math.max(0, k), s0[1] + (gr[1] - s0[1]) * Math.max(0, k), s0[2] + (gr[2] - s0[2]) * Math.max(0, k)];
+      }
       else if (g === G.DIRT) rgb = col(hash(wx >> 1, wz >> 1) < .4 ? M.PATH : M.DIRT);
       else if (g === G.FIELD) { const m = L.mark[i], dot = hash(wx >> 1, wz >> 1); rgb = col(m === 2 ? (dot < .6 ? M.CORN : M.LEAF3) : m === 3 ? (dot < .35 ? M.COTTON : M.LEAF3) : m === 4 ? (dot < .5 ? M.PEANUT : M.SOIL) : m === 5 ? (wx % 8 < 2 ? M.LEAF2 : M.SOIL) : m === 6 ? M.GRASS_DRY : M.SOIL); rgb = [rgb[0] * .88, rgb[1] * .88, rgb[2] * .88]; }
       else if (g === G.ALLEY) rgb = col(M.ALLEYWAY);
@@ -346,7 +351,7 @@ class Game {
     const hex = (id) => { const [r, g, b] = col(id); return `rgb(${r | 0},${g | 0},${b | 0})`; };
     const carCols = [M.CAR_S, M.TAXI, M.BUS, M.CAR_W, M.CAR_K, M.CAR_W, M.BURNT];
     const dim = (id, k) => { const [r, g, b] = col(id); return `rgb(${r * k | 0},${g * k | 0},${b * k | 0})`; };
-    const leafLv = [M.LEAF, M.LEAF2, M.LEAF].map((id, k) => [0, 1, 2, 3, 4].map((lv) => dim(id, (k === 2 ? .7 : .84) * (1 - lv * .1))));
+    const leafLv = [M.LEAF, M.LEAF2, M.LEAF].map((id, k) => [0, 1, 2, 3, 4].map((lv) => dim(id, (k === 2 ? .76 : .88) * (1 - lv * .06))));
     const leafAt = (k, f) => leafLv[k][Math.max(0, Math.min(4, Math.round(f * 5)))];
     const P_ = L.props;
     for (let k = 0; k < P_.length; k += PROP_STRIDE) {
@@ -443,18 +448,18 @@ class Game {
     const GS = 8, GW = Math.ceil((X1 - X0) / GS) + 2, GD = Math.ceil((Z1 - Z0) / GS) + 2, E = new Float32Array(GW * GD), F = new Float32Array(GW * GD);
     for (let gz = 0; gz < GD; gz++) for (let gx = 0; gx < GW; gx++) {
       const wx = X0 + gx * GS, wz = Z0 + gz * GS;
-      if (inWorld(wx - 24, wz - 24) && inWorld(wx + 24, wz + 24)) continue;
+      if (inWorld(wx - 80, wz - 80) && inWorld(wx + 80, wz + 80)) continue;
       E[gx + gz * GW] = L.elevAt(wx, wz);
       F[gx + gz * GW] = Math.min(1, L.forestAt(wx, wz) * .8 + L.trinityAt(wx, wz) * .35);
     }
-    softenGrid(F, GW, GD, 4);
+    softenGrid(F, GW, GD, 10);
     const at = (A, wx, wz) => {
       const fx = Math.max(0, (wx - X0) / GS), fz = Math.max(0, (wz - Z0) / GS), ix = Math.min(GW - 2, fx | 0), iz = Math.min(GD - 2, fz | 0), ux = Math.min(1, fx - ix), uz = Math.min(1, fz - iz), k = ix + iz * GW;
       return (A[k] * (1 - ux) + A[k + 1] * ux) * (1 - uz) + (A[k + GW] * (1 - ux) + A[k + GW + 1] * ux) * uz;
     };
     // The highways west, carrying straight on from where they leave the world.
     const chaikin = (pts) => { for (let n = 0; n < 2; n++) { const o = [pts[0]]; for (let i = 0; i + 1 < pts.length; i++) { const [ax, az] = pts[i], [bx, bz] = pts[i + 1]; o.push([ax * .75 + bx * .25, az * .75 + bz * .25], [ax * .25 + bx * .75, az * .25 + bz * .75]); } o.push(pts[pts.length - 1]); pts = o; } return pts; };
-    const roads = [chaikin([[0, 2290], [-196, 2350], [-480, 2412], [-760, 2400], [-1060, 2452], [-1440, 2472]]), chaikin([[0, 3560], [-300, 3570], [-620, 3560], [-900, 3604], [-1180, 3622], [-1440, 3648]])];
+    const roads = [chaikin([[40, 2278], [0, 2290], [-196, 2350], [-480, 2412], [-760, 2400], [-1060, 2452], [-1440, 2472]]), chaikin([[40, 3559], [0, 3560], [-300, 3570], [-620, 3560], [-900, 3604], [-1180, 3622], [-1440, 3648]])];
     const roadAt = (wx, wz) => {
       for (const pts of roads) {
         let run = 0;
@@ -471,7 +476,8 @@ class Game {
     const WATER = { deep: [20, 42, 54], shallow: [38, 66, 74] };
     for (let pz = 0; pz < h; pz++) for (let px = 0; px < w; px++) {
       const wx = X0 + px * 2, wz = Z0 + pz * 2;
-      if (inWorld(wx, wz)) continue;
+      const edgeIn = inWorld(wx, wz) ? Math.min(wx, wz, WZ - 1 - wz, WX - 1 - wx) : -1;
+      if (edgeIn >= 0) continue;
       const o = (px + pz * w) * 4;
       let rgb, land = true;
       if (this.seaAt(wx, wz)) {
@@ -479,10 +485,12 @@ class Game {
         rgb = [WATER.deep[0] + (WATER.shallow[0] - WATER.deep[0]) * shore, WATER.deep[1] + (WATER.shallow[1] - WATER.deep[1]) * shore, WATER.deep[2] + (WATER.shallow[2] - WATER.deep[2]) * shore];
         land = false;
       } else {
-        const crop = wz > WZ ? L.cropAt(wx, wz) : 0, t = at(E, wx, wz), road = wx < 0 && ((wz > 2200 && wz < 2560) || (wz > 3500 && wz < 3720)) ? roadAt(wx, wz) : 0;
+        const crop = wz > WZ ? L.cropAt(wx, wz) : 0, t = at(E, wx, wz), road = wx < 40 && ((wz > 2200 && wz < 2560) || (wz > 3500 && wz < 3720)) ? roadAt(wx, wz) : 0;
         const steep = Math.abs(at(E, wx + 2, wz) - at(E, wx - 2, wz)) + Math.abs(at(E, wx, wz + 2) - at(E, wx, wz - 2));
         let park = false;
-        if (road === 1) rgb = col(M.ASPHALT);
+        const sandK = wx > 1800 ? (this.seaAt(wx + 14 + mapNoise(wz * .02, 3) * 12, wz) || this.seaAt(wx - 22, wz) ? 1 : this.seaAt(wx + 34, wz) ? .45 : 0) : 0;
+        if (sandK) { const s0 = col(M.SAND), gr = this.groundColour(wx, wz, t, 0, col, hash), k = 1 - sandK; rgb = [s0[0] + (gr[0] - s0[0]) * k, s0[1] + (gr[1] - s0[1]) * k, s0[2] + (gr[2] - s0[2]) * k]; }
+        else if (road === 1) rgb = col(M.ASPHALT);
         else if (road === 2) rgb = col(M.LINE_Y);
         else if (road === 3) rgb = col(hash(wx >> 1, wz >> 1) < .4 ? M.PATH : M.DIRT);
         else if (crop === -1) rgb = col(hash(wx >> 1, wz >> 1) < .4 ? M.PATH : M.DIRT);
@@ -499,7 +507,8 @@ class Game {
         rgb = [rgb[0] * shade, rgb[1] * shade, rgb[2] * shade];
       }
       const grain = land ? .94 + hash(wx, wz) * .12 : 1;
-      img.data[o] = Math.min(255, rgb[0] * grain); img.data[o + 1] = Math.min(255, rgb[1] * grain); img.data[o + 2] = Math.min(255, rgb[2] * grain); img.data[o + 3] = 255;
+      img.data[o] = Math.min(255, rgb[0] * grain); img.data[o + 1] = Math.min(255, rgb[1] * grain); img.data[o + 2] = Math.min(255, rgb[2] * grain);
+      img.data[o + 3] = edgeIn < 0 ? 255 : Math.round(255 * (1 - edgeIn / 28) ** 1.5);
     }
     x.putImageData(img, 0, 0);
     const P = (wx, wz) => [(wx - X0) / 2, (wz - Z0) / 2];
@@ -510,7 +519,7 @@ class Game {
     x.beginPath(); x.moveTo(...P(rx, 4)); x.bezierCurveTo(...P(rx + 7, -200), ...P(rx - 33, -420), ...P(rx - 8, -780)); x.stroke();
     // Trees exactly as the world sets them out: one to each six blocks where the wood wants one, and the second stand in Trinity.
     const dim = (id, k) => { const [r, g, b] = col(id); return `rgb(${r * k | 0},${g * k | 0},${b * k | 0})`; };
-    const leafLv = [M.LEAF, M.LEAF2, M.LEAF].map((id, k) => [0, 1, 2, 3, 4].map((lv) => dim(id, (k === 2 ? .7 : .84) * (1 - lv * .1))));
+    const leafLv = [M.LEAF, M.LEAF2, M.LEAF].map((id, k) => [0, 1, 2, 3, 4].map((lv) => dim(id, (k === 2 ? .76 : .88) * (1 - lv * .06))));
     const tree = (tx, tz, a, f) => {
       if (inWorld(tx, tz) || this.seaAt(tx + 4, tz) || this.seaAt(tx - 4, tz)) return;
       if (wz0(tz) && L.cropAt(tx, tz)) return;

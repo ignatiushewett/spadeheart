@@ -50,7 +50,7 @@ const DOCK = {
   sheep: { keep: .2, why: 'The Judge has ruled on it, and she does not hear appeals.' },
   tompkins: { keep: .35, why: 'Nobody here wants to fine you. There just is not much left in the tin.' },
   morning: { keep: .3, why: 'Those spades were going to buy antibiotics.' },
-  garvey: { keep: .3, why: 'A deal is a deal, and Coach Holloway has a whole team to feed.' },
+  garvey: { keep: .3, why: 'A deal is a deal, and Coach Calloway has a whole team to feed.' },
   tryon: { keep: .15, why: 'The shortfall has been entered in the ledger, in a very nice hand.' },
 };
 const DEFEND_REAL_HELP = 30;   // kills it takes before your help buys the camp more time

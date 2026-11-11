@@ -1902,6 +1902,7 @@ export class UI {
         x.fillText(name, px, pz);
         continue;
       }
+      if (taken(px - 5, pz - 5, 10, 10)) continue;
       x.fillStyle = p.kind === 'park' ? '#9fd08a' : p.kind === 'bridge' ? '#b8c6d0' : '#e9e4d8';
       x.save();
       x.translate(px, pz);
