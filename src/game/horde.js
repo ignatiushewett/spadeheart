@@ -207,7 +207,8 @@ export class Horde {
       let m = 1;
       for (const c of living) {
         const d = Math.max(c.x0 - x, x - c.x1, c.z0 - z, z - c.z1);
-        const k = Math.max(0, Math.min(1, (d - 30) / 120));
+        // Thin by the wall and filling in steadily further out, all the way to two hundred blocks.
+        const k = Math.max(0, Math.min(1, (d - 30) / 170));
         m = Math.min(m, .06 + .94 * k * k * (3 - 2 * k));
       }
       dens[cx + cz * W] = raw[cx + cz * W] * m;

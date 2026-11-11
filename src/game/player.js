@@ -395,7 +395,7 @@ export class Player {
     if (this.loadout === 'survival') { this.updateHunger(dt); this.updateRest(dt); }
     else {
       const restCap = this.sanctuary ? 100 : 55;
-      if (this.health < restCap && g.time - this.lastHitT > 6) this.health = Math.min(restCap, this.health + dt * (this.sanctuary ? 2.5 : 1));
+      if (this.health < restCap && (g.time - this.lastHitT > 6 || this.lastHitT > g.time)) this.health = Math.min(restCap, this.health + dt * (this.sanctuary ? 2.5 : 1));
     }
     if (this.sanctuary) this.infection = Math.max(0, this.infection - dt * .05);
     this.hurtFlash = Math.max(0, this.hurtFlash - dt * 1.4);

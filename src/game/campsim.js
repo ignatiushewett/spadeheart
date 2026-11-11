@@ -566,7 +566,9 @@ export class CampSim {
     }
     if (m.stage > 0 || (s.major && s.drawing) || s.fatal || s.evac || s.collapseT > 0 || (s.real && s.breaches.length) || s.inside >= 30) op.hot = now;
     this.g.jobs.opTick(c, op, now);
-    if (now - op.hot >= OP_CALM && !s.drawing && !s.raid && s.pool <= 0 && !s.rec) this.closeOp(c, s, true, now);
+    // A lull early on is not the end of it: the follow-ups are further apart at the start, and the operation runs its length.
+    const running = op.cap && now - op.start < op.cap - .35;
+    if (!running && now - op.hot >= OP_CALM && !s.drawing && !s.raid && s.pool <= 0 && !s.rec) this.closeOp(c, s, true, now);
   }
 
   // The operation is over. A win is written up here. A loss has already been, by the report that says the camp fell.
@@ -1265,11 +1267,22 @@ export class CampSim {
     if (!W.isLoaded(midX, STREET_Y + 1, midZ)) return false;
     // Later on it takes more of the wall with it each time.
     const grow = this.pressure() - 1, bw = BREACH_W + Math.min(4, Math.floor(grow)), bh = BREACH_H + Math.min(3, Math.floor(grow * .7));
-    for (let t = tc - bw; t <= tc + bw; t++) for (let row = 0; row < 2; row++) for (let y = STREET_Y; y < STREET_Y + bh; y++) {
-      const x = horiz ? t : fixed + inward * row, z = horiz ? fixed + inward * row : t;
-      const id = W.get(x, y, z);
-      if (!id) continue;
-      if (W.set(x, y, z, 0)) cells.push(x, y, z, id);
+    // Torn, not cut: highest in the middle where the weight of them went through, lower and broken towards the sides, a few bites
+    // out of the wall past the edges, and a ragged top. The middle is always tall and wide enough for them to come through.
+    for (let t = tc - bw - 2; t <= tc + bw + 2; t++) {
+      const off = Math.abs(t - tc), u = off / (bw + .5);
+      let col = u <= 1 ? bh * Math.sqrt(1 - u * u * .6) + (rand() - .5) * 2.2 : u < 1.4 ? rand() * 2.6 * (1.4 - u) / .4 : 0;
+      if (off <= bw - 1) col = Math.max(col, Math.min(bh, 4));
+      for (let row = 0; row < 2; row++) {
+        let h = Math.round(col + (row ? (rand() - .5) * 1.6 : 0));
+        if (h > 0 && rand() < .3) h++;   // a loose block knocked off the lip
+        for (let y = STREET_Y; y < STREET_Y + h; y++) {
+          const x = horiz ? t : fixed + inward * row, z = horiz ? fixed + inward * row : t;
+          const id = W.get(x, y, z);
+          if (!id) continue;
+          if (W.set(x, y, z, 0)) cells.push(x, y, z, id);
+        }
+      }
     }
     // The crowd flattens the stakes in front of the hole too, or the rest could never get to it.
     for (let t = tc - bw - 2; t <= tc + bw + 2; t++) for (const row of [-1, -3, -4]) for (let y = STREET_Y; y < STREET_Y + 4; y++) {

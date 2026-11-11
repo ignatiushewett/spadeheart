@@ -350,7 +350,10 @@ class Game {
       let round = 0;
       H.forRadius(this.player.x, this.player.z, 3.2, () => { round++; });
       const crowd = Math.min(round, 9);
-      if (this.time - (this.lastBite || 0) < .8 - crowd * .05) return;
+      // The clock starts again at zero with every new game. The last bite from a game before must not count, or nothing could bite
+      // you until the new clock caught up with it.
+      const since = this.time - (this.lastBite ?? -1e9);
+      if (since >= 0 && since < .8 - crowd * .05) return;
       this.lastBite = this.time;
       const base = 4.2 + rand() * 4.2;
       this.player.damage(base * H.settings.damage * (1 + crowd * .07), x, z, 'bite');
@@ -1603,6 +1606,7 @@ class Game {
     this.tod = kit === 'survival' ? .201 + rand() * .016 : .33;
     this.day = 1;
     this.time = 0;
+    this.lastBite = -1e9;
     this.pickups = [];
     this.spawnPending = true;
     this.beginLoad('Entering Manhattan', () => {

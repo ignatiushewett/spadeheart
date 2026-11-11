@@ -155,8 +155,11 @@ export class Director {
     if (!m.fatal) {
       // An operation is a horde on the move for days, not one evening: until it has run its length the push keeps coming, a smaller wave
       // every half a day or so, at any hour. However fast the last one was put down, the next is already on its way.
+      // It builds. Early on the follow-ups are thin and far apart: time to sleep, patch the wall and get out on a job. Towards the
+      // end of its length they come closer together and bigger, and the last days are the hard ones.
       const op = sim.state[c.id].op;
-      const end = this.lastEvening(m), soon = now + .3 + rand() * .22;
+      const p = op && op.cap ? Math.min(1, Math.max(0, (now - op.start) / op.cap)) : 1;
+      const end = this.lastEvening(m), soon = now + (.55 + rand() * .3) * (1 - p * .55);
       if (op && op.cap && now - op.start < op.cap - .35 && soon < end - 1.2) { m.next = soon; m.stage = 0; m.fatal = false; m.within = true; }
       else {
         m.within = false;
@@ -213,11 +216,19 @@ export class Director {
     return Math.round(base * (fatal ? 2.6 : .55 + .45 * this.g.campSim.ramp()));
   }
 
+  // How big an operation's follow-up wave is against the one that opened it: a quarter early on, three quarters by the end.
+  withinK(s, now) {
+    const op = s.op, p = op && op.cap ? Math.min(1, Math.max(0, (now - op.start) / op.cap)) : 1;
+    return .25 + .5 * p * p;
+  }
+
   // What it will cost them this time: whatever it takes to bring them down to where they ought to be by next time.
   harmFor(c, m, now) {
     if (m.fatal) return 1;
     const gap = m.within ? .5 : Math.max(1.6, Math.min(4, (this.lastEvening(m) - DUSK - now) * .3));
     const left = this.strength(c), aim = this.curve(c, now + gap);
+    // The early follow-ups cost little; the hurt comes with the late ones.
+    if (m.within && !m.fatal) return Math.max(.01, Math.min(.42, Math.min(left - aim, left - .2)) * (.35 + .65 * this.withinK(this.g.campSim.state[c.id], now) / .75));
     return Math.max(.015, Math.min(.42, Math.min(left - aim, left - .2)));
   }
 
@@ -232,7 +243,7 @@ export class Director {
     m.dir = rand() * Math.PI * 2;
     m.fatal = m.next >= this.lastEvening(m) - .001;
     // The follow-up waves of an operation are its stragglers and second pushes: a good deal smaller than what opened it.
-    m.size = Math.round(this.sizeFor(c, m.fatal) * (m.within && !m.fatal ? .55 : 1));
+    m.size = Math.round(this.sizeFor(c, m.fatal) * (m.within && !m.fatal ? this.withinK(s, now) : 1));
     m.harm = this.harmFor(c, m, now);
     sim.openOp(c, s);
     const side = sideOf(m.dir), lore = LORE[c.key], who = lore.cast.find((q) => q.role === 'captain') || lore.cast.find((q) => q.role === 'leader');
@@ -293,6 +304,9 @@ export class Director {
     const weights = g.layout.camps.map((c) => {
       const s = sim.state[c.id], m = this.plans[c.id];
       if (s.status !== 'holding' || s.pool > 0 || s.raid || m.stage > 0) return 0;
+      // A settlement in an operation has waves enough of its own, paced to build towards the end. Everyday trouble on top of that
+      // was what made the first days of a long one wall-to-wall.
+      if (s.op) return 0;
       if (sim.passing) return P.home === c.id ? 5 : 1;
       const d = Math.hypot(c.cx - P.x, c.cz - P.z), close = d < 500;
       if (close && now < this.restUntil) return 0;

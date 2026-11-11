@@ -1542,7 +1542,7 @@ export class NPCs {
       if (Math.hypot(n.x - P.x, n.z - P.z) > 90) continue;
       const c = g.layout.camps[n.dest];
       const toWall = Math.max(c.x0 - n.x, n.x - c.x1, c.z0 - n.z, n.z - c.z1, 0);
-      const k = toWall > 260 ? .55 : toWall < 90 ? 1 : .55 + .45 * (1 - (toWall - 90) / 170);
+      const k = toWall > 260 ? .8 : toWall < 90 ? 1 : .8 + .2 * (1 - (toWall - 90) / 170);
       want = Math.min(want, k);
     }
     H.journeyWant = want;
@@ -1654,9 +1654,10 @@ export class NPCs {
         // Their own place in the crowd, relative to the way it is going, drifting a little as people do.
         if ((n.driftT = (n.driftT || 0) - dt) <= 0) {
           n.driftT = 6 + rand() * 8;
-          const wide = 3 + Math.sqrt(q.members.length) * 1.4;
-          n.trailS = Math.max(-wide * 1.3, Math.min(wide * 1.3, n.trailS + (rand() - .5) * 3));
-          n.trailA = Math.max(-(q.tail || 10) * 1.2, Math.min(2, n.trailA + (rand() - .5) * 2.4));
+          // Drifting about inside the knot, never out of it.
+          const hw = q.halfW || 3 + Math.sqrt(q.members.length) * 1.4, hl = q.halfL || (q.tail || 10) / 2;
+          n.trailS = Math.max(-hw * 1.1, Math.min(hw * 1.1, n.trailS + (rand() - .5) * 2.4));
+          n.trailA = Math.max(-(hl * 2 + 2.5), Math.min(.5, n.trailA + (rand() - .5) * 2.4));
         }
         const hx = q.hx ?? 0, hz = q.hz ?? 1;
         tx = lead.x + hx * n.trailA - hz * n.trailS; tz = lead.z + hz * n.trailA + hx * n.trailS;
@@ -2121,14 +2122,18 @@ export class NPCs {
       }
       // Not a formation: a crowd of people sticking together. They trail along behind whoever is in front, spread across the street,
       // and the guns go out on the edges and up near the front.
-      const N = group.length, wide = 3 + Math.sqrt(N) * 1.6;
-      q.tail = 4 + Math.sqrt(N) * 3.2;
+      // A knot, not a column: everyone has a spot somewhere in an oval behind whoever leads, no wider than a street, and only a couple
+      // of times as long as it is wide. Guns on the rim, children towards the middle.
+      const N = group.length;
+      q.halfW = Math.min(7.5, 2.5 + Math.sqrt(N) * .75);
+      q.halfL = Math.max(q.halfW * 1.2, Math.min(18, 2.5 + Math.sqrt(N) * 1.25));
+      q.tail = q.halfL * 2 + 2;
       group.forEach((m, k) => {
         m.squad = q; m.rally = null; m.dest = R.to; m.spot = undefined;
         if (k === 0) return;
-        if (m.escort || (m.armed && rand() < .5)) { m.trailA = 1 - rand() * q.tail * .7; m.trailS = (rand() < .5 ? -1 : 1) * (wide * .7 + rand() * 2.5); }
-        else { m.trailA = -(2 + Math.sqrt(k) * 2.9 + rand() * 3); m.trailS = (rand() - .5) * 2 * wide * (.4 + rand() * .6); }
-        if (m.kid) m.trailS *= .5;
+        const a = rand() * Math.PI * 2, r = m.escort || (m.armed && rand() < .5) ? .78 + rand() * .22 : m.kid ? Math.sqrt(rand()) * .5 : Math.sqrt(rand()) * .9;
+        m.trailA = -(q.halfL + 1.5) + Math.cos(a) * r * q.halfL;
+        m.trailS = Math.sin(a) * r * q.halfW;
         m.restT = rand() * 1.2;
       });
       const where = R.toName || 'the next settlement';
