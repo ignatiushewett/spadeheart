@@ -45,7 +45,7 @@ uniform vec4 uFlood;            // the statue's floodlights: x, aim height, z, s
 uniform vec4 uFloodLamp[4];     // each lamp: where it is, and how strong
 uniform sampler2D uCityLight;   // every lamp and fire in the world, painted into one map
 uniform float uCityLightK;
-const vec2 WSIZE=vec2(1536.,6400.);
+const vec2 WSIZE=vec2(4096.,4096.);
 
 float hash12(vec2 p){ vec3 q=fract(vec3(p.xyx)*.1031); q+=dot(q,q.yzx+33.33); return fract((q.x+q.y)*q.z); }
 float vnoise(vec2 p){ vec2 i=floor(p),f=fract(p); f=f*f*(3.-2.*f);
@@ -213,7 +213,9 @@ vec3 applyFog(vec3 col, vec3 wp){
   float x=K*dir.y*d;
   float path=abs(x)<.002?1.-x*.5:(1.-exp(-x))/x;
   float low=exp(-K*max(uCam.y-12.,-4.));
-  float amt=1.-exp(-uFogDensity*d*(.24+.76*low*path));
+  // High ground stands clear of the haze: the top of a mountain shows from the far side of the state.
+  float clearK=mix(1.,.22,smoothstep(40.,170.,wp.y));
+  float amt=1.-exp(-uFogDensity*d*(.24*clearK+.76*low*path));
   float sunAmt=pow(max(dot(dir,uSunDir),0.),6.);
   vec3 fog=uFogCol+uSunCol*sunAmt*.05;
   // Lamp-light hangs in the air over the camps. From a distance it is the only thing you can see.
@@ -1642,7 +1644,7 @@ out vec3 vLit;
 float h(float n){ return fract(sin(n)*43758.5453); }
 // How much light this drop is falling through right now.
 vec3 lightAtDrop(vec3 p){
-  vec3 L=textureLod(uCityLight,p.xz/vec2(1536.,6400.),0.).rgb;
+  vec3 L=textureLod(uCityLight,p.xz/vec2(4096.,4096.),0.).rgb;
   L=L*L*5.5*uCityLightK*clamp(1.-(p.y-12.)/34.,0.,1.);
   for(int i=0;i<uLightCount;i++){
     vec3 d=uLightPos[i].xyz-p;

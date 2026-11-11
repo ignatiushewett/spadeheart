@@ -1,8 +1,7 @@
 // The horde. Population lives in a coarse density grid covering the whole island; only the
 // bubble around the player becomes real entities. Entities update in tiers: full physics up
 // close, staggered flow-field steering further out, so tens of thousands stay affordable.
-import { WX, WZ, STREET_Y, G } from '../shared/constants.js';
-import { vZ, uX } from '../shared/layout.js';
+import { WX, WZ, STREET_Y, G, FLOOR_H } from '../shared/constants.js';
 import { HUMAN_VARIANT_START } from '../engine/actors.js';
 import { isGlass, HP } from '../shared/materials.js';
 
@@ -159,15 +158,9 @@ export class Horde {
         if (g === G.ROAD || g === G.WALK || g === G.PLAZA || g === G.ALLEY) street[cx + cz * W]++;
       }
       street[cx + cz * W] /= total; land[cx + cz * W] /= total;
-      const u = uX((cx + .5) * POP_CELL), v = vZ((cz + .5) * POP_CELL);
-      let d = 90;
-      if (v < .075) d = 150;
-      else if (v < .20) d = 120;
-      else if (v < .29) d = 130;
-      else if (v < .41) d = 190;
-      else if (v < .63) d = u > .32 && u < .515 ? 22 : 120;
-      else if (v < .76) d = 110;
-      else d = 70;
+      // Thick in the middle of Albion, thinner in the smaller towns, and next to nothing out in the fields and the woods.
+      let d = 0;
+      for (const [ox, oz] of [[.25, .25], [.75, .25], [.25, .75], [.75, .75]]) d += this.L.densityAt((cx + ox) * POP_CELL, (cz + oz) * POP_CELL) / 4;
       dens[cx + cz * W] = d;
     }
     // Neighbourhoods run into each other, with no line on the ground where one ends.
@@ -680,9 +673,9 @@ export class Horde {
       if (bx < 1 || bz < 1 || bx >= WX - 1 || bz >= WZ - 1) continue;
       const k = bz * WX + bx;
       if (!L.lot[k]) continue;
-      const floors = Math.floor((L.height[k] - STREET_Y) / 5);
-      if (floors < 2) continue;
-      const y = STREET_Y - 1 + 5 * (1 + Math.floor(rand() * Math.min(floors - 1, 16))) + 1;
+      const floors = Math.floor((L.height[k] - STREET_Y) / FLOOR_H);
+      if (floors < 2 || L.buildings[L.lot[k] - 1].house) continue;
+      const y = STREET_Y - 1 + FLOOR_H * (1 + Math.floor(rand() * Math.min(floors - 1, 16))) + 1;
       if (!w.isLoaded(bx, y, bz)) continue;
       const P = this.player;
       if (P && Math.abs(y - P.y) < 3 && Math.hypot(bx - P.x, bz - P.z) < 26) continue;   // not on top of you, on your own floor
@@ -1287,9 +1280,9 @@ export class Horde {
       // Nothing wakes up behind a camp's wall: those buildings were cleared long ago.
       const near = this.inCamp(x, z, 36);
       if (near && !(this.sim && this.sim.isRuined(near.id))) continue;
-      const floors = Math.floor((this.L.height[i] - STREET_Y) / 5);
-      if (floors < 2) continue;
-      const y = STREET_Y - 1 + 5 * (1 + Math.floor(rand() * Math.min(floors - 1, 16))) + 1;
+      const floors = Math.floor((this.L.height[i] - STREET_Y) / FLOOR_H);
+      if (floors < 2 || this.L.buildings[this.L.lot[i] - 1].house) continue;
+      const y = STREET_Y - 1 + FLOOR_H * (1 + Math.floor(rand() * Math.min(floors - 1, 16))) + 1;
       if (Math.abs(y - P.y) < 3 && r < 26) continue;
       if (!w.isLoaded(x, y, z)) continue;
       const cell = (x >> 6) + (z >> 6) * this.popW;

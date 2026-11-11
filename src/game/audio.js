@@ -67,7 +67,7 @@ export class Audio2 {
     this.uiLevel.gain.value = this.volume;
     this.uiLevel.connect(comp);
     if (this.wantMusic) this.music.play();
-    // Long slapback impulse: the sound of gunfire between Manhattan towers.
+    // Long slapback impulse: the sound of gunfire between Albion towers.
     const len = ctx.sampleRate * 2.6;
     const ir = ctx.createBuffer(2, len, ctx.sampleRate);
     for (let ch = 0; ch < 2; ch++) {

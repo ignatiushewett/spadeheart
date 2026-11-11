@@ -48,11 +48,11 @@ export const ITEMS = {
   parts: { name: 'Electronics', type: 'junk', value: 14, weight: .4, stack: true, desc: 'Radios, boards, batteries.' },
   cloth: { name: 'Clean Cloth', type: 'junk', value: 3, weight: .2, stack: true, desc: 'Good for bandages.' },
   smokes: { name: 'Cigarettes', type: 'junk', value: 11, weight: .05, stack: true, desc: 'Close enough to money.' },
-  jewelry: { name: 'Jewelry', type: 'junk', value: 34, weight: .05, stack: true, desc: 'From 47th Street. Worth less every day.' },
-  papers_bryant: { name: 'Bryant Park Papers', type: 'papers', value: 0, weight: .01, desc: 'Bought and stamped. Bryant Park Market opens its gates to you. Good until you die, and no use to anyone else.' },
-  papers_union: { name: 'Fort Union Papers', type: 'papers', value: 0, weight: .01, desc: 'Bought and stamped. Fort Union opens its gates to you. Good until you die, and no use to anyone else.' },
-  papers_sheep: { name: 'Sheep Meadow Papers', type: 'papers', value: 0, weight: .01, desc: 'Bought and stamped. Sheep Meadow Bastion opens its gates to you. Good until you die, and no use to anyone else.' },
-  metrocard: { name: 'MetroCard', type: 'junk', value: 1, weight: .01, stack: true, desc: 'Insufficient fare.' },
+  jewelry: { name: 'Jewelry', type: 'junk', value: 34, weight: .05, stack: true, desc: 'From Exchange Avenue. Worth less every day.' },
+  papers_bryant: { name: 'Lakeshore Market Papers', type: 'papers', value: 0, weight: .01, desc: 'Bought and stamped. Lakeshore Market opens its gates to you. Good until you die, and no use to anyone else.' },
+  papers_union: { name: 'Fort Westpoint Papers', type: 'papers', value: 0, weight: .01, desc: 'Bought and stamped. Fort Westpoint opens its gates to you. Good until you die, and no use to anyone else.' },
+  papers_sheep: { name: 'Arnhem Bastion Papers', type: 'papers', value: 0, weight: .01, desc: 'Bought and stamped. Arnhem Bastion opens its gates to you. Good until you die, and no use to anyone else.' },
+  metrocard: { name: 'Albion Transit Pass', type: 'junk', value: 1, weight: .01, stack: true, desc: 'Insufficient fare.' },
 };
 
 export const WEAPON_ORDER = ['crowbar', 'axe', 'sledge', 'pistol', 'revolver', 'smg', 'shotgun', 'rifle', 'hunting', 'lmg', 'rocket', 'grenade', 'dynamite', 'block_wood', 'block_conc', 'block_steel'];
@@ -157,7 +157,7 @@ export const KITS = {
   veteran: { name: 'Easy', desc: 'Full kit from the start.' },
   regular: { name: 'Medium', desc: 'Basic gear from your faction.' },
   drifter: { name: 'Hard', desc: 'A crowbar and nothing else.' },
-  survival: { name: 'Survival', desc: 'Garvey Yard, basic gear. No natural healing, and you need to eat. One life.' },
+  survival: { name: 'Survival', desc: 'Carver Yard, basic gear. No natural healing, and you need to eat. One life.' },
 };
 export const SURVIVAL_TIERS = ['Poor', 'Middling'];
 // Where Survival begins: a modest camp with a lot of city around it, a long way from the strong ones.
@@ -195,24 +195,28 @@ export function startingGear(kit, campKey) {
 export const TRUST_LOCK = { smg: 5, shotgun: 5, revolver: 5, rifle: 10, hunting: 10, riot: 10, dynamite: 10, grenade: 5, lmg: 25, rocket: 25, ammo_rocket: 25, tactical: 25 };
 
 export const RUMORS = [
-  'Sound carries between the towers. Fire one shot on 42nd and half of Hell\'s Kitchen comes to see.',
+  'Sound carries between the towers. Fire one shot on Kingsway and half of Midtown comes to see.',
   'Crates are worth checking on the lower floors. Pharmacies and offices got picked over last, up high.',
-  'The Guard pulled out of the 34th Street checkpoints in a hurry. Trucks still have rounds in them.',
+  'The Guard pulled out of the highway checkpoints in a hurry. Trucks still have rounds in them.',
   'Walk, don\'t run. They mostly track you by the racket you make. Crouching helps.',
   'Night is worse. They move faster and see further, and it is hard to say why.',
-  'A guy on Delancey brought a whole walk-up down with four charges. Took about sixty of them with it.',
+  'A guy in Westmoor brought a whole walk-up down with four charges. Took about sixty of them with it.',
   'Take the columns and the rest follows. A wall with nothing holding it up does not stay a wall.',
-  'Someone is still running the generator for the Times Square signs. Nobody knows who.',
+  'Someone is still running the generator for the Meridian Square signs. Nobody knows who.',
   'Plank up a stairwell and you can sleep. For a while. They chew through wood eventually.',
-  'The piers on the Hudson are quiet. Water keeps them off, but they will wait on the shore.',
-  'They say the Bastion in Sheep Meadow has fresh tomatoes. Actual tomatoes.',
+  'The piers at Dayton are quiet. Water keeps them off, but they will wait on the shore.',
+  'They say the Bastion out at Arnhem Fields has fresh tomatoes. Actual tomatoes.',
   'If you get bitten, get antibiotics. It does not cure it, but it buys you time.',
-  'I saw the Statue from the Battery yesterday. Torch was lit. Who is up there?',
-  'Nobody crosses the bridges. The Army dropped the middle of every span the first week.',
-  'Morningside still has doctors. Fort Tryon still has guns. Nobody has both.',
+  'I saw the Rock light from the Landing last night. Lamp was lit. Who is out there?',
+  'Nobody leaves by road. The Army blew the state line crossings the first week, and the Weston Tunnel is black from end to end.',
+  'Gibson still has doctors. The Abbey still has guns. Nobody has both.',
+  'It is quiet out in the farm country. Quiet is not the same as empty.',
+  'You can see Mt. Page from anywhere in Ballarat. If you are lost, put it on your west and walk to the sea.',
+  'The Guard said they would hold the line at the Florida border. Nobody has heard from the Guard.',
+  'Stay out of the marsh behind Severn Bay after dark. The water is only knee deep, and that is the problem.',
 ];
 
-// New York, as it was: everyone who had come here from everywhere else, and whoever is left of them.
+// Ballarat, as it was: everyone who had come here from everywhere else, and whoever is left of them.
 export const SURVIVOR_NAMES = [
   'Marcus', 'Dee', 'Ana', 'Tomasz', 'Priya', 'Leon', 'Yuki', 'Rosa', 'Sam', 'Ike', 'Noor', 'Gil', 'Fatima', 'Eddie', 'Mei', 'Darnell', 'Kasia', 'Hector', 'Jo', 'Ravi', 'Nadia', 'Otis', 'Lena', 'Vince',
   'Aaliyah', 'Abe', 'Adaeze', 'Adrian', 'Agnes', 'Ahmed', 'Aiko', 'Alba', 'Aleksei', 'Alma', 'Amara', 'Amir', 'Andre', 'Angelo', 'Anika', 'Anton', 'Arjun', 'Armando', 'Asha', 'Astrid', 'Aurelio', 'Ayesha',

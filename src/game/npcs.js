@@ -46,7 +46,7 @@ const DOCK = {
   bryant: { keep: .2, why: 'There is a penalty clause. The market always reads the small print.' },
   battery: { keep: .25, why: 'The Harbormaster pays for cargo delivered, and you came up short.' },
   wash: { keep: .4, why: 'The Assembly voted on your case. It was close.' },
-  union: { keep: .15, why: 'Failure to meet a tasking. Nobody at Fort Union gets partial credit.' },
+  union: { keep: .15, why: 'Failure to meet a tasking. Nobody at Fort Westpoint gets partial credit.' },
   sheep: { keep: .2, why: 'The Judge has ruled on it, and she does not hear appeals.' },
   tompkins: { keep: .35, why: 'Nobody here wants to fine you. There just is not much left in the tin.' },
   morning: { keep: .3, why: 'Those spades were going to buy antibiotics.' },
@@ -2367,7 +2367,7 @@ export class NPCs {
         if (((n.tick + fN) & 3) === 0) {
           if (n.cLeft > 0) { n.x += n.cdx * n.cLeft; n.y += n.cdy * n.cLeft; n.z += n.cdz * n.cLeft; n.phase += n.cdp * n.cLeft; }
           const ox = n.x, oy = n.y, oz = n.z, op = n.phase;
-          this.updateNPC(n, dt * 4, dp, hostile);
+          this.updateNPC(n, dt * 4, dp, hostile); this.hillY(n);
           n.cdx = (n.x - ox) / 4; n.cdy = (n.y - oy) / 4; n.cdz = (n.z - oz) / 4; n.cdp = (n.phase - op) / 4;
           // A jump (sat down, stood up, stepped through a door) is a jump: nothing to spread.
           if (Math.abs(n.cdx) + Math.abs(n.cdz) > .5) n.cLeft = 0;
@@ -2375,7 +2375,7 @@ export class NPCs {
         } else if (n.cLeft > 0) { n.x += n.cdx; n.y += n.cdy; n.z += n.cdz; n.phase += n.cdp; n.cLeft--; }
       } else {
         if (n.cLeft > 0) { n.x += n.cdx * n.cLeft; n.y += n.cdy * n.cLeft; n.z += n.cdz * n.cLeft; n.phase += n.cdp * n.cLeft; n.cLeft = 0; }
-        this.updateNPC(n, dt, dp, hostile);
+        this.updateNPC(n, dt, dp, hostile); this.hillY(n);
       }
     }
     g.horde.humans = humans;
@@ -2397,6 +2397,12 @@ export class NPCs {
   }
 
   // --- People talking among themselves ---------------------------------------------------------------
+  // Out in the country the ground is not level. Anyone walking it stands on the hill, not inside it, and comes back down with it.
+  hillY(n) {
+    const t = this.g.world.terrainTop(n.x, n.z);
+    if (t > STREET_Y) { if (n.y < t || n.onHill) { n.y = t; n.onHill = true; } } else if (n.onHill) { n.y = STREET_Y; n.onHill = false; }
+  }
+
   updateChatter(dt) {
     const g = this.g, P = g.player;
     // Conversations already running: the next person speaks when the last has had time to be read.

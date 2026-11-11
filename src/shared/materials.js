@@ -85,6 +85,13 @@ m('BRICK_O', 0xb4683a, 7); m('BRICK_P', 0x5f3836, 7); m('STUCCO', 0xb98f62, 6); 
 // Bedding. The old BEDROLL stays as the olive army blanket.
 m('MATTRESS', 0xb7ae98, 3); m('PILLOW', 0xdcd6c6, 2); m('BLANKET_G', 0x5d6266, 3); m('BLANKET_R', 0x7e3d31, 3); m('BLANKET_B', 0x3e5672, 3); m('BLANKET_C', 0xa58c62, 3);
 
+// Out of the city: painted boards, shingle roofs, barns and what grows round them.
+m('CLAP_W', 0xd6d0be, 5); m('CLAP_B', 0x7f93a6, 5); m('CLAP_Y', 0xd0bd86, 5); m('CLAP_G', 0x8c9a7a, 5);
+m('SHINGLE', 0x4c4c52, 6); m('SHINGLE_R', 0x74463a, 6); m('SHINGLE_B', 0x55626e, 6); m('ROOF_TIN', 0x8a8f90, 8);
+m('BARN_R', 0x86332a, 6); m('STUCCO_P', 0xc99a8c, 6); m('STUCCO_T', 0x79a39c, 6);
+m('HAY', 0xb89c4c, 3); m('WHEAT', 0xb9a558, 1, F_LEAF); m('SNOW', 0xd8dce0, 4); m('REED', 0x7a7f45, 1, F_LEAF);
+m('COTTON', 0xe2ded2, 1, F_LEAF); m('PEANUT', 0x5f6e34, 1, F_LEAF);
+
 // Which voxels the mesher treats as see-through (neighbouring faces stay visible).
 export const isGlass = (id) => (FLAGS[id] & F_GLASS) !== 0;
 // Glass around a hole: crazed right across, still in the frame, barely. Each pane colour has its broken self.

@@ -44,10 +44,11 @@ export function makeGenerator(L) {
     const g = ground[i];
     const top = STREET_Y - 1 + terr[i];
     const lx = x - ox, lz = z - oz;
-    let surface = M.STONE, under = M.STONE;
+    let surface = M.STONE, under = M.STONE, deep = M.STONE;
+    const flags = mark[i];
     switch (g) {
       case G.ROAD: {
-        const mk = mark[i];
+        const mk = mark[i] & 15;
         surface = mk === 1 ? M.LINE_Y : mk ? M.LINE_W : ((x >> 3) + (z >> 3)) % 7 === 0 ? M.ASPHALT2 : M.ASPHALT;
         break;
       }
@@ -61,10 +62,13 @@ export function makeGenerator(L) {
         break;
       }
       case G.ALLEY: surface = M.ALLEYWAY; break;
-      case G.PLAZA: surface = M.WALK2; break;
+      case G.PLAZA: surface = mark[i] === 4 ? ((x % 6 === 0 && z % 13 < 9) ? M.LINE_W : M.ASPHALT2) : M.WALK2; break;
       case G.PROM: surface = (x + z) % 4 === 0 ? M.WOOD_D : M.WOOD; under = M.WOOD_D; break;
       case G.CAMP: surface = M.GRAVEL; break;
-      case G.ROCK: surface = M.SCHIST; under = M.SCHIST; break;
+      case G.ROCK: surface = mark[i] ? M.SNOW : M.SCHIST; under = M.SCHIST; deep = M.SCHIST; break;
+      case G.SAND: surface = M.SAND; under = M.SAND; break;
+      case G.DIRT: surface = noise2(x * .21, z * .21) < .42 ? M.PATH : M.DIRT; under = M.DIRT; break;
+      case G.FIELD: surface = mark[i] === 6 ? M.GRASS_DRY : M.SOIL; under = M.DIRT; break;
       case G.PARK: {
         if (top < WATER_Y) { surface = M.DIRT; under = M.DIRT; break; }
         const n = noise2(x * .05, z * .05);
@@ -79,10 +83,42 @@ export function makeGenerator(L) {
     // You can dig a pit, not a mine: three voxels down the ground stops being diggable. Beside water
     // the barrier drops with the neighbouring bed, so shores and pond edges can still be cut away.
     const barrier = g === G.WATER ? 2 : Math.max(2, top - 2 + Math.min(0, terr[Math.max(0, i - 1)] - terr[i], terr[Math.min(terr.length - 1, i + 1)] - terr[i], terr[Math.max(0, i - WX)] - terr[i], terr[Math.min(terr.length - 1, i + WX)] - terr[i]));
+    if (flags & 16 && g !== G.CAMP) {
+      // A bridge or a pier: a deck over open water, on piles.
+      const pile = g === G.PROM ? (x & 7) === 0 && (z & 7) === 0 : (x & 15) < 2 && (z & 15) < 2;
+      for (let y = y0; y <= groundEnd; y++) {
+        const id = y === top ? surface : y === top - 1 ? (g === G.PROM ? M.WOOD_D : M.STEEL_D) : pile ? (g === G.PROM ? M.LOG : M.CONCRETE_D) : 0;
+        if (id) { d[lx | ((y - oy) << 5) | (lz << 10)] = id; any = true; }
+      }
+      // A rail along the open side.
+      const rail = top + 1;
+      if (g !== G.PROM && rail >= y0 && rail <= y1 && (ground[i - 1] === G.WATER || ground[i + 1] === G.WATER || ground[i - WX] === G.WATER || ground[i + WX] === G.WATER)) { d[lx | ((rail - oy) << 5) | (lz << 10)] = M.IRON; any = true; }
+      return;
+    }
     for (let y = y0; y <= groundEnd; y++) {
-      let id = y === top ? surface : y < barrier ? M.BEDROCK : under;
+      let id = y === top ? surface : y < barrier ? M.BEDROCK : y < top - 3 ? deep : under;
       d[lx | ((y - oy) << 5) | (lz << 10)] = id;
       any = true;
+    }
+    if (flags & 32) {
+      // The tunnel: seven clear over the road, a concrete lid, and then the hill.
+      const roof = height[i] - 1;
+      for (let y = Math.max(y0, STREET_Y + 6); y <= Math.min(y1, roof); y++) {
+        d[lx | ((y - oy) << 5) | (lz << 10)] = y === STREET_Y + 6 ? M.CONCRETE : y === roof ? M.GRASS : y > roof - 3 ? M.DIRT : M.STONE;
+        any = true;
+      }
+      return;
+    }
+    if (g === G.FIELD && flags > 1 && flags < 6) {
+      // What was in the ground when everyone stopped coming out to it.
+      const y = top + 1;
+      // Corn in tall rows, cotton gone to boll and never picked, low peanut rows, and somebody's tomatoes.
+      const tall = flags === 2 ? ((x + (z >> 6)) % 3 === 0 ? 0 : 2 + (h2(x, z) & 1)) : flags === 3 ? ((z & 1) && h2(x, z) % 4 ? 2 : 0) : flags === 4 ? (x % 3 === 0 ? 1 : 0) : (x % 4 === 0 && h2(x, z) % 3 ? 1 : 0);
+      for (let k = 0; k < tall; k++) {
+        const id = flags === 2 ? M.CORN : flags === 3 ? (k === tall - 1 && h2(x + k, z) % 3 ? M.COTTON : M.LEAF3) : flags === 4 ? M.PEANUT : M.TOMATO;
+        if (y + k >= y0 && y + k <= y1) { d[lx | ((y + k - oy) << 5) | (lz << 10)] = id; any = true; }
+      }
+      return;
     }
     if (g === G.LOT && lot[i]) building(i, x, z, y0, y1, buildings[lot[i] - 1]);
     else if (g === G.WALK) { fireEscape(i, x, z, y0, y1); awning(i, x, z, y0, y1); frontage(i, x, z, y0, y1); }
@@ -106,14 +142,14 @@ export function makeGenerator(L) {
       if (t % 3 === 0) place(top - 2, S.cornice || S.trim);
     }
     if (b.stoop) {
-      const m = (t + (b.seed & 15)) % 13;
-      if (m === 2 || m === 12) { place(STREET_Y, S.trim); place(STREET_Y + 1, S.trim); }
+      const m = (t + (b.seed & 15)) % 15;
+      if (m === 3 || m === 14) { place(STREET_Y, S.trim); place(STREET_Y + 1, S.trim); }
     }
   }
 
   // Shop awnings over the sidewalk, faded and torn, on the stretches of shopfront that have them.
   function awning(i, x, z, y0, y1) {
-    const y = STREET_Y + 3;
+    const y = STREET_Y + 4;
     if (y < y0 || y > y1) return;
     let nb = 0, t = 0;
     for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
@@ -125,10 +161,10 @@ export function makeGenerator(L) {
     }
     if (!nb) return;
     const b = buildings[nb - 1];
-    if (STYLES[b.style].cast === 2) return;
+    if (STYLES[b.style].cast === 2 || b.house || b.blank) return;
     const s = t + (b.seed & 15);
-    const seg = (s / 13) | 0;
-    if (s % 13 < 3 || s % 13 > 11 || h2(b.id, seg * 7) % 3 !== 0) return;
+    const seg = (s / 15) | 0;
+    if (s % 15 < 4 || s % 15 > 13 || h2(b.id, seg * 7) % 3 !== 0) return;
     if (r3(x, y, z) < .1) return;
     const col = [M.AWN_R, M.AWN_G, M.AWN_B, M.AD_YELLOW, M.AD_BLACK][h2(b.id, seg) % 5];
     d[(x - ox) | ((y - oy) << 5) | ((z - oz) << 10)] = (t & 1) ? col : M.CANVAS;
@@ -155,65 +191,87 @@ export function makeGenerator(L) {
     const t = dir <= 2 ? z : x;
     if (((t + b.seed) % 22) > 6) return;
     const top = b.tiers[1];
-    if (top > STREET_Y + 45) return;
+    if (top > STREET_Y + 54 || b.house) return;
     const base = STREET_Y + 1 * FLOOR_H - 1;
     for (let y = Math.max(y0, base); y <= Math.min(y1, top - 2); y++) {
       if ((y - base) % FLOOR_H === 0) d[(x - ox) | ((y - oy) << 5) | ((z - oz) << 10)] = M.IRON, any = true;
     }
   }
 
-  const isSealed = (b) => (b.seed >>> 9) % 100 < 74;
+  const FH = FLOOR_H;
+  const isSealed = (b) => (b.seed >>> 9) % 100 < (b.house ? 40 : 62);
   // Rough planks across an opening, with the odd chink at the top you could see through but never fit through.
-  const boards = (t, lv) => (lv === 3 && t % 2 ? 0 : lv === 2 ? M.BARRICADE2 : M.BARRICADE);
+  const boards = (t, lv) => (lv >= 3 && t % 2 ? 0 : lv === 2 ? M.BARRICADE2 : M.BARRICADE);
   // Always the way up from the street, and every so often further up, in the buildings that were held.
-  const stairsBarred = (b, fl, top) => isSealed(b) && (fl <= 8 || top < 70) && (fl === 0 || h2(b.id + 21, fl) % 3 === 0);
+  const stairsBarred = (b, fl, top) => !b.house && isSealed(b) && (fl <= 8 || top < 80) && (fl === 0 || h2(b.id + 21, fl) % 3 === 0);
 
   function building(i, x, z, y0, y1, b) {
     const top = height[i];
     if (!top) return;
     const S = STYLES[b.style];
+    // A house's walls stop at the eaves, and the roof climbs from there.
+    const wallTop = b.house ? b.tiers[1] : top;
     const hN = height[i - WX], hS = height[i + WX], hW = height[i - 1], hE = height[i + 1];
     const e = edge[i];
     const lx = x - ox, lz = z - oz;
     const startY = Math.max(y0, STREET_Y);
     const endY = Math.min(y1, top - 1);
-    const inShaft = b.sx >= 0 && x >= b.sx && x < b.sx + 4 && z >= b.sz && z < b.sz + 6;
+    const hasStair = b.sx >= 0;
+    const inShaft = hasStair && x >= b.sx && x < b.sx + 5 && z >= b.sz && z < b.sz + 6;
+    // The stairwell's own walls: down both sides and across the back, open at the foot of the flights.
+    const shaftWall = hasStair && !b.house && !inShaft && z >= b.sz + 1 && z <= b.sz + 6 && x >= b.sx - 1 && x <= b.sx + 5 && (x === b.sx - 1 || x === b.sx + 5 || z === b.sz + 6);
 
     for (let y = startY; y <= endY; y++) {
+      let id = 0;
+      if (y >= wallTop) {
+        // Shingles outside, an empty loft inside.
+        if (y === top - 1) { d[lx | ((y - oy) << 5) | (lz << 10)] = S.roof; any = true; }
+        continue;
+      }
       const rel = y - (STREET_Y - 1);
-      const lv = rel % FLOOR_H;
-      const fl = (rel / FLOOR_H) | 0;
+      const lv = rel % FH;
+      const fl = (rel / FH) | 0;
       const oN = hN <= y, oS = hS <= y, oW = hW <= y, oE = hE <= y;
       const open = oN || oS || oW || oE;
-      let id = 0;
-      if (e === 0 || open) {
+      if (b.blank) {
+        // A silo or an elevator: a skin with nothing in it, and no way in.
+        if (e === 0 || open || y === top - 1) id = y === top - 1 ? S.roof : (y - STREET_Y) % 8 === 7 ? S.trim : S.wall;
+      } else if (e === 0 || open) {
         if (!open) id = S.wall;                    // party wall between buildings
-        else if (lv === 0) id = y === top - 1 ? S.roof : S.trim;
+        else if (lv === 0) id = y === wallTop - 1 ? S.roof : S.trim;
         else {
           const corner = (oN || oS) && (oW || oE);
           const t = (oN || oS) ? x : z;
-          if (corner) id = S.wall;
-          else if (fl === 0) {
-            // Ground floor: shop fronts and doorways. The doors went for firewood long ago. Most
-            // buildings are shut up behind that: shutters down, glass in the frames, boards inside.
+          if (corner) id = b.house ? S.trim : S.wall;
+          else if (fl === 0 && b.house) {
+            // A front door, a back door, and windows like the ones upstairs. A barn has doors you could drive through.
+            const s = t + (b.seed & 31);
+            if (b.open) id = s % 23 < 6 && lv <= 4 ? 0 : lv === 3 && s % 9 === 4 ? S.glass : S.wall;
+            else if (s % 23 < 2 && lv <= 3) id = isSealed(b) && h2(b.id, (s / 23) | 0) % 2 === 0 ? boards(t, lv) : 0;
+            else id = lv >= 2 && lv <= 3 && (t + (b.seed & 7)) % S.p < S.w && s % 23 > 3 ? (r3(x, y, z) < .1 ? 0 : S.glass) : S.wall;
+          } else if (fl === 0) {
+            // Ground floor: shop fronts and doorways, three wide and tall enough to walk a crowd through. The doors went for firewood
+            // long ago. Most buildings are shut up behind that: shutters down, glass in the frames, boards inside.
             const s = (t + (b.seed & 15));
             const sealed = isSealed(b);
-            const seg = (s / 13) | 0;
-            const doorHit = s % 13 < 2;
-            if (doorHit && lv <= 3) {
-              if (h2(b.id, seg) % (sealed ? 3 : 5) === 0) id = boards(t, lv);
+            const seg = (s / 15) | 0;
+            const doorHit = s % 15 < 3;
+            if (doorHit && lv <= 4) {
+              if (lv === 4) id = S.trim;
+              else if (h2(b.id, seg) % (sealed ? 3 : 6) === 0) id = boards(t, lv);
               else id = 0;
-            } else if (S.cast === 2 || b.style === 4 || (s % 13 > 3 && (s >> 4) % 2 === 0)) {
+            } else if (S.cast === 2 || b.style === 4 || (s % 15 > 4 && (s >> 4) % 2 === 0)) {
               // A painted fascia above the shop window, one business to each stretch of frontage.
-              if (lv > 3 && h2(b.id + 3, seg) % 3 === 0) id = (s & 1) && h2(b.id, seg) % 2 ? M.AD_CREAM : [M.AD_RED, M.AD_BLUE, M.AD_GREEN, M.AD_BLACK, M.AD_YELLOW][h2(b.id + 5, seg) % 5];
-              else if (lv > 3 || s % 6 === 0) id = S.trim;
+              if (lv > 4 && h2(b.id + 3, seg) % 3 === 0) id = (s & 1) && h2(b.id, seg) % 2 ? M.AD_CREAM : [M.AD_RED, M.AD_BLUE, M.AD_GREEN, M.AD_BLACK, M.AD_YELLOW][h2(b.id + 5, seg) % 5];
+              else if (lv > 4 || s % 7 === 0) id = S.trim;
               else if (sealed) id = h2(b.id + 7, seg) % 5 < 2 ? M.SHUTTER : M.GLASS_C;
               else id = r3(x, y, z) < .28 ? 0 : h2(b.id + 17, seg) % 100 < 24 ? M.GLASS_C_X : M.GLASS_C;
-            } else id = lv === 2 && s % 4 < 2 ? S.glass : S.wall;
+            } else id = lv >= 2 && lv <= 3 && s % 4 < 2 ? S.glass : S.wall;
           } else {
             const pitch = S.p;
             const hit = ((t + (b.seed & 7)) % pitch) < S.w;
-            const hiRange = S.cast === 2 ? lv >= 1 : lv >= 1 && lv <= 3;
+            // A sill a block off the floor and a head a block under the ceiling; curtain wall runs floor to ceiling.
+            const hiRange = S.cast === 2 ? lv >= 1 : b.house ? lv >= 2 && lv <= 3 : lv >= 2 && lv <= 4;
             if (hit && hiRange) {
               const r = r3(x, y, z);
               if (r < .085) id = 0;
@@ -226,33 +284,27 @@ export function makeGenerator(L) {
               if (px) id = px;
             }
           }
-          // Weeks of fire: windows gone, brick scorched black around them, worst on the two floors still burning.
-          if (b.burn !== undefined && fl >= b.burn - 1 && fl <= b.burn + 2 && id && lv) {
-            const going = fl === b.burn || fl === b.burn + 1;
-            if (id === S.glass || id === M.GLASS_C || id === M.WIN_LIT) id = going ? 0 : M.BURNT;
-            else if (r3(x, y, z) < (going ? .85 : .6)) id = M.BURNT;
-          }
         }
-      } else if (inShaft && y <= b.top - 1) {
+      } else if (inShaft) {
+        // Two flights round a spine. Up the left side: three steps to a half-landing across the back. Up the right side coming back:
+        // three more steps, and you are on the next floor facing the way you came in.
         const r = z - b.sz, l = x - b.sx;
-        const laneA = l < 2;
+        const lastFloor = b.house && y >= wallTop - FH;
         let solid;
-        if (r === 0) solid = lv === 0;
-        else if (r <= 3) {
-          if (laneA) solid = lv === r;
-          else solid = r === 3 ? lv === 4 : lv === 0;
-        } else solid = lv === 3;
-        id = solid ? (y === top - 1 ? S.roof : M.CONCRETE) : 0;
+        // A house's top floor: the stairs arrive and stop. Its floor runs round the head of the stairs, and a rail stands along the spine.
+        if (lastFloor) solid = y === wallTop - 1 || (lv === 0 && (r === 0 || (l >= 3 && r === 1))) || (l === 2 && r >= 1 && r <= 3 && lv === 1);
+        else if (l === 2 && r >= 1 && r <= 3) solid = true;
+        else if (r === 0) solid = lv === 0;
+        else if (r <= 3) solid = l < 2 ? lv === r : lv === (r === 3 ? 4 : r === 2 ? 5 : 0);
+        else solid = lv === 3;
+        id = solid ? (y === top - 1 ? S.roof : lastFloor && y === wallTop - 1 ? S.floor : l === 2 && lv ? M.CONCRETE_D : M.CONCRETE) : 0;
         // Whoever held out upstairs filled the bottom of the flight with whatever they could carry.
-        if (!solid && laneA && r >= 1 && r <= 3 && lv > r && stairsBarred(b, fl, top)) id = lv === 4 && r > 1 ? (x % 2 ? M.BARRICADE2 : 0) : y % 2 ? M.BARRICADE2 : M.BARRICADE;
+        if (!solid && l < 2 && r >= 1 && r <= 3 && lv > r && stairsBarred(b, fl, top)) id = lv === 5 && r > 1 ? (x % 2 ? M.BARRICADE2 : 0) : y % 2 ? M.BARRICADE2 : M.BARRICADE;
       } else if (lv === 0) {
-        id = y === top - 1 ? S.roof : (b.burn !== undefined && (fl === b.burn || fl === b.burn + 1) && r3(x, y, z) < .5 ? M.BURNT : S.floor);
-      } else if (b.burn !== undefined && (fl === b.burn || fl === b.burn + 1)) {
-        // Burnt out to the columns, and still burning: in the middle of the floor, where it has the most to eat, back from the windows.
-        if (x % 11 === 0 && z % 11 === 0) id = M.BURNT;
-        else if (lv === 1 && e >= 3 && e <= 13 && r3(x, y, z) < .15) id = M.FIRE;
-        else if (lv === 1 && r3(x, y + 7, z) < .08) id = M.BURNT;
-        else id = 0;
+        // A barn is one tall room: no floor between the ground and the loft boards.
+        id = y === top - 1 ? S.roof : b.open && y !== wallTop - 1 ? 0 : S.floor;
+      } else if (shaftWall) {
+        id = M.PLASTER2;
       } else {
         id = interior(b, S, x, y, z, lv, fl, e, top);
       }
@@ -260,9 +312,15 @@ export function makeGenerator(L) {
     }
 
     // Rooftop dressing above the slab.
-    if (y1 >= top && y0 <= top + 9) {
+    if (!b.house && !b.blank && y1 >= top && y0 <= top + 9) {
       const inParapet = e === 0 || hN < top || hS < top || hW < top || hE < top;
-      if (inParapet) {
+      const head = hasStair && top === b.top && z >= b.sz + 1 && z <= b.sz + 6 && x >= b.sx - 1 && x <= b.sx + 5;
+      if (head) {
+        // The stairhead: a box over the top of the flights, with its open side where you step out.
+        for (let y = Math.max(y0, top); y <= Math.min(y1, top + 5); y++) {
+          if (y === top + 5 || shaftWall) { d[lx | ((y - oy) << 5) | (lz << 10)] = y === top + 5 ? S.roof : S.wall; any = true; }
+        }
+      } else if (inParapet) {
         if (top >= y0 && top <= y1) { d[lx | ((top - oy) << 5) | (lz << 10)] = S.trim; any = true; }
       } else if (e > 2 && !inShaft) {
         const gx = x >> 3, gz = z >> 3;
@@ -273,9 +331,9 @@ export function makeGenerator(L) {
         }
       }
       if (b.tank && top === b.top) {
-        const dx = x - b.cx - 6, dz = z - b.cz + 5;
+        const dx = x - b.cx - 9, dz = z - b.cz + 8;
         const dist2 = dx * dx + dz * dz;
-        if (dist2 < 11) {
+        if (dist2 < 11 && !head) {
           const start = top + 3, stop = top + 8;
           for (let y = Math.max(y0, start); y <= Math.min(y1, stop); y++) { d[lx | ((y - oy) << 5) | (lz << 10)] = M.TANK; any = true; }
           if (dist2 < 3 && top + 9 >= y0 && top + 9 <= y1) { d[lx | ((top + 9 - oy) << 5) | (lz << 10)] = M.TANK; any = true; }
@@ -286,19 +344,28 @@ export function makeGenerator(L) {
   }
 
   function interior(b, S, x, y, z, lv, fl, e, top) {
-    // Structural columns everywhere; rooms and furniture on floors people would loot.
-    if (x % 11 === 0 && z % 11 === 0) return M.CONCRETE;
-    const detail = fl <= 8 || top < 70;
+    if (b.open) return lv === 1 && e > 2 && r3(x, 7, z) < .02 ? M.HAY : 0;
+    const ux = x - b.x0, uz = z - b.z0;
+    // Columns in anything big enough to need them, on the building's own grid.
+    if (b.bestE >= 9 && ux % 12 === 6 && uz % 12 === 6) return M.CONCRETE;
+    const detail = fl <= 8 || top < 80;
     if (!detail) return 0;
+    // Rooms you can cross in more than three steps. Offices are open floors with the odd glass-walled corner; a shop is one room
+    // back to its stockroom; a house is four or five rooms.
+    const shop = fl === 0 && !b.house && !b.harlem;
+    const span = b.house ? 7 : S.cast === 2 ? 19 : 12;
     const fh = h2(b.id, fl >> 1);
-    const px = 9 + (fh % 6), pz = 9 + ((fh >> 4) % 6);
+    const px = span + (fh % 6), pz = span + ((fh >> 4) % 6);
     const ox2 = (fh >> 8) % px, oz2 = (fh >> 12) % pz;
-    const onX = (x + ox2) % px === 0, onZ = (z + oz2) % pz === 0;
-    const nearShaft = b.sx >= 0 && x >= b.sx - 2 && x < b.sx + 6 && z >= b.sz - 2 && z < b.sz + 8;
-    if ((onX || onZ) && e > 1 && !nearShaft) {
-      const t = onX ? z : x;
-      // No doors left, just the gaps where they hung. In a shut-up building someone has nailed every one of them closed.
-      if (lv <= 3 && (t + (fh >> 16)) % 13 < 2) return isSealed(b) || h2((t >> 2) * 7, fl + b.id) % 3 === 0 ? boards(t, lv) : 0;
+    const onX = (ux + ox2) % px === 0, onZ = (uz + oz2) % pz === 0;
+    const nearShaft = b.sx >= 0 && x >= b.sx - 3 && x < b.sx + 8 && z >= b.sz - 4 && z < b.sz + 9;
+    if ((onX || onZ) && e > 1 && !nearShaft && !(shop && e < 12)) {
+      const t = onX ? uz : ux;
+      // No doors left, just the gaps where they hung: two wide, a block of wall over the top. In a shut-up building someone has nailed
+      // some of them closed.
+      const m = (t + (fh >> 16)) % 11;
+      if (m < 2 && lv <= 3) return isSealed(b) && h2((t / 11 | 0) * 7 + (onX ? 3 : 0), fl + b.id) % 3 === 0 ? boards(t, lv) : 0;
+      if (S.cast === 2) return lv <= 3 ? M.GLASS_C : 0;
       return (fh >> 3) % 2 ? M.PLASTER : M.PLASTER2;
     }
     if (nearShaft || e < 2) return 0;
@@ -310,9 +377,9 @@ export function makeGenerator(L) {
         const c = h3(x, fl + 7, z) % 100;
         return c < 14 ? M.CRATE_MED : c < 30 ? M.CRATE_AMMO : M.CRATE;
       }
-      if (k < .1 && inX < 3 && inZ === 1) return M.WOOD;
-      if (k > .1 && k < .15 && inZ === 0) return M.SHELF;
-    } else if (lv === 2 && k > .1 && k < .15 && inZ === 0) return M.SHELF;
+      if (k < .08 && inX < 3 && inZ === 1) return M.WOOD;
+      if (k > .1 && k < .14 && inZ === 0) return M.SHELF;
+    } else if (lv <= 3 && k > .1 && k < .14 && inZ === 0) return M.SHELF;
     return 0;
   }
 
@@ -353,6 +420,19 @@ export function makeGenerator(L) {
 
   function tree(x, z, seed, size) {
     const base = STREET_Y - 1 + terr[Math.max(0, z * WX + x)] + 1;
+    if (size && seed % 5 < 2) {
+      // A pine: a tall bare trunk and a cone of dark needles.
+      const tall = 9 + size * 2 + seed % 4;
+      for (let y = 0; y < tall - 2; y++) put(x, base + y, z, M.TRUNK);
+      for (let y = 3 + seed % 2; y <= tall; y++) {
+        const r = Math.min(3, Math.round((tall - y) * .42 + ((y & 1) ? .6 : 0)));
+        for (let dz = -r; dz <= r; dz++) for (let dx = -r; dx <= r; dx++) {
+          if (dx * dx + dz * dz > r * r + 1 || (!dx && !dz && y < tall - 2)) continue;
+          put(x + dx, base + y, z + dz, M.LEAF);
+        }
+      }
+      return;
+    }
     const trunkH = 3 + size + seed % 3;
     for (let y = 0; y < trunkH; y++) put(x, base + y, z, M.TRUNK);
     const r = 2 + size;
@@ -371,6 +451,7 @@ export function makeGenerator(L) {
     const base = STREET_Y;
     switch (t) {
       case P.CAR: car(x, z, a, b, c); break;
+      case P.BALE: { const y = STREET_Y + terr[z * WX + x]; if (a % 3) box(x, y, z, x + 2, y + 1, z + 1, M.HAY); else box(x, y, z, x + 1, y + 1, z + 2, M.HAY); break; }
       case P.TREE: if (ground[z * WX + x] === G.WALK) tree(x, z, a, 0); break;
       case P.PARKTREE: tree(x, z, a, 1 + a % 3); break;
       case P.LAMP:
@@ -490,38 +571,41 @@ export function makeGenerator(L) {
         break;
       }
       case 'statue': {
-        // Fort Wood's star, then the granite pedestal, then the lady herself.
+        // Severn Rock Light: a concrete apron on the rock, the keeper's house, and the tower in its red and white bands.
         const yb = STREET_Y;
-        for (let dz = -27; dz <= 27; dz++) for (let dx = -27; dx <= 27; dx++) {
-          const a = Math.atan2(dz, dx), dist = Math.hypot(dx, dz);
-          const star = 19 + 7 * Math.abs(Math.cos(a * 5.5));
-          if (dist <= star) box(s.x + dx, yb, s.z + dz, s.x + dx, yb + 3, s.z + dz, M.GRANITE);
-          if (dist <= star && dist > star - 2) box(s.x + dx, yb + 4, s.z + dz, s.x + dx, yb + 5, s.z + dz, M.GRANITE);
+        for (let dz = -24; dz <= 24; dz++) for (let dx = -24; dx <= 24; dx++) {
+          const dist = Math.hypot(dx, dz);
+          if (dist <= 23.5) box(s.x + dx, yb, s.z + dz, s.x + dx, yb + 3, s.z + dz, dist > 21.5 ? M.GRANITE : M.CONCRETE);
         }
-        box(s.x - 15, yb + 4, s.z - 15, s.x + 15, yb + 7, s.z + 15, M.LIMESTONE);
-        box(s.x - 12, yb + 8, s.z - 12, s.x + 12, yb + 9, s.z + 12, M.GRANITE);
-        box(s.x - 10, yb + 10, s.z - 10, s.x + 10, yb + 14, s.z + 10, M.LIMESTONE);
-        box(s.x - 8, yb + 15, s.z - 8, s.x + 8, yb + 26, s.z + 8, M.GRANITE);
-        for (let k = -6; k <= 6; k += 3) for (const q of [-9, 9]) { box(s.x + k, yb + 15, s.z + q, s.x + k, yb + 26, s.z + q, M.LIMESTONE); box(s.x + q, yb + 15, s.z + k, s.x + q, yb + 26, s.z + k, M.LIMESTONE); }
-        box(s.x - 9, yb + 27, s.z - 9, s.x + 9, yb + 29, s.z + 9, M.LIMESTONE);
-        const b0 = yb + 30;
-        for (let y = 0; y < 42; y++) {
-          const r = Math.round(6.5 - y * .09);
-          for (let dz = -r; dz <= r; dz++) for (let dx = -r; dx <= r; dx++) if (dx * dx + dz * dz <= r * r + 2) put(s.x + dx, b0 + y, s.z + dz, M.COPPER);
+        box(s.x - 19, yb + 4, s.z + 5, s.x - 9, yb + 8, s.z + 14, M.CLAP_W);
+        box(s.x - 18, yb + 4, s.z + 6, s.x - 10, yb + 7, s.z + 13, 0);
+        box(s.x - 9, yb + 4, s.z + 8, s.x - 9, yb + 6, s.z + 9, 0);
+        box(s.x - 20, yb + 9, s.z + 4, s.x - 8, yb + 9, s.z + 15, M.SHINGLE_R);
+        box(s.x - 18, yb + 10, s.z + 6, s.x - 10, yb + 10, s.z + 13, M.SHINGLE_R);
+        const b0 = yb + 4;
+        for (let y = 0; y < 60; y++) {
+          const r = 6.6 - y * .04, band = ((y / 10) | 0) % 2 ? M.BARN_R : M.CLAP_W;
+          const R = Math.ceil(r);
+          for (let dz = -R; dz <= R; dz++) for (let dx = -R; dx <= R; dx++) {
+            const q = dx * dx + dz * dz;
+            if (q > r * r + 1) continue;
+            // A shell, with the stair's centre post up the middle, and a door at the foot of it.
+            if (q > (r - 1.4) * (r - 1.4)) { if (!(y < 3 && dx < 0 && Math.abs(dz) < 1)) put(s.x + dx, b0 + y, s.z + dz, band); } else if (!dx && !dz) put(s.x, b0 + y, s.z, M.IRON);
+            else if (y % 6 === 0 && y) put(s.x + dx, b0 + y, s.z + dz, M.STEEL_D);
+          }
         }
-        box(s.x - 3, b0 + 42, s.z - 3, s.x + 3, b0 + 48, s.z + 3, M.COPPER);
-        // A band round her head, with the rays standing up out of it.
-        box(s.x - 3, b0 + 49, s.z - 3, s.x + 3, b0 + 49, s.z + 3, M.COPPER);
-        for (let k = -4; k <= 4; k++) {
-          const tall = k % 2 === 0 ? 2 : 0;
-          box(s.x + k, b0 + 49, s.z, s.x + k, b0 + 49 + tall, s.z, M.COPPER);
-          box(s.x, b0 + 49, s.z + k, s.x, b0 + 49 + tall, s.z + k, M.COPPER);
+        // The gallery, the lantern room, and what is left of the lamp.
+        for (let dz = -7; dz <= 7; dz++) for (let dx = -7; dx <= 7; dx++) {
+          const q = dx * dx + dz * dz;
+          if (q <= 44) put(s.x + dx, b0 + 60, s.z + dz, M.IRON);
+          if (q <= 44 && q > 32) put(s.x + dx, b0 + 61, s.z + dz, M.IRON);
+          if (q <= 14 && q > 7) for (let y = 61; y <= 65; y++) put(s.x + dx, b0 + y, s.z + dz, (dx + dz) % 3 ? M.GLASS_C : M.IRON);
+          if (q <= 18) put(s.x + dx, b0 + 66, s.z + dz, M.COPPER);
+          if (q <= 6) put(s.x + dx, b0 + 67, s.z + dz, M.COPPER);
         }
-        box(s.x + 4, b0 + 30, s.z - 1, s.x + 6, b0 + 58, s.z + 1, M.COPPER);
-        box(s.x + 3, b0 + 59, s.z - 2, s.x + 7, b0 + 60, s.z + 2, M.GOLD);
-        box(s.x + 4, b0 + 61, s.z - 1, s.x + 6, b0 + 63, s.z + 1, M.FIRE);
-        box(s.x - 8, b0 + 22, s.z - 2, s.x - 5, b0 + 30, s.z + 2, M.COPPER);
-        // Her floodlights: a squat steel housing with the lamp in it, bolted down on the points of the star.
+        box(s.x, b0 + 61, s.z, s.x, b0 + 64, s.z, M.NEON_W);
+        box(s.x, b0 + 68, s.z, s.x, b0 + 70, s.z, M.IRON);
+        // The floodlights: a squat steel housing with the lamp in it, bolted down round the apron.
         for (const [dx, dz] of STATUE_LAMPS) {
           box(s.x + dx - 1, yb + 4, s.z + dz - 1, s.x + dx + 1, yb + 4, s.z + dz + 1, M.STEEL_D);
           put(s.x + dx, yb + 5, s.z + dz, M.NEON_W);

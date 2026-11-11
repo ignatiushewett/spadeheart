@@ -281,7 +281,7 @@ export class Player {
     }
     input.mouseDX = 0; input.mouseDY = 0;
 
-    // Wish direction. yaw 0 looks up -z (uptown).
+    // Wish direction. yaw 0 looks up -z (north).
     const s = Math.sin(this.yaw), c = Math.cos(this.yaw);
     let fw = 0, st = 0;
     if (locked) {

@@ -18,7 +18,7 @@ const fmt = (n) => Math.round(n).toLocaleString('en-US');
 // An operation is fought all round the settlement you are standing in: a marker in the middle of it points nowhere useful.
 const unpointed = (j) => j.unmarked || j.type === 'defend' || (j.type === 'patrol' && j.status === 'active' && (j.walked || j.waiting));
 const opBannerHtml = (name) => `<div class="op-banner" style="background-image:url(${opBanner(name)})"><small>Operation</small><span>${name}</span></div>`;
-// The camp line in the top left ("Garvey Yard: Quiet"). Hidden for now; set true to bring it back.
+// The camp line in the top left ("Carver Yard: Quiet"). Hidden for now; set true to bring it back.
 const SHOW_CAMP_LINE = false;
 const statusWord = (line) => (line === 'Holding' ? 'Quiet' : line);
 // Getting back on its feet is not an emergency.
@@ -420,7 +420,7 @@ export class UI {
     if (s.empty) {
       card.classList.add('empty');
       line('b', 'Empty');
-      // Every character is a survivor: straight into a bed in Garvey Yard.
+      // Every character is a survivor: straight into a bed in Carver Yard.
       button('New character', true, () => { g.slot = s.n; g.newGame(this.readDifficulty(), 0, 'survival'); });
     } else {
       const kills = `${s.kills.toLocaleString('en-US')} infected down`;

@@ -1,4 +1,4 @@
-// Skyline proxy: the whole island as merged boxes so Manhattan is always on the horizon.
+// Skyline proxy: every town as merged boxes and the hills as one coarse sheet, so Albion and Mt. Page are always on the horizon.
 // A per-column load mask in the shader swaps each piece for real voxels once meshed.
 import { WX, WZ, STREET_Y, G } from '../shared/constants.js';
 import { PALETTE, M } from '../shared/materials.js';
@@ -26,17 +26,14 @@ export class FarCity {
     for (let z = 0; z < D; z++) for (let x = 0; x < W; x++) {
       const i = (z * CELL + 2) * WX + x * CELL + 2;
       const h = height[i];
-      if (h) {
+      if (h && lot[i]) {
         H[x + z * W] = h;
-        C[x + z * W] = lot[i] ? 1 + buildings[lot[i] - 1].style : 200;
-      } else if (terr[i] > 2 && ground[i] !== G.WATER) {
-        H[x + z * W] = STREET_Y + terr[i];
-        C[x + z * W] = 201;
+        C[x + z * W] = 1 + buildings[lot[i] - 1].style;
       }
     }
     // Trees make the parks read as canopy from afar.
     for (let k = 0; k < L.props.length; k += PROP_STRIDE) {
-      if (L.props[k] !== P.PARKTREE) continue;
+      if (L.props[k] !== P.PARKTREE || terr[L.props[k + 2] * WX + L.props[k + 1]] > 2) continue;
       const x = L.props[k + 1] >> 2, z = L.props[k + 2] >> 2;
       const i = x + z * W;
       if (!H[i]) {
@@ -93,6 +90,23 @@ export class FarCity {
       if (lowN < h) quad(bucket, [[x1, base(lowN), z0], [x0, base(lowN), z0], [x0, h, z0], [x1, h, z0]], [0, 0, -1], p.col, p.glass);
       if (lowS < h) quad(bucket, [[x0, base(lowS), z1], [x1, base(lowS), z1], [x1, h, z1], [x0, h, z1]], [0, 0, 1], p.col, p.glass);
     }
+    // The country: one quad to every sixteen blocks, tilted to the slope, and lifted where the forest stands on it.
+    {
+      const T = 16, mark = L.mark;
+      const at = (x, z) => { const i = Math.min(WZ - 1, z) * WX + Math.min(WX - 1, x); return ground[i] === G.WATER ? -4 : terr[i]; };
+      const grass = srgb(M.GRASS, 1), wood = srgb(M.LEAF, .8), rock = srgb(M.SCHIST, 1), snow = srgb(M.SNOW, 1), field = srgb(M.GRASS_DRY, 1);
+      for (let z = 0; z < WZ; z += T) for (let x = 0; x < WX; x += T) {
+        const a = at(x, z), b = at(x + T, z), c = at(x, z + T), e = at(x + T, z + T);
+        if (Math.max(a, b, c, e) <= 2) continue;
+        const i = (z + 8) * WX + x + 8, g = ground[i];
+        if (g === G.WATER) continue;
+        const trees = g === G.PARK && L.forestAt(x + 8, z + 8) > .42 ? 8 : 0;
+        const col = g === G.ROCK ? (mark[i] ? snow : rock) : g === G.FIELD ? field : trees ? wood : grass;
+        const y = (t) => STREET_Y - 1 + Math.max(t, -1) + trees;
+        const nx = (a + c - b - e) / 2, nz = (a + b - c - e) / 2, nl = Math.hypot(nx, T, nz);
+        quad(verts[Math.min(verts.length - 1, Math.floor(z / BUCKET))], [[x, y(c), z + T], [x + T, y(e), z + T], [x + T, y(b), z], [x, y(a), z]], [nx / nl, T / nl, nz / nl], col, 0);
+      }
+    }
     // Spires and bridges, hand-placed so the silhouette reads.
     for (const s of L.structs) {
       if (s.type === 'spire') {
@@ -110,9 +124,10 @@ export class FarCity {
         }
       } else if (s.type === 'statue') {
         const bucket = verts[Math.floor(s.z / BUCKET)];
-        this.box(bucket, s.x - 9, STREET_Y - 2, s.z - 9, s.x + 9, STREET_Y + 30, s.z + 9, srgb(M.GRANITE, 1), quad);
-        this.box(bucket, s.x - 6, STREET_Y + 30, s.z - 6, s.x + 6, STREET_Y + 74, s.z + 6, srgb(M.COPPER, 1), quad);
-        this.box(bucket, s.x + 4, STREET_Y + 74, s.z - 1, s.x + 7, STREET_Y + 90, s.z + 1, srgb(M.COPPER, 1), quad);
+        this.box(bucket, s.x - 22, STREET_Y - 2, s.z - 22, s.x + 22, STREET_Y + 4, s.z + 22, srgb(M.CONCRETE, 1), quad);
+        this.box(bucket, s.x - 6, STREET_Y + 4, s.z - 6, s.x + 6, STREET_Y + 34, s.z + 6, srgb(M.CLAP_W, 1), quad);
+        this.box(bucket, s.x - 5, STREET_Y + 34, s.z - 5, s.x + 5, STREET_Y + 64, s.z + 5, srgb(M.BARN_R, 1), quad);
+        this.box(bucket, s.x - 3, STREET_Y + 64, s.z - 3, s.x + 3, STREET_Y + 72, s.z + 3, srgb(M.COPPER, 1), quad);
       }
     }
 
@@ -194,6 +209,7 @@ export function buildCityMap(L) {
   const groundCol = {
     [G.WATER]: [20, 42, 54], [G.ROAD]: [50, 50, 52], [G.WALK]: [100, 98, 92], [G.LOT]: [72, 72, 70], [G.PARK]: [66, 76, 50],
     [G.PLAZA]: [120, 116, 108], [G.ALLEY]: [70, 68, 64], [G.PROM]: [108, 88, 62], [G.CAMP]: [94, 90, 78], [G.ROCK]: [110, 110, 112],
+    [G.SAND]: [150, 138, 104], [G.FIELD]: [104, 92, 56], [G.DIRT]: [96, 82, 62],
   };
   for (let z = 0; z < h; z++) for (let x = 0; x < w; x++) {
     const i = (z << 1) * WX + (x << 1);

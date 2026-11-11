@@ -31,7 +31,7 @@ const rand = Math.random;
 // The timeout keeps boot moving in a background tab, where animation frames stop.
 const nextFrame = () => new Promise((r) => { requestAnimationFrame(r); setTimeout(r, 120); });
 const DAY_SECONDS = 1500;
-const GARVEY_V = 4;        // which build of Garvey Yard a save's edits belong to
+const GARVEY_V = 4;        // which build of Carver Yard a save's edits belong to
 const INTRO_TIME = 7.5;    // seconds of words on black before the wake-up
 const INTRO_FADE = 1.3;    // the last of that is them fading out, and a beat of nothing
 // What a broken voxel gives back when you tear it down by hand.
@@ -43,7 +43,7 @@ const SETTINGS_KEY = 'acez.settings.v2';
 const OLD_SETTINGS_KEY = 'acez.settings.v1';
 const DB_NAME = 'acez';
 const MENU_SHOT = { angle: .62, dist: 185, height: 88, turn: .46, pitch: -.14, fov: 1.05, flight: 125, startHeight: 30, startOff: 44, startPitch: -.1 };
-const SAVE_KEY = 'slot9';  // bumped whenever the map changes: old voxel edits no longer line up
+const SAVE_KEY = 'slot10';  // bumped whenever the map changes: old voxel edits no longer line up
 export const SLOTS = 3;
 // Slot 1 keeps the plain key, so a save from before there were slots simply becomes the first character.
 const slotKey = (n) => (n === 1 ? SAVE_KEY : `${SAVE_KEY}.${n}`);   // 'sandbox' gives its own key too
@@ -263,17 +263,20 @@ class Game {
       } else if (g === G.WATER || (L.terr[i] < -2 && g === G.PARK)) {
         const shore = hash(wx * .013 + 3, wz * .013) * .15 + (L.terr[i] > -6 ? .75 : 0);
         rgb = [WATER.deep[0] + (WATER.shallow[0] - WATER.deep[0]) * shore, WATER.deep[1] + (WATER.shallow[1] - WATER.deep[1]) * shore, WATER.deep[2] + (WATER.shallow[2] - WATER.deep[2]) * shore];
-      } else if (g === G.ROAD) rgb = col(L.mark[i] === 1 ? M.LINE_Y : L.mark[i] ? M.LINE_W : M.ASPHALT);
+      } else if (g === G.ROAD) rgb = col((L.mark[i] & 15) === 1 ? M.LINE_Y : L.mark[i] & 15 ? M.LINE_W : M.ASPHALT);
       else if (g === G.WALK) rgb = col(M.WALK);
-      else if (g === G.PLAZA) rgb = col(M.WALK2);
+      else if (g === G.PLAZA) rgb = col(L.mark[i] === 4 ? M.ASPHALT2 : M.WALK2);
+      else if (g === G.SAND) rgb = col(M.SAND);
+      else if (g === G.DIRT) rgb = col(hash(wx >> 1, wz >> 1) < .4 ? M.PATH : M.DIRT);
+      else if (g === G.FIELD) rgb = col([M.SOIL, M.SOIL, M.CORN, M.COTTON, M.PEANUT, wx % 8 < 2 ? M.TOMATO : M.SOIL, M.GRASS_DRY][L.mark[i]] || M.SOIL);
       else if (g === G.ALLEY) rgb = col(M.ALLEYWAY);
       else if (g === G.PROM) rgb = col((wx + wz) % 4 === 0 ? M.WOOD_D : M.WOOD);
       else if (g === G.CAMP) rgb = col(M.GRAVEL);
-      else if (g === G.ROCK) rgb = col(M.SCHIST);
+      else if (g === G.ROCK) { rgb = col(L.mark[i] ? M.SNOW : M.SCHIST); const t = Math.min(90, L.terr[i]); rgb = [rgb[0] + t * .5, rgb[1] + t * .5, rgb[2] + t * .5]; }
       else if (g === G.PARK) {
         const n = hash(wx >> 2, wz >> 2);
         rgb = col(n < .3 ? M.GRASS_DRY : n < .65 ? M.GRASS : M.GRASS2);
-        const t = L.terr[i];
+        const t = Math.min(44, L.terr[i] * .55);
         rgb = [rgb[0] + t * 1.6, rgb[1] + t * 1.6, rgb[2] + t * 1.2];
       } else rgb = col(M.WALK);
       // The shadow of anything taller, thrown south-east by a low sun.
@@ -282,7 +285,7 @@ class Game {
       for (let s = 1; s <= 8; s++) {
         const nz = wz - s * 4, nx = wx - s * 3;
         if (nz < 0 || nx < 0) break;
-        if ((L.height[nz * WX + nx] || 0) - own > s * 5) { shade = .58; break; }
+        if ((L.height[nz * WX + nx] || STREET_Y + L.terr[nz * WX + nx]) - (top || STREET_Y + L.terr[i]) > s * 5) { shade = .58; break; }
       }
       const grain = .94 + hash(wx, wz) * .12;
       const o = (px + z * w) * 4;
@@ -1528,7 +1531,7 @@ class Game {
     this.weather.randomise();
     const lady = this.layout.structs.find((s) => s.type === 'statue'), bat = this.layout.camps.find((c) => c.key === 'battery');
     const bx = bat.cx - lady.x, bz = bat.cz - lady.z, bd = Math.hypot(bx, bz);
-    // What gets loaded in full is everything from her feet to the far side of the Battery, whichever of them the camera is nearer to.
+    // What gets loaded in full is everything from the foot of the light to the far side of the Landing, whichever of them the camera is nearer to.
     this.menuCenter = { x: lady.x + bx * .63, z: lady.z + bz * .63, lx: lady.x, lz: lady.z, ux: bx / bd, uz: bz / bd, bd, bx: bat.cx, bz: bat.cz };
     this.menuT = rand() * 100;
     this.menuY = undefined;
@@ -1536,7 +1539,8 @@ class Game {
     {
       const ca = Math.cos(MENU_SHOT.angle), sa = Math.sin(MENU_SHOT.angle), M0 = this.menuCenter;
       const to = { x: M0.lx - (M0.ux * ca - M0.uz * sa) * MENU_SHOT.dist, z: M0.lz - (M0.ux * sa + M0.uz * ca) * MENU_SHOT.dist };
-      const from = { x: bat.x0 - MENU_SHOT.startOff, z: bat.cz - 20 };
+      // Off the near wall of the Landing, out over the bay.
+      const from = { x: bat.cx - M0.ux * (MENU_SHOT.startOff + 115) + M0.uz * 20, z: bat.cz - M0.uz * (MENU_SHOT.startOff + 115) - M0.ux * 20 };
       const mx = (from.x + to.x) / 2, mz = (from.z + to.z) / 2, nx = mx - M0.lx, nz = mz - M0.lz, nd = Math.hypot(nx, nz) || 1;
       // Facing the camp at the start and past her at the end, and always the long way round to the left.
       const yawFrom = Math.atan2(bat.cx - from.x, from.z - bat.cz);
@@ -1609,7 +1613,7 @@ class Game {
     this.lastBite = -1e9;
     this.pickups = [];
     this.spawnPending = true;
-    this.beginLoad('Entering Manhattan', () => {
+    this.beginLoad('Entering Ballarat', () => {
       const leader = LORE[c.key].cast.find((m) => m.role === 'leader');
       // The sandbox skips the introductions: you walk in already carrying your kit, and nobody sends you to see anyone.
       if (this.slot === 'sandbox' && kit !== 'survival') {
@@ -2044,7 +2048,7 @@ class Game {
     });
   }
 
-  // Survival, from the top: a new face, the first morning, Garvey Yard, the city as it was. Same save slot.
+  // Survival, from the top: a new face, the first morning, Carver Yard, the city as it was. Same save slot.
   restartSurvival() {
     if (this.player.loadout !== 'survival') return;
     this.ui.closeAll();

@@ -450,7 +450,7 @@ export class Renderer {
     const asp = this.width / this.height;
     this.prevViewProj.set(this.viewProj);
     const cp = Math.cos(cam.pitch), sp = Math.sin(cam.pitch), cy = Math.cos(cam.yaw), sy = Math.sin(cam.yaw);
-    // yaw 0 faces -z (uptown); yaw grows to the right.
+    // yaw 0 faces -z (north); yaw grows to the right.
     const fx = sy * cp, fy = sp, fz = -cy * cp;
     this.camForward = [fx, fy, fz];
     this.camPos = [cam.x, cam.y, cam.z];
