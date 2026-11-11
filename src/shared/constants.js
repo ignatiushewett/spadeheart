@@ -2,7 +2,7 @@
 // +x is east (towards the sea), +z is south, +y is up.
 export const CS = 32;
 export const CS3 = CS * CS * CS;
-export const WX = 4096;
+export const WX = 5216;
 export const WZ = 4096;
 export const WY = 256;
 export const CW = WX / CS;

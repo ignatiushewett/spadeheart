@@ -671,6 +671,7 @@ export class Renderer {
     gl.activeTexture(gl.TEXTURE1);
     gl.bindTexture(gl.TEXTURE_2D, this.texPalette);
     gl.uniform1i(p.u.uPalette, 1);
+    if (p.u.uSway) gl.uniform1f(p.u.uSway, 1 + Math.min(1.6, Math.hypot(this.windX || 0, this.windZ || 0) * .25 + (this.rain || 0) * .8));
     gl.uniform1i(p.u.uGlassPass, 0);
     this.bindRainMap(p); this.bindBlood(p);
     gl.activeTexture(gl.TEXTURE0);

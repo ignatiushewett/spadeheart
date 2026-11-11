@@ -95,16 +95,55 @@ export class FarCity {
       const T = 16, mark = L.mark;
       const at = (x, z) => { const i = Math.min(WZ - 1, z) * WX + Math.min(WX - 1, x); return ground[i] === G.WATER ? -4 : terr[i]; };
       const grass = srgb(M.GRASS, 1), wood = srgb(M.LEAF, .8), rock = srgb(M.SCHIST, 1), snow = srgb(M.SNOW, 1), field = srgb(M.GRASS_DRY, 1);
+      const GC = { [G.ROAD]: srgb(M.ASPHALT, 1), [G.WALK]: srgb(M.WALK, 1), [G.LOT]: srgb(M.WALK2, 1), [G.PLAZA]: srgb(M.WALK2, 1), [G.ALLEY]: srgb(M.ALLEYWAY, 1), [G.CAMP]: srgb(M.GRAVEL, 1),
+        [G.SAND]: srgb(M.SAND, 1), [G.DIRT]: srgb(M.DIRT, 1), [G.FIELD]: srgb(M.SOIL, 1), [G.PROM]: srgb(M.WOOD, 1), [G.PARK]: grass, [G.ROCK]: rock, [G.WATER]: grass };
+      // The colour of a patch of ground from afar: what covers most of it, blended.
+      const patch = (x, z) => {
+        const c = [0, 0, 0];
+        for (let k = 0; k < 4; k++) {
+          const sx = Math.min(WX - 1, x + 2 + (k & 1) * 8), sz = Math.min(WZ - 1, z + 2 + (k >> 1) * 8), g = ground[sz * WX + sx];
+          const q = g === G.FIELD && mark[sz * WX + sx] === 2 ? srgb(M.CORN, .8) : GC[g] || grass;
+          c[0] += q[0] / 4; c[1] += q[1] / 4; c[2] += q[2] / 4;
+        }
+        return c;
+      };
       for (let z = 0; z < WZ; z += T) for (let x = 0; x < WX; x += T) {
         const a = at(x, z), b = at(x + T, z), c = at(x, z + T), e = at(x + T, z + T);
-        if (Math.max(a, b, c, e) <= 2) continue;
+        if (Math.max(a, b, c, e) <= 2 && L.forestAt(x + 8, z + 8) < .3) continue;
         const i = (z + 8) * WX + x + 8, g = ground[i];
-        if (g === G.WATER) continue;
-        const trees = g === G.PARK && L.forestAt(x + 8, z + 8) > .42 ? 8 : 0;
-        const col = g === G.ROCK ? (mark[i] ? snow : rock) : g === G.FIELD ? field : trees ? wood : grass;
-        const y = (t) => STREET_Y - 1 + Math.max(t, -1) + trees;
+        if (g === G.WATER && Math.max(a, b, c, e) <= 6) continue;
+        const canopy = (cx, cz) => { const j = Math.min(WZ - 1, cz) * WX + Math.min(WX - 1, cx); return ground[j] === G.PARK ? 8 * Math.max(0, Math.min(1, (L.forestAt(cx, cz) - .3) / .25)) : 0; };
+        const ta = canopy(x, z), tb = canopy(x + T, z), tc = canopy(x, z + T), te = canopy(x + T, z + T), trees = (ta + tb + tc + te) / 4;
+        const col = g === G.ROCK ? rock : trees > 4 ? wood : patch(x, z);
+        const y = (t, k) => STREET_Y - 1 + Math.max(t, -1) + k;
         const nx = (a + c - b - e) / 2, nz = (a + b - c - e) / 2, nl = Math.hypot(nx, T, nz);
-        quad(verts[Math.min(verts.length - 1, Math.floor(z / BUCKET))], [[x, y(c), z + T], [x + T, y(e), z + T], [x + T, y(b), z], [x, y(a), z]], [nx / nl, T / nl, nz / nl], col, 0);
+        quad(verts[Math.min(verts.length - 1, Math.floor(z / BUCKET))], [[x, y(c, tc), z + T], [x + T, y(e, te), z + T], [x + T, y(b, tb), z], [x, y(a, ta), z]], [nx / nl, T / nl, nz / nl], col, .3);
+      }
+      // Past the edges of the world the country carries on: woods rising and falling away from whatever the edge was, out to the
+      // horizon, so that from a hill the state does not end in open sea on three sides.
+      const S = 64, FAR = 3200, h2n = (a, b) => { const v = Math.sin(a * 12.9898 + b * 78.233) * 43758.5453; return v - Math.floor(v); };
+      const vn = (a, b) => {
+        const ia = Math.floor(a), ib = Math.floor(b), fa = a - ia, fb = b - ib, ua = fa * fa * (3 - 2 * fa), ub = fb * fb * (3 - 2 * fb);
+        const p = h2n(ia, ib), q = h2n(ia + 1, ib), r = h2n(ia, ib + 1), s = h2n(ia + 1, ib + 1);
+        return p + (q - p) * ua + (r - p) * ub + (p - q - r + s) * ua * ub;
+      };
+      const coastOf = (row) => { let e = WX - 1; while (e > 0 && ground[row * WX + e] === G.WATER) e--; return e; };
+      const topC = coastOf(0), botC = coastOf(WZ - 1);
+      const skirtH = (x, z) => {
+        const cx = Math.max(0, Math.min(WX - 1, x)), cz = Math.max(0, Math.min(WZ - 1, z)), d = Math.hypot(x - cx, z - cz);
+        const edgeH = Math.max(0, terr[cz * WX + cx]), k = Math.min(1, d / 500);
+        return edgeH * (1 - k * k * (3 - 2 * k)) + (14 + 46 * vn(x / 700, z / 700) + 14 * vn(x / 180 + 3, z / 180)) * k * k * (3 - 2 * k) + 8;
+      };
+      const woodC = [srgb(M.LEAF, .75), srgb(M.LEAF2, .75), srgb(M.LEAF, .65)];
+      const land = (x, z) => (x < 0 ? true : z < 0 ? x < topC : z >= WZ ? x < botC : false);
+      for (let z = -FAR; z < WZ + FAR; z += S) for (let x = -FAR; x < WX; x += S) {
+        if (x >= 0 && z >= 0 && z < WZ) continue;
+        if (!land(x + S / 2, z + S / 2)) continue;
+        const a = skirtH(x, z), b = skirtH(x + S, z), c = skirtH(x, z + S), e = skirtH(x + S, z + S);
+        const y = (t) => STREET_Y - 1 + t;
+        const nx = (a + c - b - e) / 2, nz = (a + b - c - e) / 2, nl = Math.hypot(nx, S, nz);
+        const bucket = verts[Math.max(0, Math.min(verts.length - 1, Math.floor(z / BUCKET)))];
+        quad(bucket, [[x, y(c), z + S], [x + S, y(e), z + S], [x + S, y(b), z], [x, y(a), z]], [nx / nl, S / nl, nz / nl], woodC[Math.floor(h2n(x, z) * 3)], .3);
       }
     }
     // Spires and bridges, hand-placed so the silhouette reads.
@@ -176,7 +215,7 @@ export class FarCity {
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib);
       gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, idx, gl.STATIC_DRAW);
       gl.bindVertexArray(null);
-      this.buckets.push({ vao, count: idx.length, z0: b * BUCKET, z1: (b + 1) * BUCKET });
+      this.buckets.push({ vao, count: idx.length, z0: b * BUCKET, z1: (b + 1) * BUCKET, first: b === 0, last: b === verts.length - 1 });
     }
   }
 
@@ -190,7 +229,7 @@ export class FarCity {
 
   draw(gl, planes) {
     for (const b of this.buckets) {
-      if (!aabbInFrustum(planes, 0, 0, b.z0, WX, 256, b.z1)) continue;
+      if (!aabbInFrustum(planes, -3200, 0, b.z0 - (b.first ? 3200 : 0), WX, 256, b.z1 + (b.last ? 3200 : 0))) continue;
       gl.bindVertexArray(b.vao);
       gl.drawElements(gl.TRIANGLES, b.count, gl.UNSIGNED_INT, 0);
     }

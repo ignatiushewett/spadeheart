@@ -4337,7 +4337,7 @@ export class Jobs {
     }
     const job = {
       id: this.nextId++, favour: key, giver: npc.name, campId: npc.camp, type: spec.type, title: spec.title, desc: spec.desc,
-      reward: spec.reward, bonus: spec.bonus || null, status: 'active', x, z, y: STREET_Y,
+      reward: spec.reward, bonus: spec.bonus || null, status: 'active', x, z, y: this.g.world.terrainTop(x, z),
     };
     if (spec.type === 'kill') { job.need = spec.need || 30; job.got = 0; }
     if (spec.type === 'hold') { job.time = 40; job.held = 0; }

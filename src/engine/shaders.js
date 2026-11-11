@@ -45,7 +45,7 @@ uniform vec4 uFlood;            // the statue's floodlights: x, aim height, z, s
 uniform vec4 uFloodLamp[4];     // each lamp: where it is, and how strong
 uniform sampler2D uCityLight;   // every lamp and fire in the world, painted into one map
 uniform float uCityLightK;
-const vec2 WSIZE=vec2(4096.,4096.);
+const vec2 WSIZE=vec2(5216.,4096.);
 
 float hash12(vec2 p){ vec3 q=fract(vec3(p.xyx)*.1031); q+=dot(q,q.yzx+33.33); return fract((q.x+q.y)*q.z); }
 float vnoise(vec2 p){ vec2 i=floor(p),f=fract(p); f=f*f*(3.-2.*f);
@@ -242,6 +242,8 @@ export const CHUNK_VS = COMMON + FRAME_UNIFORMS + /* glsl */`
 layout(location=0) in uvec4 aPos;
 layout(location=1) in uvec4 aInfo;
 uniform vec3 uOrigin;
+uniform sampler2D uPalette;
+uniform float uSway;
 out vec3 vWorld;
 out vec3 vNormal;
 out float vAO;
@@ -250,6 +252,15 @@ flat out int vId;
 const vec3 NORMALS[6]=vec3[6](vec3(1,0,0),vec3(-1,0,0),vec3(0,1,0),vec3(0,-1,0),vec3(0,0,1),vec3(0,0,-1));
 void main(){
   vec3 p=vec3(aPos.xyz)+uOrigin;
+  // Leaves and standing crops move in the air: each corner on its own slow loop, worked out from where it is, so faces that share a
+  // corner move together and nothing opens up between them. Harder in a wind.
+  int flags=int(texelFetch(uPalette,ivec2(int(aInfo.x),0),0).a*255.+.5);
+  if((flags&8)!=0&&uSway>0.){
+    float t=uTime,k=uSway;
+    p.x+=(sin(t*1.7+p.x*.41+p.y*.23+p.z*.17)*.6+sin(t*2.9+p.z*.73)*.4)*.075*k;
+    p.z+=(cos(t*1.4+p.z*.37+p.y*.29+p.x*.13)*.6+sin(t*3.3+p.x*.67)*.4)*.075*k;
+    p.y+=sin(t*2.1+p.x*.5+p.z*.5)*.025*k;
+  }
   vWorld=p;
   vNormal=NORMALS[aPos.w];
   vAO=float(aInfo.y);
@@ -615,23 +626,25 @@ layout(location=0) out vec4 outCol;
 void main(){
   // Voxel chunks replace the proxy column by column as they finish meshing.
   float m=texture(uLoadMask,vWorld.xz/uWorldSize).r;
-  if(m>.5) discard;
+  bool inWorld=vWorld.x>=0.&&vWorld.z>=0.&&vWorld.x<uWorldSize.x&&vWorld.z<uWorldSize.y;
+  if(m>.5&&inWorld) discard;
   vec3 n=vNormal;
   vec3 col=vColor.rgb;
   float dist=length(vWorld-uCam);
   float windows=0.;
   float lit=0.;
-  if(abs(n.y)<.5){
+  // Ground (flagged .3) has no windows in it, however steep.
+  if(abs(n.y)<.5&&abs(vColor.a-.3)>.1){
     float t=abs(n.x)>.5?vWorld.z:vWorld.x;
     float pitch=vColor.a>.5?3.:4.;
-    float fy=fract((vWorld.y-11.)/5.);
+    float fy=fract((vWorld.y-11.)/6.);
     float fx=fract(t/pitch);
     float aa=clamp(dist*.0015,0.,.5);
     float wx=smoothstep(.5+aa,.5-aa,abs(fx-.5)*1.5);
     float wy=smoothstep(.4+aa,.4-aa,abs(fy-.55));
     windows=wx*wy;
     if(vColor.a>.5) windows=max(windows,.75);
-    vec2 cell=vec2(floor(t/pitch),floor((vWorld.y-11.)/5.));
+    vec2 cell=vec2(floor(t/pitch),floor((vWorld.y-11.)/6.));
     lit=step(.9985,hash12(cell+floor(vWorld.xz/64.)));
   }
   vec3 glass=mix(col*.25,uHorizon*.8,.5);
@@ -1644,7 +1657,7 @@ out vec3 vLit;
 float h(float n){ return fract(sin(n)*43758.5453); }
 // How much light this drop is falling through right now.
 vec3 lightAtDrop(vec3 p){
-  vec3 L=textureLod(uCityLight,p.xz/vec2(4096.,4096.),0.).rgb;
+  vec3 L=textureLod(uCityLight,p.xz/vec2(5216.,4096.),0.).rgb;
   L=L*L*5.5*uCityLightK*clamp(1.-(p.y-12.)/34.,0.,1.);
   for(int i=0;i<uLightCount;i++){
     vec3 d=uLightPos[i].xyz-p;

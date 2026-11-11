@@ -8,6 +8,7 @@ import { buildLayout, P as PROP, PROP_STRIDE } from './shared/layout.js';
 import { glowLights } from './shared/camps.js';
 import { WX, WZ, CW, CD, STREET_Y, WATER_Y, G, STATUE_LAMPS, FLOOR_H } from './shared/constants.js';
 import { M, HP, isGlass, PALETTE, FLAGS, F_EMISSIVE, F_CRACK, CRACKED, F_LEAF, F_GLASS } from './shared/materials.js';
+import { r2 } from './shared/rng.js';
 import { Horde, DIFFICULTY } from './game/horde.js';
 import { Player } from './game/player.js';
 import { NPCs, Jobs } from './game/npcs.js';
@@ -82,6 +83,14 @@ async function dbGet(key) {
     q.onsuccess = () => { db.close(); resolve(q.result); };
     q.onerror = () => reject(q.error);
   });
+}
+
+// Smooth value noise for the maps.
+function mapNoise(a, b) {
+  const hash = (p, q) => { const v = Math.sin(p * 127.1 + q * 311.7) * 43758.5453; return v - Math.floor(v); };
+  const ia = Math.floor(a), ib = Math.floor(b), fa = a - ia, fb = b - ib, ua = fa * fa * (3 - 2 * fa), ub = fb * fb * (3 - 2 * fb);
+  const p = hash(ia, ib), q = hash(ia + 1, ib), r = hash(ia, ib + 1), t = hash(ia + 1, ib + 1);
+  return p + (q - p) * ua + (r - p) * ub + (p - q - r + t) * ua * ub;
 }
 
 class Game {
@@ -237,8 +246,20 @@ class Game {
     this.schedule();
   }
 
-  // The map is drawn from the city itself, roof by roof, the way an Ace of Spades map is: every
-  // pixel the colour of what is really there, with the shadow of the tall things falling across it.
+  // The map is drawn from the state itself, roof by roof, the way an Ace of Spades map is: every pixel the colour of what is really
+  // there, the hills lit from the north-west with a line round them every so often, and the shadow of the tall things falling across it.
+  // Past the edges of the world the country carries on (and the sea, to the east), so the map never ends in a hard line.
+  groundColour(wx, wz, t, f, col, hash) {
+    const n = hash(wx >> 2, wz >> 2);
+    let rgb = col(n < .3 ? M.GRASS_DRY : n < .65 ? M.GRASS : M.GRASS2);
+    const lum = rgb[0] * .3 + rgb[1] * .59 + rgb[2] * .11, sat = .72 + mapNoise(wx * .012 + 4, wz * .012) * .75 + (hash(wx >> 3, wz >> 3) - .5) * .12;
+    rgb = [lum + (rgb[0] - lum) * sat, lum + (rgb[1] - lum) * sat, lum + (rgb[2] - lum) * sat];
+    const hk = Math.min(.5, Math.max(0, t) / 150);
+    rgb = [rgb[0] + (112 - rgb[0]) * hk, rgb[1] + (108 - rgb[1]) * hk, rgb[2] + (66 - rgb[2]) * hk];
+    const fk = Math.pow(Math.max(0, f), 1.25) * .88;
+    return [rgb[0] + (18 - rgb[0]) * fk, rgb[1] + (34 - rgb[1]) * fk, rgb[2] + (17 - rgb[2]) * fk];
+  }
+
   makeMapCanvas() {
     const L = this.layout;
     const c = document.createElement('canvas');
@@ -246,6 +267,14 @@ class Game {
     c.width = w; c.height = h;
     const x = c.getContext('2d');
     const img = x.createImageData(w, h);
+    const T = (wx, wz) => L.terr[Math.max(0, Math.min(WZ - 1, wz)) * WX + Math.max(0, Math.min(WX - 1, wx))];
+    const FGW = (WX >> 4) + 2, FGD = (WZ >> 4) + 2, FG = new Float32Array(FGW * FGD);
+    for (let gz = 0; gz < FGD; gz++) for (let gx = 0; gx < FGW; gx++) FG[gx + gz * FGW] = Math.min(1, L.forestAt(gx * 16, gz * 16) * .8 + L.trinityAt(gx * 16, gz * 16) * .35);
+    const FA = (wx, wz) => {
+      const fx = wx / 16, fz = wz / 16, ix = Math.min(FGW - 2, fx | 0), iz = Math.min(FGD - 2, fz | 0), ux = fx - ix, uz = fz - iz, k = ix + iz * FGW;
+      return (FG[k] * (1 - ux) + FG[k + 1] * ux) * (1 - uz) + (FG[k + FGW] * (1 - ux) + FG[k + FGW + 1] * ux) * uz;
+    };
+    const FOREST = [24, 42, 22];
     const col = (id) => [PALETTE[id * 4], PALETTE[id * 4 + 1], PALETTE[id * 4 + 2]];
     const hash = (a, b) => { const v = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return v - Math.floor(v); };
     const WATER = { deep: [20, 42, 54], shallow: [38, 66, 74] };
@@ -268,19 +297,23 @@ class Game {
       else if (g === G.PLAZA) rgb = col(L.mark[i] === 4 ? M.ASPHALT2 : M.WALK2);
       else if (g === G.SAND) rgb = col(M.SAND);
       else if (g === G.DIRT) rgb = col(hash(wx >> 1, wz >> 1) < .4 ? M.PATH : M.DIRT);
-      else if (g === G.FIELD) rgb = col([M.SOIL, M.SOIL, M.CORN, M.COTTON, M.PEANUT, wx % 8 < 2 ? M.TOMATO : M.SOIL, M.GRASS_DRY][L.mark[i]] || M.SOIL);
+      else if (g === G.FIELD) { const m = L.mark[i], dot = hash(wx >> 1, wz >> 1); rgb = col(m === 2 ? (dot < .6 ? M.CORN : M.LEAF3) : m === 3 ? (dot < .35 ? M.COTTON : M.LEAF3) : m === 4 ? (dot < .5 ? M.PEANUT : M.SOIL) : m === 5 ? (wx % 8 < 2 ? M.LEAF2 : M.SOIL) : m === 6 ? M.GRASS_DRY : M.SOIL); rgb = [rgb[0] * .88, rgb[1] * .88, rgb[2] * .88]; }
       else if (g === G.ALLEY) rgb = col(M.ALLEYWAY);
       else if (g === G.PROM) rgb = col((wx + wz) % 4 === 0 ? M.WOOD_D : M.WOOD);
       else if (g === G.CAMP) rgb = col(M.GRAVEL);
-      else if (g === G.ROCK) { rgb = col(L.mark[i] ? M.SNOW : M.SCHIST); const t = Math.min(90, L.terr[i]); rgb = [rgb[0] + t * .5, rgb[1] + t * .5, rgb[2] + t * .5]; }
+      else if (g === G.ROCK) rgb = col(M.SCHIST);
       else if (g === G.PARK) {
-        const n = hash(wx >> 2, wz >> 2);
-        rgb = col(n < .3 ? M.GRASS_DRY : n < .65 ? M.GRASS : M.GRASS2);
-        const t = Math.min(44, L.terr[i] * .55);
-        rgb = [rgb[0] + t * 1.6, rgb[1] + t * 1.6, rgb[2] + t * 1.2];
+        rgb = this.groundColour(wx, wz, L.terr[i], L.townAt(wx, wz) ? 0 : FA(wx, wz), col, hash);
       } else rgb = col(M.WALK);
-      // The shadow of anything taller, thrown south-east by a low sun.
+      // Relief: lit from the north-west, a little lighter the higher it is, and a contour every twelve blocks of height.
       let shade = 1;
+      if (!top && g !== G.WATER) {
+        const t = L.terr[i], slope = ((T(wx + 4, wz) - T(wx - 4, wz)) + (T(wx, wz + 4) - T(wx, wz - 4))) * .07;
+        shade *= 1 + Math.max(-.6, Math.min(.5, slope));
+        const lift = g === G.PARK ? 0 : Math.max(0, Math.min(60, t)) * .2;
+        rgb = [rgb[0] + lift, rgb[1] + lift * .9, rgb[2] + lift * .7];
+        if (t > 3 && (g === G.PARK || g === G.ROCK || g === G.FIELD) && (Math.floor(t / 16) !== Math.floor(T(wx + 2, wz) / 16) || Math.floor(t / 16) !== Math.floor(T(wx, wz + 2) / 16))) shade *= .87;
+      }
       const own = top || STREET_Y;
       for (let s = 1; s <= 8; s++) {
         const nz = wz - s * 4, nx = wx - s * 3;
@@ -298,7 +331,9 @@ class Game {
     // Things on the ground: trees and parked cars, at their real positions.
     const hex = (id) => { const [r, g, b] = col(id); return `rgb(${r | 0},${g | 0},${b | 0})`; };
     const carCols = [M.CAR_S, M.TAXI, M.BUS, M.CAR_W, M.CAR_K, M.CAR_W, M.BURNT];
-    const leaf = [hex(M.LEAF), hex(M.LEAF2), hex(M.LEAF3)];
+    const dim = (id, k) => { const [r, g, b] = col(id); return `rgb(${r * k | 0},${g * k | 0},${b * k | 0})`; };
+    const leafLv = [M.LEAF, M.LEAF2, M.LEAF].map((id, k) => [0, 1, 2, 3, 4].map((lv) => dim(id, (k === 2 ? .7 : .84) * (1 - lv * .1))));
+    const leafAt = (k, f) => leafLv[k][Math.max(0, Math.min(4, Math.round(f * 5)))];
     const P_ = L.props;
     for (let k = 0; k < P_.length; k += PROP_STRIDE) {
       const t = P_[k], a = P_[k + 3], b = P_[k + 4], px = P_[k + 1] >> 1, pz = P_[k + 2] >> 1;
@@ -307,8 +342,10 @@ class Game {
         x.fillStyle = hex(carCols[b] || M.CAR_S);
         if (a === 0) x.fillRect(px, pz, wid, len); else x.fillRect(px, pz, len, wid);
       } else if (t === PROP.TREE || t === PROP.PARKTREE) {
-        x.fillStyle = leaf[a % 3];
         const r = t === PROP.PARKTREE ? 3 : 2;
+        x.fillStyle = 'rgba(6,12,6,.5)';
+        x.fillRect(px - (r >> 1) + 1, pz - (r >> 1) + 1, r, r);
+        x.fillStyle = leafAt(a % 3, FA(P_[k + 1], P_[k + 2]));
         x.fillRect(px - (r >> 1), pz - (r >> 1), r, r);
       }
     }
@@ -316,17 +353,169 @@ class Game {
     const partCol = { bonfire: M.FIRE, bench: M.WOOD_D, stall: M.AWN_G, crops: M.LEAF2, court: M.COURT, firepit: M.LOG, table: M.WOOD, garden: M.LEAF, flag: M.IRON, tower: M.IRON, bigtent: M.TENT_W, tent: M.TENT_G };
     const wallCol = { cabs: M.TAXI, containers: M.CONT_R, palisade: M.LOG, hesco: M.SANDBAG, sheet: M.STEEL, scrap: M.RUST, white: M.CAR_W, brick: M.BRICK_R, stone: M.GRANITE };
     for (const camp of L.camps) {
+      const idOf = (p) => { const id = p.sign || p.roof || p.col || p.mat || partCol[p.t] || M.PLANK; return typeof id === 'number' ? id : 0; };
+      const box = (p) => [p.x0 >> 1, p.z0 >> 1, Math.max(1, (p.x1 - p.x0 + 1) >> 1), Math.max(1, (p.z1 - p.z0 + 1) >> 1)];
+      x.fillStyle = 'rgba(4,6,8,.42)';
+      for (const p of camp.parts) { if (!idOf(p) || !(p.h > 1)) continue; const [bx, bz, bw, bd] = box(p), o = Math.min(5, Math.max(1, p.h / 4)); x.fillRect(bx + o * .75, bz + o, bw, bd); }
       for (const p of camp.parts) {
-        const id = p.sign || p.roof || p.col || p.mat || partCol[p.t] || M.PLANK;
-        if (typeof id !== 'number') continue;
+        const id = idOf(p);
+        if (!id) continue;
+        const [bx, bz, bw, bd] = box(p);
         x.fillStyle = hex(id);
-        x.fillRect(p.x0 >> 1, p.z0 >> 1, Math.max(1, (p.x1 - p.x0 + 1) >> 1), Math.max(1, (p.z1 - p.z0 + 1) >> 1));
+        x.fillRect(bx, bz, bw, bd);
+        if (bw > 2 && bd > 2) { x.strokeStyle = dim(id, .62); x.lineWidth = .7; x.strokeRect(bx + .35, bz + .35, bw - .7, bd - .7); }
       }
       x.strokeStyle = hex(wallCol[camp.wall] || M.STEEL);
       x.lineWidth = 2;
       x.strokeRect((camp.x0 >> 1) + 1, (camp.z0 >> 1) + 1, (camp.x1 - camp.x0) >> 1, (camp.z1 - camp.z0) >> 1);
     }
     this.mapCanvas = c;
+    this.mapSurround = this.makeMapSurround();
+    this.mapMargin = this.makeMapMargin();
+  }
+
+  // The country just past the edges, for the map: drawn at the map's own detail and exactly the way the map draws its own country,
+  // pixel for pixel, so there is no seam where the world stops. The woods, the fields running on south, the river running on north,
+  // and the two highways west carrying on out of sight.
+  makeMapMargin() {
+    const L = this.layout, X0 = -1408, Z0 = -768, X1 = WX, Z1 = WZ + 768, w = (X1 - X0) >> 1, h = (Z1 - Z0) >> 1;
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h; c.x0 = X0; c.z0 = Z0;
+    const x = c.getContext('2d'), img = x.createImageData(w, h);
+    const col = (id) => [PALETTE[id * 4], PALETTE[id * 4 + 1], PALETTE[id * 4 + 2]];
+    const hash = (a, b) => { const v = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return v - Math.floor(v); };
+    const inWorld = (wx, wz) => wx >= 0 && wz >= 0 && wx < WX && wz < WZ;
+    const GS = 8, GW = Math.ceil((X1 - X0) / GS) + 2, GD = Math.ceil((Z1 - Z0) / GS) + 2, E = new Float32Array(GW * GD), F = new Float32Array(GW * GD);
+    for (let gz = 0; gz < GD; gz++) for (let gx = 0; gx < GW; gx++) {
+      const wx = X0 + gx * GS, wz = Z0 + gz * GS;
+      if (inWorld(wx - 24, wz - 24) && inWorld(wx + 24, wz + 24)) continue;
+      E[gx + gz * GW] = L.elevAt(wx, wz);
+      F[gx + gz * GW] = Math.min(1, L.forestAt(wx, wz) * .8 + L.trinityAt(wx, wz) * .35);
+    }
+    const at = (A, wx, wz) => {
+      const fx = Math.max(0, (wx - X0) / GS), fz = Math.max(0, (wz - Z0) / GS), ix = Math.min(GW - 2, fx | 0), iz = Math.min(GD - 2, fz | 0), ux = Math.min(1, fx - ix), uz = Math.min(1, fz - iz), k = ix + iz * GW;
+      return (A[k] * (1 - ux) + A[k + 1] * ux) * (1 - uz) + (A[k + GW] * (1 - ux) + A[k + GW + 1] * ux) * uz;
+    };
+    // The highways west, carrying straight on from where they leave the world.
+    const chaikin = (pts) => { for (let n = 0; n < 2; n++) { const o = [pts[0]]; for (let i = 0; i + 1 < pts.length; i++) { const [ax, az] = pts[i], [bx, bz] = pts[i + 1]; o.push([ax * .75 + bx * .25, az * .75 + bz * .25], [ax * .25 + bx * .75, az * .25 + bz * .75]); } o.push(pts[pts.length - 1]); pts = o; } return pts; };
+    const roads = [chaikin([[0, 2290], [-196, 2350], [-480, 2412], [-760, 2400], [-1060, 2452], [-1440, 2472]]), chaikin([[0, 3560], [-300, 3570], [-620, 3560], [-900, 3604], [-1180, 3622], [-1440, 3648]])];
+    const roadAt = (wx, wz) => {
+      for (const pts of roads) {
+        let run = 0;
+        for (let k = 0; k + 1 < pts.length; k++) {
+          const [ax, az] = pts[k], [bx, bz] = pts[k + 1], dx = bx - ax, dz = bz - az, len = Math.hypot(dx, dz);
+          const t = Math.max(0, Math.min(1, ((wx - ax) * dx + (wz - az) * dz) / (len * len)));
+          const d = Math.hypot(wx - ax - dx * t, wz - az - dz * t);
+          if (d <= 11) return d <= 8 ? (d < 1 && (run + t * len) % 11 < 6 ? 2 : 1) : 3;
+          run += len;
+        }
+      }
+      return 0;
+    };
+    const WATER = { deep: [20, 42, 54], shallow: [38, 66, 74] };
+    for (let pz = 0; pz < h; pz++) for (let px = 0; px < w; px++) {
+      const wx = X0 + px * 2, wz = Z0 + pz * 2;
+      if (inWorld(wx, wz)) continue;
+      const o = (px + pz * w) * 4;
+      let rgb, land = true;
+      if (wx > L.coastAt(wz)) {
+        const shore = hash(wx * .013 + 3, wz * .013) * .15;
+        rgb = [WATER.deep[0] + (WATER.shallow[0] - WATER.deep[0]) * shore, WATER.deep[1] + (WATER.shallow[1] - WATER.deep[1]) * shore, WATER.deep[2] + (WATER.shallow[2] - WATER.deep[2]) * shore];
+        land = false;
+      } else {
+        const crop = wz > WZ ? L.cropAt(wx, wz) : 0, t = at(E, wx, wz), road = wx < 0 && ((wz > 2200 && wz < 2560) || (wz > 3500 && wz < 3720)) ? roadAt(wx, wz) : 0;
+        const steep = Math.abs(at(E, wx + 2, wz) - at(E, wx - 2, wz)) + Math.abs(at(E, wx, wz + 2) - at(E, wx, wz - 2));
+        let park = false;
+        if (road === 1) rgb = col(M.ASPHALT);
+        else if (road === 2) rgb = col(M.LINE_Y);
+        else if (road === 3) rgb = col(hash(wx >> 1, wz >> 1) < .4 ? M.PATH : M.DIRT);
+        else if (crop === -1) rgb = col(hash(wx >> 1, wz >> 1) < .4 ? M.PATH : M.DIRT);
+        else if (crop > 0) {
+          const dot = hash(wx >> 1, wz >> 1);
+          rgb = col(crop === 2 ? (dot < .6 ? M.CORN : M.LEAF3) : crop === 3 ? (dot < .35 ? M.COTTON : M.LEAF3) : crop === 4 ? (dot < .5 ? M.PEANUT : M.SOIL) : crop === 5 ? (wx % 8 < 2 ? M.LEAF2 : M.SOIL) : crop === 6 ? M.GRASS_DRY : M.SOIL);
+          rgb = [rgb[0] * .88, rgb[1] * .88, rgb[2] * .88];
+        } else if ((t >= 12 && steep > 7) || t > 128 + mapNoise(wx * .02, wz * .02) * 30) rgb = col(M.SCHIST);
+        else { rgb = this.groundColour(wx, wz, t, at(F, wx, wz), col, hash); park = true; }
+        let shade = 1 + Math.max(-.6, Math.min(.5, ((at(E, wx + 4, wz) - at(E, wx - 4, wz)) + (at(E, wx, wz + 4) - at(E, wx, wz - 4))) * .07));
+        const lift = park ? 0 : Math.max(0, Math.min(60, t)) * .2;
+        rgb = [rgb[0] + lift, rgb[1] + lift * .9, rgb[2] + lift * .7];
+        if (t > 3 && !road && (Math.floor(t / 16) !== Math.floor(at(E, wx + 2, wz) / 16) || Math.floor(t / 16) !== Math.floor(at(E, wx, wz + 2) / 16))) shade *= .87;
+        rgb = [rgb[0] * shade, rgb[1] * shade, rgb[2] * shade];
+      }
+      const grain = land ? .94 + hash(wx, wz) * .12 : 1;
+      img.data[o] = Math.min(255, rgb[0] * grain); img.data[o + 1] = Math.min(255, rgb[1] * grain); img.data[o + 2] = Math.min(255, rgb[2] * grain); img.data[o + 3] = 255;
+    }
+    x.putImageData(img, 0, 0);
+    const P = (wx, wz) => [(wx - X0) / 2, (wz - Z0) / 2];
+    // The river north, out of the top of the world.
+    x.lineCap = 'round'; x.lineJoin = 'round';
+    x.strokeStyle = 'rgb(29,54,64)'; x.lineWidth = 17;
+    const rx = L.gx(1633);
+    x.beginPath(); x.moveTo(...P(rx, 4)); x.bezierCurveTo(...P(rx + 7, -200), ...P(rx - 33, -420), ...P(rx - 8, -780)); x.stroke();
+    // Trees exactly as the world sets them out: one to each six blocks where the wood wants one, and the second stand in Trinity.
+    const dim = (id, k) => { const [r, g, b] = col(id); return `rgb(${r * k | 0},${g * k | 0},${b * k | 0})`; };
+    const leafLv = [M.LEAF, M.LEAF2, M.LEAF].map((id, k) => [0, 1, 2, 3, 4].map((lv) => dim(id, (k === 2 ? .7 : .84) * (1 - lv * .1))));
+    const tree = (tx, tz, a, f) => {
+      if (inWorld(tx, tz) || tx > L.coastAt(tz) - 4) return;
+      if (wz0(tz) && L.cropAt(tx, tz)) return;
+      const [qx, qz] = P(tx, tz);
+      x.fillStyle = 'rgba(6,12,6,.5)';
+      x.fillRect(Math.round(qx), Math.round(qz), 3, 3);
+      x.fillStyle = leafLv[a % 3][Math.max(0, Math.min(4, Math.round(f * 5)))];
+      x.fillRect(Math.round(qx) - 1, Math.round(qz) - 1, 3, 3);
+    };
+    const wz0 = (tz) => tz > WZ;
+    for (let wz = Math.floor(Z0 / 6) * 6; wz < Z1; wz += 6) for (let wx = Math.floor(X0 / 6) * 6; wx < X1; wx += 6) {
+      if (inWorld(wx, wz) && inWorld(wx + 4, wz + 4)) continue;
+      const t = at(E, wx, wz), steep = Math.abs(at(E, wx + 2, wz) - at(E, wx - 2, wz)) + Math.abs(at(E, wx, wz + 2) - at(E, wx, wz - 2));
+      if ((t >= 12 && steep > 7) || (wx < 0 && ((wz > 2200 && wz < 2560) || (wz > 3500 && wz < 3720)) && roadAt(wx, wz))) continue;
+      const f = at(F, wx, wz), j = r2(wx, wz);
+      if (j < L.forestAt(wx, wz) * .8) tree(wx + Math.floor(j * 40) % 4, wz + Math.floor(j * 70) % 4, Math.floor(j * 9999), f);
+      const tk = L.trinityAt(wx, wz);
+      if (tk > .2 && r2(wx + 3, wz + 3) < tk * .85) tree(wx + 3, wz + 3, Math.floor(r2(wz + 3, wx) * 9999), f);
+    }
+    return c;
+  }
+
+  // The country round the state, for the maps: the same land, the same woods, the same light, carried on past the edges at an eighth of
+  // the detail, so that nothing ends in a line. The sea is wherever the coast says it is, and the two roads west run on to the horizon.
+  makeMapSurround() {
+    const L = this.layout, S = 4096, P = 8, n = (WX + S * 2) / P;
+    const c = document.createElement('canvas');
+    c.width = c.height = n; c.span = S;
+    const x = c.getContext('2d'), img = x.createImageData(n, n);
+    const col = (id) => [PALETTE[id * 4], PALETTE[id * 4 + 1], PALETTE[id * 4 + 2]];
+    const hash = (a, b) => { const v = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return v - Math.floor(v); };
+    const G4 = (n >> 2) + 2, E = new Float32Array(G4 * G4), F = new Float32Array(G4 * G4);
+    for (let gz = 0; gz < G4; gz++) for (let gx = 0; gx < G4; gx++) {
+      const wx = -S + gx * 32, wz = -S + gz * 32;
+      E[gx + gz * G4] = L.elevAt(wx, wz);
+      F[gx + gz * G4] = Math.min(1, L.forestAt(wx, wz) + L.trinityAt(wx, wz) * .3);
+    }
+    const at = (A, px, pz) => {
+      const fx = px / 4, fz = pz / 4, ix = Math.min(G4 - 2, fx | 0), iz = Math.min(G4 - 2, fz | 0), ux = fx - ix, uz = fz - iz, k = ix + iz * G4;
+      return (A[k] * (1 - ux) + A[k + 1] * ux) * (1 - uz) + (A[k + G4] * (1 - ux) + A[k + G4 + 1] * ux) * uz;
+    };
+    const grass = [col(M.GRASS_DRY), col(M.GRASS), col(M.GRASS2)], leaf = [col(M.LEAF), col(M.LEAF2), col(M.LEAF3)], sea = [20, 42, 54];
+    for (let pz = 0; pz < n; pz++) for (let px = 0; px < n; px++) {
+      const wx = -S + px * P, wz = -S + pz * P, o = (px + pz * n) * 4;
+      let rgb;
+      if (wx > L.coastAt(wz) || wx >= WX) rgb = sea;
+      else {
+        const t = at(E, px, pz), f = at(F, px, pz), h = hash(px, pz);
+        const g = grass[h < .3 ? 0 : h < .65 ? 1 : 2], lf = leaf[(h * 7 | 0) % 3], k = Math.min(1, f * 1.15) * (.75 + hash(pz, px) * .5);
+        rgb = [g[0] + (lf[0] - g[0]) * k, g[1] + (lf[1] - g[1]) * k, g[2] + (lf[2] - g[2]) * k];
+        const lift = Math.max(0, Math.min(60, t)) * .45, sl = (at(E, px - 1, pz - 1) - at(E, px + 1, pz + 1)) * .03;
+        const sh = (1 + Math.max(-.42, Math.min(.42, sl))) * (Math.floor(t / 16) !== Math.floor(at(E, px + 1, pz) / 16) ? .87 : 1) * (.94 + hash(px * 3, pz) * .1);
+        rgb = [(rgb[0] + lift) * sh, (rgb[1] + lift * .9) * sh, (rgb[2] + lift * .7) * sh];
+      }
+      img.data[o] = rgb[0]; img.data[o + 1] = rgb[1]; img.data[o + 2] = rgb[2]; img.data[o + 3] = 255;
+    }
+    x.putImageData(img, 0, 0);
+    x.strokeStyle = `rgb(${col(M.ASPHALT).map((v) => v | 0).join(',')})`;
+    x.lineWidth = 2;
+    for (const [z0, z1] of [[2470, 2560], [3646, 3700]]) { x.beginPath(); x.moveTo((S - 1420) / P, (z0 + S) / P); x.bezierCurveTo((S - 2200) / P, (z0 + 30 + S) / P, (S - 3200) / P, (z1 + S) / P, 0, (z1 + 60 + S) / P); x.stroke(); }
+    return c;
   }
 
   setupAtmosphere() {
@@ -1935,10 +2124,11 @@ class Game {
       this.placeInBed2(bed);
     }
     // If the foot of the bed is blocked, anywhere else nearby will do to stand.
-    const Y = bed.y ?? STREET_Y, clear = (x, z) => !W.solid(Math.floor(x), Y, Math.floor(z)) && !W.solid(Math.floor(x), Y + 1, Math.floor(z)) && !W.solid(Math.floor(x), Y + 2, Math.floor(z));
+    // A spot to stand is floor underfoot and room for a head over it, both: never the middle of a wall.
+    const Y = bed.y ?? STREET_Y, clear = (x, z) => W.solid(Math.floor(x), Y - 1, Math.floor(z)) && !W.solid(Math.floor(x), Y, Math.floor(z)) && !W.solid(Math.floor(x), Y + 1, Math.floor(z)) && !W.solid(Math.floor(x), Y + 2, Math.floor(z));
     if (!clear(P.x, P.z)) {
-      search: for (let r = 2; r < 9; r++) for (let a = 0; a < 12; a++) {
-        const x = bed.x + Math.cos(a * .5236) * r, z = bed.z - 1 + Math.sin(a * .5236) * r;
+      search: for (let r = 1.2; r < 9; r += .6) for (let a = 0; a < 16; a++) {
+        const x = bed.x + .5 + Math.cos(a * .3927) * r, z = bed.z + Math.sin(a * .3927) * r;
         if (clear(x, z)) { P.x = x; P.z = z; break search; }
       }
     }

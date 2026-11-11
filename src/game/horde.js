@@ -389,7 +389,7 @@ export class Horde {
       const R2 = rmax * rmax, r2 = 36 * 36;
       for (let t = 0; t < 300 && sent < count * .4; t++) {
         const i = Math.floor(rand() * this.n);
-        if (state[i] !== S_IDLE || mig[i] || siege[i] || py[i] > STREET_Y + 3) continue;
+        if (state[i] !== S_IDLE || mig[i] || siege[i] || py[i] > this.gy(px[i], pz[i]) + 3) continue;
         const d = (px[i] - tx) ** 2 + (pz[i] - tz) ** 2;
         if (d < r2 || d > R2) continue;
         mig[i] = 1;
@@ -673,9 +673,9 @@ export class Horde {
       if (bx < 1 || bz < 1 || bx >= WX - 1 || bz >= WZ - 1) continue;
       const k = bz * WX + bx;
       if (!L.lot[k]) continue;
-      const floors = Math.floor((L.height[k] - STREET_Y) / FLOOR_H);
-      if (floors < 2 || L.buildings[L.lot[k] - 1].house) continue;
-      const y = STREET_Y - 1 + FLOOR_H * (1 + Math.floor(rand() * Math.min(floors - 1, 16))) + 1;
+      const hb = L.buildings[L.lot[k] - 1], floors = Math.floor((L.height[k] - STREET_Y - hb.lift) / FLOOR_H);
+      if (floors < 2 || hb.house) continue;
+      const y = STREET_Y + hb.lift - 1 + FLOOR_H * (1 + Math.floor(rand() * Math.min(floors - 1, 16))) + 1;
       if (!w.isLoaded(bx, y, bz)) continue;
       const P = this.player;
       if (P && Math.abs(y - P.y) < 3 && Math.hypot(bx - P.x, bz - P.z) < 26) continue;   // not on top of you, on your own floor
@@ -1193,9 +1193,9 @@ export class Horde {
       if (this.siege[i]) sc[this.siege[i] - 1]++;
 
       // Only the detailed update has gravity. Anyone up off the street with nothing under them gets it, wherever they are.
-      const unheld = py[i] > STREET_Y + 1 && ((i + f) & 7) === 0 && w.isLoaded(Math.floor(px[i]), Math.floor(py[i]), Math.floor(pz[i])) && !w.solid(Math.floor(px[i]), Math.floor(py[i] - .05), Math.floor(pz[i]));
+      const unheld = py[i] > this.gy(px[i], pz[i]) + 1 && ((i + f) & 7) === 0 && w.isLoaded(Math.floor(px[i]), Math.floor(py[i]), Math.floor(pz[i])) && !w.solid(Math.floor(px[i]), Math.floor(py[i] - .05), Math.floor(pz[i]));
       if (unheld) this.droppers[i] = 1;
-      if (this.droppers[i] || (d2 < NEAR2 && Math.abs(py[i] - P.y) < 30) || (st !== S_IDLE && d2 < 8100 && py[i] > STREET_Y + 2.5)) {
+      if (this.droppers[i] || (d2 < NEAR2 && Math.abs(py[i] - P.y) < 30) || (st !== S_IDLE && d2 < 8100 && py[i] > this.gy(px[i], pz[i]) + 2.5)) {
         if (this.droppers[i] && w.solid(Math.floor(px[i]), Math.floor(py[i] - .05), Math.floor(pz[i]))) this.droppers[i] = 0;
         nearCount++;
         this.updateNear(i, dt, d2, speedK);
@@ -1280,9 +1280,9 @@ export class Horde {
       // Nothing wakes up behind a camp's wall: those buildings were cleared long ago.
       const near = this.inCamp(x, z, 36);
       if (near && !(this.sim && this.sim.isRuined(near.id))) continue;
-      const floors = Math.floor((this.L.height[i] - STREET_Y) / FLOOR_H);
-      if (floors < 2 || this.L.buildings[this.L.lot[i] - 1].house) continue;
-      const y = STREET_Y - 1 + FLOOR_H * (1 + Math.floor(rand() * Math.min(floors - 1, 16))) + 1;
+      const hb = this.L.buildings[this.L.lot[i] - 1], floors = Math.floor((this.L.height[i] - STREET_Y - hb.lift) / FLOOR_H);
+      if (floors < 2 || hb.house) continue;
+      const y = STREET_Y + hb.lift - 1 + FLOOR_H * (1 + Math.floor(rand() * Math.min(floors - 1, 16))) + 1;
       if (Math.abs(y - P.y) < 3 && r < 26) continue;
       if (!w.isLoaded(x, y, z)) continue;
       const cell = (x >> 6) + (z >> 6) * this.popW;
@@ -1330,7 +1330,7 @@ export class Horde {
     const w = this.world, L = this.L, { px, py, pz } = this;
     for (let t = 0; t < 60 && this.n; t++) {
       const i = Math.floor(rand() * this.n);
-      if (this.state[i] !== S_IDLE || this.siege[i] || this.mig[i] || this.lure[i] || Math.abs(py[i] - STREET_Y) > 1.5) continue;
+      if (this.state[i] !== S_IDLE || this.siege[i] || this.mig[i] || this.lure[i] || Math.abs(py[i] - this.gy(px[i], pz[i])) > 1.5) continue;
       const d = Math.hypot(px[i] - P.x, pz[i] - P.z);
       if (d < 45 || d > 160) continue;
       const near = this.inCamp(px[i], pz[i], 45);
@@ -1345,8 +1345,9 @@ export class Horde {
           const lot = L.lot[z * WX + x];
           if (!lot) continue;
           const b = L.buildings[lot - 1];
-          if (!b || (L.height[z * WX + x] - STREET_Y) < 8 || !w.isLoaded(x, STREET_Y + 1, z)) break;
-          if (w.solid(x, STREET_Y + 1, z)) face = { x, z, ax, az, lot, sx: x - ax * 1.5, sz: z - az * 1.5 };
+          const fy = STREET_Y + b.lift;
+          if (!b || (L.height[z * WX + x] - fy) < 8 || !w.isLoaded(x, fy + 1, z)) break;
+          if (w.solid(x, fy + 1, z)) face = { x, z, ax, az, lot, sx: x - ax * 1.5, sz: z - az * 1.5 };
           else break;
         }
         if (face) break;
@@ -1357,7 +1358,7 @@ export class Horde {
       if (!k) return;
       const crew = [];
       this.forRadius(face.sx, face.sz, 18, (j) => {
-        if (crew.length >= 26 || this.state[j] !== S_IDLE || this.siege[j] || this.mig[j] || this.lure[j] || Math.abs(py[j] - STREET_Y) > 1.5) return;
+        if (crew.length >= 26 || this.state[j] !== S_IDLE || this.siege[j] || this.mig[j] || this.lure[j] || Math.abs(py[j] - this.gy(px[j], pz[j])) > 1.5) return;
         if (rand() < .75) { this.lure[j] = k; crew.push(j); }
       });
       if (crew.length < 6) { for (const j of crew) this.lure[j] = 0; this.dropLure(k); continue; }
@@ -1368,7 +1369,7 @@ export class Horde {
 
   workWild(W, dt) {
     const w = this.world, P = this.player;
-    const done = (W.t -= dt) <= 0 || Math.hypot(W.sx - P.x, W.sz - P.z) < 30 || !w.isLoaded(W.x, STREET_Y + 1, W.z);
+    const done = (W.t -= dt) <= 0 || Math.hypot(W.sx - P.x, W.sz - P.z) < 30 || !w.isLoaded(W.x, this.gy(W.x, W.z) + 1, W.z);
     if (done) {
       // Over: they lose interest and wander off. Anyone it was all happening in front of is another matter: close up, they have seen you.
       for (let i = 0; i < this.n; i++) if (this.lure[i] === W.k) { this.lure[i] = 0; if (!this.siege[i] && Math.hypot(this.px[i] - P.x, this.pz[i] - P.z) > 30) this.state[i] = S_IDLE; }
@@ -1387,7 +1388,7 @@ export class Horde {
     for (let h = 0; h < hits; h++) {
       // Along the front, a little either side of where they are packed, from the ground up to the first floor's windows.
       const side = Math.round((rand() - .5) * 7), up = Math.floor(rand() * 4);
-      const x = W.az ? W.x + side : W.x, z = W.ax ? W.z + side : W.z, y = STREET_Y + up;
+      const x = W.az ? W.x + side : W.x, z = W.ax ? W.z + side : W.z, y = this.gy(W.sx, W.sz) + up;
       // Into the building a block or two, past whatever has already gone.
       for (let r = 0; r < 3; r++) {
         const cx = x + W.ax * r, cz = z + W.az * r, id = w.get(cx, y, cz);
@@ -1692,7 +1693,7 @@ export class Horde {
         this.chewBudget -= cost;
         // Nothing ahead of them and stranded on top of something: down through it, to where the people are.
         if (this.chewAhead(i, bx, y, bz, ruin)) this.blk[i] = .02;
-        else if (this.stuck[i] >= 2 && y > STREET_Y + .5) {
+        else if (this.stuck[i] >= 2 && y > this.gy(bx, bz) + .5) {
           const ux = Math.floor(bx), uy = Math.floor(y - .05), uz = Math.floor(bz), id = w.get(ux, uy, uz);
           if (id && HP[id] !== 255 && this.onGnaw) this.onGnaw(ux, uy, uz, id, ruin);
         }
@@ -1926,6 +1927,9 @@ export class Horde {
     if (d2 > TURN2 && Math.abs(sx[i]) + Math.abs(sz[i]) > .05) yaw[i] = Math.atan2(sx[i], sz[i]);
     this.snapGround(i, dt);
   }
+
+  // The street level wherever a body stands: the lifted ground of a town, or the datum.
+  gy(x, z) { return STREET_Y + Math.max(0, this.L.terr[Math.max(0, Math.min(WZ - 1, z | 0)) * WX + Math.max(0, Math.min(WX - 1, x | 0))]); }
 
   // Coarse ground follow; stops wanderers walking into walls or water.
   snapGround(i, dt) {

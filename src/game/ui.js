@@ -917,7 +917,11 @@ export class UI {
     x.scale(scale, scale);
     // Map canvas is half resolution of the world. Filtered, or the streets shimmer as it turns.
     x.imageSmoothingEnabled = true;
-    x.drawImage(g.mapCanvas, -P.x / 2 * 2, -P.z / 2 * 2, g.mapCanvas.width * 2, g.mapCanvas.height * 2);
+    const sur = g.mapSurround;
+    if (sur) x.drawImage(sur, -P.x - sur.span, -P.z - sur.span, WX + sur.span * 2, WZ + sur.span * 2);
+    const mg = g.mapMargin;
+    if (mg) x.drawImage(mg, mg.x0 - P.x, mg.z0 - P.z, mg.width * 2, mg.height * 2);
+    x.drawImage(g.mapCanvas, -P.x, -P.z, WX, WZ);
     const H = g.horde;
     const rim = cx / scale, range = rim * 1.42;
     // Every one of them in range: this close in there are few enough to draw, and thinning them out hid half a crowd.
@@ -966,7 +970,7 @@ export class UI {
       if (dx * dx + dz * dz > (cx - 18) * (cx - 18)) continue;
       if (shown++ >= 5) break;
       const sx = cx + dx * cosY - dz * sinY, sy = cx + dx * sinY + dz * cosY;
-      if (p.kind === 'area') { x.fillStyle = 'rgba(233,228,216,.62)'; x.fillText(p.name, sx, sy); continue; }
+      if (p.kind === 'area' || p.kind === 'town') { x.fillStyle = 'rgba(233,228,216,.62)'; x.fillText(p.name, sx, sy); continue; }
       x.fillStyle = p.kind === 'park' ? '#9fd08a' : '#e9e4d8';
       x.save();
       x.translate(sx, sy);
@@ -1845,6 +1849,10 @@ export class UI {
     x.fillRect(0, 0, c.width, c.height);
     x.setTransform(s, 0, 0, s, c.width / 2 - v.x * s, c.height / 2 - v.z * s);
     x.imageSmoothingEnabled = s > 1 ? false : true;
+    const sur = g.mapSurround;
+    if (sur) { x.imageSmoothingEnabled = true; x.drawImage(sur, -sur.span, -sur.span, WX + sur.span * 2, WZ + sur.span * 2); x.imageSmoothingEnabled = s > 1 ? false : true; }
+    const mg = g.mapMargin;
+    if (mg) x.drawImage(mg, mg.x0, mg.z0, mg.width * 2, mg.height * 2);
     x.drawImage(g.mapCanvas, 0, 0, WX, WZ);
     x.setTransform(1, 0, 0, 1, 0, 0);
     const P = g.player;
@@ -1871,6 +1879,18 @@ export class UI {
       if (p.tier && s < .34) continue;
       const px = tx(p.x), pz = tz(p.z);
       if (px < -60 || pz < -20 || px > c.width + 60 || pz > c.height + 20) continue;
+      // The five towns, big enough to read from across the map.
+      if (p.kind === 'town') {
+        x.font = `700 ${Math.round(Math.max(18, Math.min(30, 20 * Math.sqrt(s * 2.2))))}px Quantico, Bahnschrift, Segoe UI, sans-serif`;
+        const name = p.name.toUpperCase(), w = x.measureText(name).width;
+        labels.boxes.push({ x: px - w / 2 - 4, y: pz - 14, w: w + 8, h: 28 });
+        x.lineWidth = 5; x.strokeStyle = 'rgba(8,10,12,.82)';
+        x.strokeText(name, px, pz);
+        x.fillStyle = '#f3ecd9';
+        x.fillText(name, px, pz);
+        x.lineWidth = 3; x.strokeStyle = 'rgba(8,10,12,.7)';
+        continue;
+      }
       if (p.kind === 'area') {
         x.font = '600 12px Quantico, Bahnschrift, Segoe UI, sans-serif';
         const name = p.name.toUpperCase(), w = x.measureText(name).width;

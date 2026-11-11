@@ -103,8 +103,9 @@ export function makeGenerator(L) {
     if (flags & 32) {
       // The tunnel: seven clear over the road, a concrete lid, and then the hill.
       const roof = height[i] - 1;
-      for (let y = Math.max(y0, STREET_Y + 6); y <= Math.min(y1, roof); y++) {
-        d[lx | ((y - oy) << 5) | (lz << 10)] = y === STREET_Y + 6 ? M.CONCRETE : y === roof ? M.GRASS : y > roof - 3 ? M.DIRT : M.STONE;
+      const lid = top + 8;
+      for (let y = Math.max(y0, lid); y <= Math.min(y1, roof); y++) {
+        d[lx | ((y - oy) << 5) | (lz << 10)] = y === lid ? M.CONCRETE : y === roof ? M.GRASS : y > roof - 3 ? M.DIRT : M.STONE;
         any = true;
       }
       return;
@@ -143,14 +144,12 @@ export function makeGenerator(L) {
     }
     if (b.stoop) {
       const m = (t + (b.seed & 15)) % 15;
-      if (m === 3 || m === 14) { place(STREET_Y, S.trim); place(STREET_Y + 1, S.trim); }
+      if (m === 3 || m === 14) { place(STREET_Y + b.lift, S.trim); place(STREET_Y + b.lift + 1, S.trim); }
     }
   }
 
   // Shop awnings over the sidewalk, faded and torn, on the stretches of shopfront that have them.
   function awning(i, x, z, y0, y1) {
-    const y = STREET_Y + 4;
-    if (y < y0 || y > y1) return;
     let nb = 0, t = 0;
     for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
       for (const reach of [1, 2]) {
@@ -162,6 +161,8 @@ export function makeGenerator(L) {
     if (!nb) return;
     const b = buildings[nb - 1];
     if (STYLES[b.style].cast === 2 || b.house || b.blank) return;
+    const y = STREET_Y + 4 + b.lift;
+    if (y < y0 || y > y1) return;
     const s = t + (b.seed & 15);
     const seg = (s / 15) | 0;
     if (s % 15 < 4 || s % 15 > 13 || h2(b.id, seg * 7) % 3 !== 0) return;
@@ -191,8 +192,8 @@ export function makeGenerator(L) {
     const t = dir <= 2 ? z : x;
     if (((t + b.seed) % 22) > 6) return;
     const top = b.tiers[1];
-    if (top > STREET_Y + 54 || b.house) return;
-    const base = STREET_Y + 1 * FLOOR_H - 1;
+    if (top - b.lift > STREET_Y + 54 || b.house) return;
+    const base = STREET_Y + b.lift + FLOOR_H - 1;
     for (let y = Math.max(y0, base); y <= Math.min(y1, top - 2); y++) {
       if ((y - base) % FLOOR_H === 0) d[(x - ox) | ((y - oy) << 5) | ((z - oz) << 10)] = M.IRON, any = true;
     }
@@ -214,7 +215,7 @@ export function makeGenerator(L) {
     const hN = height[i - WX], hS = height[i + WX], hW = height[i - 1], hE = height[i + 1];
     const e = edge[i];
     const lx = x - ox, lz = z - oz;
-    const startY = Math.max(y0, STREET_Y);
+    const startY = Math.max(y0, STREET_Y + b.lift);
     const endY = Math.min(y1, top - 1);
     const hasStair = b.sx >= 0;
     const inShaft = hasStair && x >= b.sx && x < b.sx + 5 && z >= b.sz && z < b.sz + 6;
@@ -228,14 +229,14 @@ export function makeGenerator(L) {
         if (y === top - 1) { d[lx | ((y - oy) << 5) | (lz << 10)] = S.roof; any = true; }
         continue;
       }
-      const rel = y - (STREET_Y - 1);
+      const rel = y - (STREET_Y - 1 + b.lift);
       const lv = rel % FH;
       const fl = (rel / FH) | 0;
       const oN = hN <= y, oS = hS <= y, oW = hW <= y, oE = hE <= y;
       const open = oN || oS || oW || oE;
       if (b.blank) {
         // A silo or an elevator: a skin with nothing in it, and no way in.
-        if (e === 0 || open || y === top - 1) id = y === top - 1 ? S.roof : (y - STREET_Y) % 8 === 7 ? S.trim : S.wall;
+        if (e === 0 || open || y === top - 1) id = y === top - 1 ? S.roof : (y - STREET_Y - b.lift) % 8 === 7 ? S.trim : S.wall;
       } else if (e === 0 || open) {
         if (!open) id = S.wall;                    // party wall between buildings
         else if (lv === 0) id = y === wallTop - 1 ? S.roof : S.trim;
@@ -448,9 +449,9 @@ export function makeGenerator(L) {
 
   function prop(idx) {
     const t = props[idx], x = props[idx + 1], z = props[idx + 2], a = props[idx + 3], b = props[idx + 4], c = props[idx + 5];
-    const base = STREET_Y;
+    const base = STREET_Y + terr[z * WX + x];
     switch (t) {
-      case P.CAR: car(x, z, a, b, c); break;
+      case P.CAR: car(x, z, a, b, c, base); break;
       case P.BALE: { const y = STREET_Y + terr[z * WX + x]; if (a % 3) box(x, y, z, x + 2, y + 1, z + 1, M.HAY); else box(x, y, z, x + 1, y + 1, z + 2, M.HAY); break; }
       case P.TREE: if (ground[z * WX + x] === G.WALK) tree(x, z, a, 0); break;
       case P.PARKTREE: tree(x, z, a, 1 + a % 3); break;
@@ -479,7 +480,7 @@ export function makeGenerator(L) {
         break;
       }
       case P.CHECKPOINT: {
-        const y = STREET_Y - 1;
+        const y = base;
         for (let k = -9; k <= 9; k++) {
           if (Math.abs(k) < 3) continue;
           put(x + k, y, z + 9, M.JERSEY); put(x + k, y + 1, z + 9, M.JERSEY);

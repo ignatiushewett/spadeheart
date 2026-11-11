@@ -30,7 +30,7 @@ export const LORE = {
           { id: 'cable_yes', sub: true, ask: 'I will find out.', say: 'It is marked. If they are walking around out there, you do what you have to do. And thank you.', job: 'bryant_cable' },
           { id: 'cable_done', pay: 'bryant_cable', req: { flag: 'bryant_cable_done', notFlag: 'bryant_cable_paid' }, ask: 'I found your junction box. And your crew.', say: 'Do not tell me how they looked. Just tell me if it was quick. No? Then lie to me, and take this. Their names go on the wall tonight.', standing: 12 },
         ],
-        favours: { bryant_cable: { title: 'The lost cable crew', type: 'fetch', u: .311, v: .215, reward: 340, bonus: 'medkit', desc: 'Find where the market\'s cable crew stopped on Kingsway and bring back the junction box.' } },
+        favours: { bryant_cable: { title: 'The lost cable crew', type: 'fetch', u: .288, v: .171, reward: 340, bonus: 'medkit', desc: 'Find where the market\'s cable crew stopped on Kingsway and bring back the junction box.' } },
       },
       {
         id: 'abara', name: 'Doc Abara', role: 'medic', title: 'Field Medic', weapon: 'pistol', wardrobe: 'med',
@@ -95,7 +95,7 @@ export const LORE = {
           { id: 'radio_done', pay: 'battery_radio', req: { flag: 'battery_radio_done', notFlag: 'battery_radio_paid' }, ask: 'The burst went out. Did you hear anything?', say: 'Static. Then nothing. Then, for eleven seconds, somebody keying a microphone. No voice. Just the click, twice. It might be nothing. Three hundred people are dancing outside right now, so do not tell them that.', standing: 14 },
           { id: 'trust', ask: 'Anything left in the hold?', req: { standing: 25 }, say: 'There is always something in the hold for a friend of the boat. Flare charges, medical. Take it before the kids find it.', give: { dynamite: 1, medkit: 2 }, daily: true },
         ],
-        favours: { battery_radio: { title: 'One burst out to sea', type: 'hold', u: .8374, v: .7964, reward: 420, bonus: 'dynamite', desc: 'Hold the old transmitter on the pleasure pier for forty seconds, and try to survive the attention.' } },
+        favours: { battery_radio: { title: 'One burst out to sea', type: 'hold', u: .925, v: .745, reward: 420, bonus: 'dynamite', desc: 'Hold the old transmitter on the pleasure pier for forty seconds, and try to survive the attention.' } },
       },
       {
         id: 'obi', name: 'Obi', role: 'general', title: 'Quartermaster', weapon: 'axe', wardrobe: 'civ',
@@ -141,7 +141,7 @@ export const LORE = {
           { id: 'books_done', pay: 'wash_books', req: { flag: 'wash_books_done', notFlag: 'wash_books_paid' }, ask: 'Here is your crate of farming manuals.', say: 'Soil pH. Crop rotation. Oh, these are beautiful. Thank you. I will tell the Assembly you carried this through all of that, for the sake of tomatoes. There may be a song.', standing: 14 },
           { id: 'trust', ask: 'Could the commune spare anything?', req: { standing: 25 }, say: 'There is a standing motion on your account. It passed. Tam packed you some things.', give: { medkit: 1, antibiotic: 1, ammo_rifle: 30 }, daily: true },
         ],
-        favours: { wash_books: { title: 'The agricultural archive', type: 'fetch', u: .4956, v: .6177, reward: 300, bonus: 'antibiotic', desc: 'Recover the crate of farming manuals the commune left behind at the extension office on Church Street.' } },
+        favours: { wash_books: { title: 'The agricultural archive', type: 'fetch', u: .4907, v: .6104, reward: 300, bonus: 'antibiotic', desc: 'Recover the crate of farming manuals the commune left behind at the extension office on Church Street.' } },
       },
       {
         id: 'tam', name: 'Tam Nguyen', role: 'medic', title: 'Nursing Student', weapon: 'bat', wardrobe: 'med',
@@ -189,7 +189,7 @@ export const LORE = {
           { id: 'depot_done', pay: 'union_depot', req: { flag: 'union_depot_done', notFlag: 'union_depot_paid' }, ask: 'Street outside the armory is clear.', say: 'Good. Truck rolls at first light. You did that alone, and I have men here who will not go into Albion in a squad. You ever want a stripe, you come see me. Here. It is a real M249, and it is not on anyone\'s books.', standing: 15, give: { lmg: 1, ammo_rifle: 200 } },
           { id: 'trust', ask: 'Request resupply, Sergeant.', req: { standing: 25 }, say: 'Granted. Sign for it. That is a joke, nobody has signed for anything since August.', give: { ammo_rifle: 90, grenade: 2 }, daily: true },
         ],
-        favours: { union_depot: { title: 'Clear the 69th Armory', type: 'kill', u: .16, v: .30, need: 40, reward: 380, desc: 'Put down forty infected around the 69th Regiment Armory on Carrow Avenue, in Albion, so a truck can get in.' } },
+        favours: { union_depot: { title: 'Clear the 69th Armory', type: 'kill', u: .115, v: .171, need: 40, reward: 380, desc: 'Put down forty infected around the 69th Regiment Armory on Carrow Avenue, in Albion, so a truck can get in.' } },
       },
       {
         id: 'petrakis', name: 'Mrs. Petrakis', role: 'local', title: 'Marksman', weapon: 'sniper', wardrobe: 'civ', spot: 'hq',
@@ -240,7 +240,7 @@ export const LORE = {
           { id: 'seed_done', pay: 'sheep_seeds', req: { flag: 'sheep_seeds_done', notFlag: 'sheep_seeds_paid' }, ask: 'Your seed bank, Judge.', say: 'Do you know, in forty-one years on the bench, no one has ever handed me anything that made me cry? Sit down. You are getting the tomatoes. They are not on the market, those tomatoes. You are an honored citizen of the Bastion, and that is a court order.', standing: 16, give: { medkit: 2, beans: 6, water: 6 } },
           { id: 'trust', ask: 'Could the Bastion spare provisions?', req: { standing: 25 }, say: 'Citizens draw from the common stores. Here is your ration, and do not sell it, I would know.', give: { beans: 4, water: 4, medkit: 1 }, daily: true },
         ],
-        favours: { sheep_seeds: { title: 'The heirloom seed bank', type: 'fetch', u: .514, v: .609, reward: 360, bonus: 'stim', desc: 'Recover the heirloom seed bank from the co-op store under the Weston elevator, north of the Bastion.' } },
+        favours: { sheep_seeds: { title: 'The heirloom seed bank', type: 'fetch', u: .5347, v: .603, reward: 360, bonus: 'stim', desc: 'Recover the heirloom seed bank from the co-op store under the Weston elevator, north of the Bastion.' } },
       },
       {
         id: 'ellis', name: 'Ellis Boone', role: 'general', title: 'Farm Boss', weapon: 'shotgun', wardrobe: 'civ', spot: 'field',
@@ -290,7 +290,7 @@ export const LORE = {
           { id: 'squat_done', pay: 'tompkins_csquat', req: { flag: 'tompkins_csquat_done', notFlag: 'tompkins_csquat_paid' }, ask: 'The block around C-Squat is clear.', say: 'And the people? No. No, I can see from your face. They went out swinging? Of course they did. I was at their wedding, those two, in 1994, it had a tuba. Take this. It is hers, and she would hate you, and she would want you to have it.', standing: 15, give: { sledge: 1, dynamite: 3 } },
           { id: 'trust', ask: 'Anything in the free box?', req: { standing: 25 }, say: 'Everything in the free box is free. That is why it is the free box. Do not take the good stuff, I have been saving it. Ah, take the good stuff.', give: { dynamite: 1, ammo_shell: 24, whiskey: 1 }, daily: true },
         ],
-        favours: { tompkins_csquat: { title: 'Clear the Foundry squat', type: 'kill', u: .813, v: .151, need: 35, reward: 320, desc: 'Kill thirty-five infected on the Foundry Street block around the squat, and find out what became of the people inside.' } },
+        favours: { tompkins_csquat: { title: 'Clear the Foundry squat', type: 'kill', u: .7617, v: .0854, need: 35, reward: 320, desc: 'Kill thirty-five infected on the Foundry Street block around the squat, and find out what became of the people inside.' } },
       },
       {
         id: 'sprocket', name: 'Sprocket', role: 'junk', title: 'Bike Mechanic', weapon: 'axe', wardrobe: 'scrap',
@@ -328,7 +328,7 @@ export const LORE = {
           trusted: 'You are the only person on my list who brings things back instead of bleeding on them.',
         },
         topics: [
-          { id: 'clinic', ask: 'How many do you treat here?', say: 'Two hundred a week, walking in through the gate from every settlement this side of the mountain. Dayton people, east bank people, people from nowhere. Our rule is that nobody gets turned away, and everybody gets checked. We have had to hold that second rule at gunpoint more often than I would like.', then: ['checked', 'quar'] },
+          { id: 'clinic', ask: 'How many do you treat here?', say: 'Two hundred a week, walking in through the gate from every settlement this side of the mountain. Dayton people, Westmoor people, people from nowhere. Our rule is that nobody gets turned away, and everybody gets checked. We have had to hold that second rule at gunpoint more often than I would like.', then: ['checked', 'quar'] },
           { id: 'checked', sub: true, ask: 'What happens if someone is bitten?', say: 'They go to the white tent on the far side, and we tell them the truth. Then I sit with them. I have sat with one hundred and twelve people. It is the only part of medicine I have left that I am certain I do well.', standing: 2 },
           { id: 'quar', sub: true, ask: 'Do you know what this thing is?', say: 'I have a theory with no lab behind it. It is not a virus in any way I understand. Everyone carries it. Everyone. The bite only seems to speed up what is already in there. That is why we check the ones who die of ordinary things, too. Please do not repeat that outside these walls.', set: 'morning_truth', standing: 1 },
           { id: 'cure', ask: 'Do you think there will be a cure?', say: 'I used to be the kind of doctor who said no to that question quite gently. It is a yes-or-no question for a lab with electricity. Find me a working centrifuge and I will give you a better answer.' },
@@ -337,7 +337,7 @@ export const LORE = {
           { id: 'cent_done', pay: 'morning_cent', req: { flag: 'morning_cent_done', notFlag: 'morning_cent_paid' }, ask: 'I have your centrifuge.', say: 'You went into St. Luke\'s. And you are not bitten, I can see that from here, but hold out your arms anyway. Thank you. I will have a real answer for you within a month, and it may be a terrible one. It will be the first true thing anyone has known about this. Come here. I do not hug. Consider this an exception.', standing: 18, give: { antibiotic: 4, stim: 2 } },
           { id: 'trust', ask: 'Can you spare any supplies?', req: { standing: 25 }, say: 'You keep our patients alive by keeping yourself alive. It is not charity, it is triage. Take it.', give: { medkit: 2, antibiotic: 2 }, daily: true },
         ],
-        favours: { morning_cent: { title: 'A centrifuge from St. Brigid\'s', type: 'fetch', u: .803, v: .215, reward: 400, bonus: 'antibiotic', desc: 'Recover the crated portable centrifuge from the ambulance bay at St. Brigid\'s, in the middle of Dayton.' } },
+        favours: { morning_cent: { title: 'A centrifuge from St. Brigid\'s', type: 'fetch', u: .813, v: .3003, reward: 400, bonus: 'antibiotic', desc: 'Recover the crated portable centrifuge from the ambulance bay at St. Brigid\'s, in the middle of Dayton.' } },
       },
       {
         id: 'tomasz', name: 'Tomasz Bielski', role: 'medic', title: 'Pharmacist', weapon: 'smg', wardrobe: 'med',
@@ -375,8 +375,8 @@ export const LORE = {
           trusted: 'You are starting now. Do not let it go to your head. Starters run the most.',
         },
         topics: [
-          { id: 'block', ask: 'How did you get everyone organized so fast?', say: 'Same way you run a summer league with no money. Lists. Who has a car, who has a key to the gym, whose grandmother is on insulin, whose uncle has a gun he is not supposed to have. The east bank was keeping those lists long before anybody across the river cared. When the Guard pulled back, I blew one whistle on Mill Road and four hundred people knew where to stand.', then: ['city', 'lost', 'whistle'] },
-          { id: 'city', sub: true, ask: 'Do you resent how the city treated the east bank?', say: 'Resent is a big word for a tired woman. The city closed our pool three summers running and then sent a man up here to give a speech about youth programs. Now the west bank sends us traders, and I take their spades and I feed them. A grudge burns calories. I am rationing.', standing: 2 },
+          { id: 'block', ask: 'How did you get everyone organized so fast?', say: 'Same way you run a summer league with no money. Lists. Who has a car, who has a key to the gym, whose grandmother is on insulin, whose uncle has a gun he is not supposed to have. Westmoor was keeping those lists long before anybody downtown cared. When the Guard pulled back, I blew one whistle on Mill Road and four hundred people knew where to stand.', then: ['city', 'lost', 'whistle'] },
+          { id: 'city', sub: true, ask: 'Do you resent how the city treated Westmoor?', say: 'Resent is a big word for a tired woman. The city closed our pool three summers running and then sent a man up here to give a speech about youth programs. Now the Exchange District sends us traders, and I take their spades and I feed them. A grudge burns calories. I am rationing.', standing: 2 },
           { id: 'lost', sub: true, ask: 'Have you lost many?', say: 'My husband, Leon, the first day, on the 2 train. My sister. Fourteen of my girls, that I know of. I keep their jersey numbers on the board in the church, not their names. I can read numbers. On Sunday the Reverend reads the names. It takes forty minutes now. Nobody has ever once complained.', standing: 2, set: 'loretta_names' },
           { id: 'whistle', sub: true, ask: 'What is the whistle for?', say: 'A whistle carries four blocks and never runs out of batteries. One long, get inside. Two short, get on the wall. Three, you run for the church and you do not stop for anybody, me included. The kids learned it in a day. Grown men took a week.', standing: 1 },
           { id: 'food', ask: 'Something smells incredible.', say: 'That is Big Tiny. It is mostly pigeon. Do not ask, eat. Everybody who comes through my gate gets one plate. No tryouts. It is the only rule I ever made that I never had to explain.', give: { beans: 1 }, once: true, standing: 1 },
@@ -386,7 +386,7 @@ export const LORE = {
           { id: 'kids_done', pay: 'garvey_school', req: { flag: 'garvey_school_done', notFlag: 'garvey_school_paid' }, ask: 'I held the radio at the school. Three kids came out.', say: 'Three. Okay. Okay. And Okoye? No. No, he would not have left them. He would have kept the clock right to the end. Sunday the Reverend reads his name, and you sit up front with me. That is not a request.', standing: 20, give: { riot: 1, medkit: 3 } },
           { id: 'trust', ask: 'Could you spare a little?', req: { standing: 25 }, say: 'For you? Take it. Shells, a kit, something to eat. And bring the bag back. I am not running a charity, I am running a team.', give: { medkit: 1, ammo_shell: 16, beans: 2 }, daily: true },
         ],
-        favours: { garvey_school: { title: 'The light in Eastbank Elementary', type: 'hold', u: .469, v: .22, reward: 350, bonus: 'stim', desc: 'Go to Eastbank Elementary on Tanner Avenue and hold the radio open for anyone still hiding in the school.' } },
+        favours: { garvey_school: { title: 'The light in Westmoor Elementary', type: 'hold', u: .17, v: .26, reward: 350, bonus: 'stim', desc: 'Go to Westmoor Elementary, out on the Greenside edge of Westmoor, and hold the radio open for anyone still hiding in the school.' } },
       },
       {
         id: 'tiny', name: 'Big Tiny', role: 'general', title: 'Pitmaster', weapon: 'axe', wardrobe: 'civ', spot: 'plaza',
@@ -425,8 +425,8 @@ export const LORE = {
       {
         id: 'finch', name: 'Tobias Finch', role: 'leader', title: 'Warden of the Keep', weapon: 'machete', wardrobe: 'civ',
         greet: {
-          first: 'You came up the hill, then. Most do not. Tobias Finch. I was Assistant Curator of Medieval Art at the Abbey Museum, and now I run the place, and they call me Warden because someone has to be. A railroad man shipped these stones from France for the view. I am pleased to report they still work.',
-          again: ['What news from the valley?', 'You find us in good order. We have just re-roofed the chapter house.'],
+          first: 'You came out along the valley road, then. Most do not. Tobias Finch. I was Assistant Curator of Medieval Art at the Abbey Museum, and now I run the place, and they call me Warden because someone has to be. A railroad man shipped these stones from France for the view. I am pleased to report they still work.',
+          again: ['What news from up the hill?', 'You find us in good order. We have just re-roofed the chapter house.'],
           hurt: 'You are bleeding on eight hundred years of masonry. Go and see the nurse. She is very good.',
           night: 'The watch is set. I still walk the wall myself. It is the only time I sleep afterwards.',
           trusted: 'Good to see you. People here ask after you, you know.',
@@ -435,13 +435,13 @@ export const LORE = {
           { id: 'real', ask: 'Warden? The stone walls? You really run it like a castle?', say: 'Partly because it is one. And partly because of what these people were, six weeks ago: accountants, frightened ones. Give someone a post on a wall with a name and a history, and they will stand on it against a thousand dead. I had three years of graduate theory, and nothing else I tried worked as well.', then: ['actor', 'alone'] },
           { id: 'actor', sub: true, ask: 'So it is all an act.', say: 'Of course it is. What do you think a garrison ever was? Frightened men telling each other a story about who they are. It holds, though. And now, if you will excuse me, I have the east wall to look at.', standing: 2, set: 'finch_real' },
           { id: 'alone', sub: true, ask: 'Do you ever get to stop being the Warden?', say: 'My husband used to tell me when to stop. The first night, he went back for the cat. I find that if I am the Warden from dawn until dusk, there are only a few hours in which I have to be Toby. So. Yes. At those times.', standing: 2 },
-          { id: 'why', ask: 'Why crossbows? You have guns.', say: 'Sound. Gunfire travels for miles. We are at the top of a very quiet hill, we have rather less company than the rest of you, and we would like to keep it that way. Also, you can get a bolt back. The rifles are for when it has already gone wrong.' },
+          { id: 'why', ask: 'Why crossbows? You have guns.', say: 'Sound. Gunfire travels for miles. We are at the end of a very quiet valley, we have rather less company than the rest of you, and we would like to keep it that way. Also, you can get a bolt back. The rifles are for when it has already gone wrong.' },
           { id: 'tapestry', ask: 'Does the Keep need anything?', req: { standing: 10 }, say: 'There is one thing, and I know how it sounds. The Unicorn Tapestries were crated in May for restoration, and they were last seen at a conservator\'s lab on 175th. I have told these people that we are the ones who kept something of the old world safe. I would like to have actually done it.', then: ['tap_yes'], once: true },
           { id: 'tap_yes', sub: true, ask: 'I will go and get them.', say: 'Thank you. I mean that. Do bring them back flat.', job: 'tryon_tapestry' },
           { id: 'tap_done', pay: 'tryon_tapestry', req: { flag: 'tryon_tapestry_done', notFlag: 'tryon_tapestry_paid' }, ask: 'I have your Unicorn Tapestries.', say: 'Oh. Oh, look at them. Five hundred years. They survived the French Revolution in a barn, you know, covering potatoes. Here. Take these, from the armory, you have earned them. I am going to go somewhere private now for a few moments.', standing: 18, give: { axe: 1, stim: 2, dynamite: 2 } },
           { id: 'trust', ask: 'Could you spare anything from the armory?', req: { standing: 25 }, say: 'For you, within reason. Reggie! The usual for our friend!', give: { ammo_rifle: 40, grenade: 1, medkit: 1 }, daily: true },
         ],
-        favours: { tryon_tapestry: { title: 'The Unicorn Tapestries', type: 'fetch', u: .2197, v: .781, reward: 450, bonus: 'stim', desc: 'Recover the crated Unicorn Tapestries from a conservator\'s studio on Court Street, down in Esperance, for reasons the Warden finds obvious.' } },
+        favours: { tryon_tapestry: { title: 'The Unicorn Tapestries', type: 'fetch', u: .2319, v: .8057, reward: 450, bonus: 'stim', desc: 'Recover the crated Unicorn Tapestries from a conservator\'s studio on Court Street, down in Esperance, for reasons the Warden finds obvious.' } },
       },
       {
         id: 'reginald', name: 'Reggie Marsh', role: 'captain', title: 'North Gate Watch', weapon: 'spear', wardrobe: 'mil', spot: 'gate',
