@@ -248,7 +248,10 @@ export function makeGenerator(L) {
           else if (fl === 0 && b.house) {
             // A front door, a back door, and windows like the ones upstairs. A barn has doors you could drive through.
             const s = t + (b.seed & 31);
-            if (b.open) id = s % 23 < 6 && lv <= 4 ? 0 : lv === 3 && s % 9 === 4 ? S.glass : S.wall;
+            // Every house has a front door, two wide in the middle of its south side, whatever else its walls happen to have.
+            const hx = (b.x0 + b.x1) >> 1, front = !b.open && oS && !oW && !oE && (x === hx || x === hx + 1);
+            if (front) id = lv <= 3 ? 0 : S.wall;
+            else if (b.open) id = s % 23 < 6 && lv <= 4 ? 0 : lv === 3 && s % 9 === 4 ? S.glass : S.wall;
             else if (s % 23 < 2 && lv <= 3) id = isSealed(b) && h2(b.id, (s / 23) | 0) % 2 === 0 ? boards(t, lv) : 0;
             else id = lv >= 2 && lv <= 3 && (t + (b.seed & 7)) % S.p < S.w && s % 23 > 3 ? (r3(x, y, z) < .1 ? 0 : S.glass) : S.wall;
           } else if (fl === 0) {
