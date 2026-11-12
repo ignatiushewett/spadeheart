@@ -345,7 +345,8 @@ export function makeGenerator(L) {
   }
 
   function interior(b, S, x, y, z, lv, fl, e, top) {
-    if (b.open) return lv === 1 && e > 2 && r3(x, 7, z) < .02 ? M.HAY : 0;
+    // A barn has no upper floor to put anything on: the hay is on the ground.
+    if (b.open) return fl === 0 && lv === 1 && e > 2 && r3(x, 7, z) < .02 ? M.HAY : 0;
     const ux = x - b.x0, uz = z - b.z0;
     // Columns in anything big enough to need them, on the building's own grid.
     if (b.bestE >= 9 && ux % 12 === 6 && uz % 12 === 6) return M.CONCRETE;

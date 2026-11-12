@@ -133,8 +133,9 @@ export function planCamp(def, id, r, ground) {
       const outX = -inX, outZ = -inZ;
       // The watch stands a step back from the lamp housing, so nobody has their head in the light.
       c.guards.push({ x: tx + .5 - outX * 1.2, y: YB + def.H + 6, z: tz + .5 - outZ * 1.2, yaw, gate: true });
-      c.parts.push({ t: 'flood', x0: tx + outX * 3 - 1, z0: tz + outZ * 3 - 1, x1: tx + outX * 3 + 1, z1: tz + outZ * 3 + 1, h: def.H + 8, dx: outX, dz: outZ });
-      c.floods.push({ x: tx + outX * 3 + .5, y: YB + def.H + 8, z: tz + outZ * 3 + .5, dx: outX, dz: outZ });
+      // Up on the roof's outer edge, over the heads of the watch and out of the way of the view.
+      c.parts.push({ t: 'flood', x0: tx + outX * 3 - 1, z0: tz + outZ * 3 - 1, x1: tx + outX * 3 + 1, z1: tz + outZ * 3 + 1, h: def.H + 11, dx: outX, dz: outZ, roof: true });
+      c.floods.push({ x: tx + outX * 4 + .5, y: YB + def.H + 11, z: tz + outZ * 4 + .5, dx: outX, dz: outZ });
     }
     light(g.cx - inX * 18, g.cz - inZ * 18, 36, COOL);
     // Gate watch on the ground: the two people you always pass on the way in.
@@ -651,8 +652,6 @@ function wallVoxel(style, t, h, row, H) {
   return M.CONCRETE;
 }
 
-const crenel = (style) => style === 'stone' || style === 'hesco' || style === 'brick';
-
 // Every glowing block in the camp that no hand-placed light already covers gets a light of its own. The blocks are found by stamping the
 // whole camp once and noting where they went, so nothing that glows can be missed. One light per light-map cell is plenty.
 const GLOW = new Map([
@@ -717,9 +716,6 @@ export function stampCamp(c, ctx) {
           P(t, y, row, wallVoxel(wall, t, h, row, H));
         }
       }
-      const cren = crenel(wall) ? t % 4 < 2 : wall === 'palisade' ? t % 3 === 0 : t % 6 === 0;
-      if (cren) P(t, YB + H, 0, wallVoxel(wall, t, H, 0, H));
-      if (wall === 'palisade' && t % 3 === 0) P(t, YB + H + 1, 0, M.LOG);
       for (let row = 2; row <= 4; row++) P(t, YB + hc - 1, row, M.PLANK);
       if (t % 8 === 0) for (let y = YB; y < YB + hc - 1; y++) P(t, y, 4, M.WOOD_D);
       const clearOfGate = !c.gates.some((g) => g.side === sideKey && Math.abs(t - g.tc) < 9);
@@ -776,7 +772,7 @@ function stampPart(p, c, box, put, car, letterAt) {
     case 'flood': {
       // A pole off the side of the tower and a bank of lamps looking out.
       const cx = x0 + 1, cz = z0 + 1;
-      box(cx, YB + h - 3, cz, cx, YB + h - 1, cz, M.IRON);
+      if (!p.roof) box(cx, YB + h - 3, cz, cx, YB + h - 1, cz, M.IRON);
       for (let k = -1; k <= 1; k++) {
         if (p.dx) { put(cx + p.dx, YB + h, cz + k, M.LAMP); put(cx, YB + h, cz + k, M.IRON); put(cx, YB + h + 1, cz + k, M.IRON); }
         else { put(cx + k, YB + h, cz + p.dz, M.LAMP); put(cx + k, YB + h, cz, M.IRON); put(cx + k, YB + h + 1, cz, M.IRON); }
@@ -794,9 +790,10 @@ function stampPart(p, c, box, put, car, letterAt) {
       box(x0 - 1, YB + h, z0 - 1, x1 + 1, YB + h, z1 + 1, M.PLANK);
       for (let a = x0 - 1; a <= x1 + 1; a++) { put(a, YB + h + 1, z0 - 1, mat); put(a, YB + h + 1, z1 + 1, mat); }
       for (let b = z0 - 1; b <= z1 + 1; b++) { put(x0 - 1, YB + h + 1, b, mat); put(x1 + 1, YB + h + 1, b, mat); }
-      for (const [a, b] of [[x0 - 1, z0 - 1], [x1 + 1, z0 - 1], [x0 - 1, z1 + 1], [x1 + 1, z1 + 1]]) box(a, YB + h + 1, b, a, YB + h + 3, b, M.WOOD_D);
-      box(x0 - 1, YB + h + 4, z0 - 1, x1 + 1, YB + h + 4, z1 + 1, p.big ? M.RUST : M.CANVAS);
-      put(cxm, YB + h + 3, czm, M.LAMP);
+      for (const [a, b] of [[x0 - 1, z0 - 1], [x1 + 1, z0 - 1], [x0 - 1, z1 + 1], [x1 + 1, z1 + 1]]) box(a, YB + h + 1, b, a, YB + h + 4, b, M.WOOD_D);
+      box(x0 - 1, YB + h + 5, z0 - 1, x1 + 1, YB + h + 5, z1 + 1, p.big ? M.RUST : M.CANVAS);
+      // The lamp hangs up against the roof, well over anyone's head.
+      put(cxm, YB + h + 4, czm, M.LAMP);
       break;
     }
     case 'bonfire': {

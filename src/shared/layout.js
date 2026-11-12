@@ -388,6 +388,8 @@ export function buildLayout(seed = 1609) {
     garvey: around(1740, 3350, 128, 96),      // Carver Yard: the old mill village in the valley below Esperance, where a new life starts
     tryon: around(560, 900, 90, 124),         // Abbey Keep: the old abbey, walled into Westmoor on Albion's west side
   };
+  // The walls stand a block further out than the plots above: the yard inside and the walkway get the room.
+  for (const k in campRects) { const r = campRects[k]; r.x0--; r.z0--; r.x1++; r.z1++; }
   const campDist = (x, z) => {
     let m = Infinity;
     for (const k in campRects) { const r = campRects[k]; m = Math.min(m, Math.max(0, r.x0 - x, x - r.x1, r.z0 - z, z - r.z1)); }
@@ -961,6 +963,59 @@ export function buildLayout(seed = 1609) {
     }
   }
   const camps = CAMP_DEFS.map((def, id) => planCamp(def, id, campRects[def.key], ground));
+  // Trodden dirt where everybody walks: in at each gate, down the market's aisles to the square, and on to the hall and the fields.
+  // The way is the one the people take, round the stalls and sheds, and it goes straight wherever it can rather than wandering.
+  for (const c of camps) {
+    const NW = c.navW, ND = c.navD, nav = c.nav, n = NW * ND;
+    const cellOf2 = (x, z) => Math.max(0, Math.min(NW - 1, Math.floor((x - c.x0) / 2))) + Math.max(0, Math.min(ND - 1, Math.floor((z - c.z0) / 2))) * NW;
+    const paint = (x, z) => {
+      for (let dz = -1; dz <= 2; dz++) for (let dx = -1; dx <= 2; dx++) {
+        const i = (z + dz) * WX + x + dx;
+        if (ground[i] === G.CAMP || ground[i] === G.PARK) { ground[i] = G.DIRT; mark[i] = 0; }
+      }
+    };
+    const route = (ax, az, bx, bz) => {
+      const s = cellOf2(ax, az), t = cellOf2(bx, bz);
+      const cost = new Int32Array(n * 4).fill(1 << 30), prev = new Int32Array(n * 4).fill(-1), buckets = [];
+      const push = (k, d) => { (buckets[d] || (buckets[d] = [])).push(k); };
+      for (let dir = 0; dir < 4; dir++) { cost[s * 4 + dir] = 0; push(s * 4 + dir, 0); }
+      const DX = [1, -1, 0, 0], DZ = [0, 0, 1, -1];
+      let end = -1;
+      for (let d = 0; d < buckets.length && end < 0; d++) {
+        const b = buckets[d];
+        if (!b) continue;
+        for (let q = 0; q < b.length; q++) {
+          const k = b[q];
+          if (cost[k] !== d) continue;
+          const cell = k >> 2, dir = k & 3;
+          if (cell === t) { end = k; break; }
+          const cx = cell % NW, cz = (cell / NW) | 0;
+          for (let nd = 0; nd < 4; nd++) {
+            const nx = cx + DX[nd], nz = cz + DZ[nd];
+            if (nx < 1 || nz < 1 || nx >= NW - 1 || nz >= ND - 1) continue;
+            const nc = nx + nz * NW;
+            if (nav[nc] && nc !== t) continue;
+            const nk = nc * 4 + nd, nd2 = d + 1 + (nd === dir ? 0 : 4);
+            if (nd2 < cost[nk]) { cost[nk] = nd2; prev[nk] = k; push(nk, nd2); }
+          }
+        }
+      }
+      for (let k = end; k >= 0; k = prev[k]) { const cell = k >> 2; paint(c.x0 + (cell % NW) * 2, c.z0 + ((cell / NW) | 0) * 2); }
+      return end >= 0;
+    };
+    const { plaza, market, hq, field } = c.spots;
+    for (const g of c.gates) {
+      const inX = g.horiz ? 0 : g.side === 'W' ? 1 : -1, inZ = g.horiz ? (g.side === 'N' ? 1 : -1) : 0;
+      // Out through the gate and across the apron to the road.
+      for (let k = -10; k <= 6; k++) paint(g.cx - 1 + inX * k, g.cz - 1 + inZ * k);
+      const sx = g.cx + inX * 6, sz = g.cz + inZ * 6;
+      if (market) route(sx, sz, market.x, market.z); else if (plaza) route(sx, sz, plaza.x, plaza.z);
+    }
+    if (market && plaza) route(market.x, market.z, plaza.x, plaza.z);
+    if (plaza && hq) route(plaza.x, plaza.z, hq.x, hq.z);
+    if (plaza && c.clerk) route(plaza.x, plaza.z, c.clerk.doorX, c.clerk.doorZ);
+    if (plaza && field) route(plaza.x, plaza.z, field.x, field.z);
+  }
 
   // --- Lots and buildings ----------------------------------------------------------------------------
   const buildings = [];
