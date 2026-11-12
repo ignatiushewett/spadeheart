@@ -8,7 +8,7 @@ import { buildLayout, P as PROP, PROP_STRIDE } from './shared/layout.js';
 import { glowLights } from './shared/camps.js';
 import { WX, WZ, CW, CD, STREET_Y, WATER_Y, G, STATUE_LAMPS, FLOOR_H } from './shared/constants.js';
 import { M, HP, isGlass, PALETTE, FLAGS, F_EMISSIVE, F_CRACK, CRACKED, F_LEAF, F_GLASS } from './shared/materials.js';
-import { r2 } from './shared/rng.js';
+import { r2, h2 } from './shared/rng.js';
 import { Horde, DIFFICULTY } from './game/horde.js';
 import { Player } from './game/player.js';
 import { NPCs, Jobs } from './game/npcs.js';
@@ -99,8 +99,11 @@ function softenGrid(A, W, D, passes) {
 }
 
 // Smooth value noise for the maps.
+// A cheap integer hash for the maps, 0..1, for any pair of numbers (fractions are kept to a sixty-fourth).
+function mapHash(a, b) { return h2((a * 64) | 0, (b * 64) | 0) / 4294967296; }
+
 function mapNoise(a, b) {
-  const hash = (p, q) => { const v = Math.sin(p * 127.1 + q * 311.7) * 43758.5453; return v - Math.floor(v); };
+  const hash = (p, q) => h2(p | 0, q | 0) / 4294967296;
   const ia = Math.floor(a), ib = Math.floor(b), fa = a - ia, fb = b - ib, ua = fa * fa * (3 - 2 * fa), ub = fb * fb * (3 - 2 * fb);
   const p = hash(ia, ib), q = hash(ia + 1, ib), r = hash(ia, ib + 1), t = hash(ia + 1, ib + 1);
   return p + (q - p) * ua + (r - p) * ub + (p - q - r + t) * ua * ub;
@@ -212,14 +215,18 @@ class Game {
     await nextFrame();
     const t0 = performance.now();
     this.layout = buildLayout();
-    console.log(`layout ${(performance.now() - t0).toFixed(0)} ms, ${this.layout.buildings.length} buildings, ${this.layout.props.length / PROP_STRIDE} props`);
+    console.log(`layout ${(performance.now() - t0).toFixed(0)} ms, ${this.layout.buildings.length} buildings, ${this.layout.props.length / PROP_STRIDE} props`, JSON.stringify(this.layout.timings));
     this.ui.loading('', .45, '', false, true);
     await nextFrame();
     const gl = this.renderer.gl;
+    const t1 = performance.now();
     const map = buildCityMap(this.layout);
     this.renderer.setCityMap(map.rgba, map.w, map.h);
+    const t2 = performance.now();
     this.far = new FarCity(gl, this.layout);
+    const t3 = performance.now();
     this.makeMapCanvas();
+    console.log(`city map ${(t2 - t1) | 0} ms, far ${(t3 - t2) | 0} ms, maps ${(performance.now() - t3) | 0} ms`);
     this.ui.loading('', .7, '', false, true);
     await nextFrame();
     this.world = new World(this.layout, this.renderer);
@@ -297,7 +304,7 @@ class Game {
     };
     const FOREST = [24, 42, 22];
     const col = (id) => [PALETTE[id * 4], PALETTE[id * 4 + 1], PALETTE[id * 4 + 2]];
-    const hash = (a, b) => { const v = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return v - Math.floor(v); };
+    const hash = mapHash;
     const WATER = { deep: [20, 42, 54], shallow: [38, 66, 74] };
     for (let z = 0; z < h; z++) for (let px = 0; px < w; px++) {
       const wx = px << 1, wz = z << 1, i = wz * WX + wx;
@@ -458,9 +465,9 @@ class Game {
     c.width = w; c.height = h; c.x0 = X0; c.z0 = Z0;
     const x = c.getContext('2d'), img = x.createImageData(w, h);
     const col = (id) => [PALETTE[id * 4], PALETTE[id * 4 + 1], PALETTE[id * 4 + 2]];
-    const hash = (a, b) => { const v = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return v - Math.floor(v); };
+    const hash = mapHash;
     const inWorld = (wx, wz) => wx >= 0 && wz >= 0 && wx < WX && wz < WZ;
-    const GS = 8, GW = Math.ceil((X1 - X0) / GS) + 2, GD = Math.ceil((Z1 - Z0) / GS) + 2, E = new Float32Array(GW * GD), F = new Float32Array(GW * GD);
+    const GS = 16, GW = Math.ceil((X1 - X0) / GS) + 2, GD = Math.ceil((Z1 - Z0) / GS) + 2, E = new Float32Array(GW * GD), F = new Float32Array(GW * GD);
     for (let gz = 0; gz < GD; gz++) for (let gx = 0; gx < GW; gx++) {
       const wx = X0 + gx * GS, wz = Z0 + gz * GS;
       if (inWorld(wx - 220, wz - 220) && inWorld(wx + 220, wz + 220)) continue;
@@ -560,20 +567,20 @@ class Game {
   // The country round the state, for the maps: the same land, the same woods, the same light, carried on past the edges at an eighth of
   // the detail, so that nothing ends in a line. The sea is wherever the coast says it is, and the two roads west run on to the horizon.
   makeMapSurround() {
-    const L = this.layout, S = 4096, P = 8, n = (WX + S * 2) / P;
+    const L = this.layout, S = 4096, P = 16, n = (WX + S * 2) / P;
     const c = document.createElement('canvas');
     c.width = c.height = n; c.span = S;
     const x = c.getContext('2d'), img = x.createImageData(n, n);
     const col = (id) => [PALETTE[id * 4], PALETTE[id * 4 + 1], PALETTE[id * 4 + 2]];
-    const hash = (a, b) => { const v = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return v - Math.floor(v); };
-    const G4 = (n >> 2) + 2, E = new Float32Array(G4 * G4), F = new Float32Array(G4 * G4);
+    const hash = mapHash;
+    const G4 = (n >> 1) + 2, E = new Float32Array(G4 * G4), F = new Float32Array(G4 * G4);
     for (let gz = 0; gz < G4; gz++) for (let gx = 0; gx < G4; gx++) {
       const wx = -S + gx * 32, wz = -S + gz * 32;
       E[gx + gz * G4] = L.elevAt(wx, wz);
       F[gx + gz * G4] = Math.min(1, L.forestAt(wx, wz) + L.trinityAt(wx, wz) * .3);
     }
     const at = (A, px, pz) => {
-      const fx = px / 4, fz = pz / 4, ix = Math.min(G4 - 2, fx | 0), iz = Math.min(G4 - 2, fz | 0), ux = fx - ix, uz = fz - iz, k = ix + iz * G4;
+      const fx = px / 2, fz = pz / 2, ix = Math.min(G4 - 2, fx | 0), iz = Math.min(G4 - 2, fz | 0), ux = fx - ix, uz = fz - iz, k = ix + iz * G4;
       return (A[k] * (1 - ux) + A[k + 1] * ux) * (1 - uz) + (A[k + G4] * (1 - ux) + A[k + G4 + 1] * ux) * uz;
     };
     const grass = [col(M.GRASS_DRY), col(M.GRASS), col(M.GRASS2)], leaf = [col(M.LEAF), col(M.LEAF2), col(M.LEAF3)], sea = [20, 42, 54];
@@ -1219,16 +1226,23 @@ class Game {
     }
     sx /= count; sy /= count; sz /= count;
     this.player.voxelsBroken += count;
+    // What it was made of decides what it leaves: a tree is leaves and wood, and comes down as a log in its own litter, with no dust to
+    // speak of; anything built throws up dust in proportion to how much of it there was, and the scatter is its own stone or brick.
+    let organic = 0;
+    for (let k = 3; k < list.length; k += 4) if ((FLAGS[list[k]] & F_LEAF) || list[k] === M.TRUNK) organic++;
+    const built = count - organic;
+    this.collapseOrganic = organic > built;
+    this.rubbleMat = built > 8 ? this.heapMats(list)[0] || M.RUBBLE : 0;
     // The heap is laid down where it fell; what bounces off it is only the odd bit of scatter.
-    if (this.heapFor) this.buildingHeap(this.heapFor, list); else this.collapseHeap(list);
-    this.rubbleBudget = Math.min(140, 10 + count * .03);
+    if (this.heapFor) this.buildingHeap(this.heapFor, list); else if (this.collapseOrganic) this.treeFall(list); else this.collapseHeap(list);
+    this.rubbleBudget = built > 8 ? Math.min(140, 10 + built * .03) : 0;
     if (count > 8) {
       this.audio.collapse(sx, sy, sz, Math.min(1, count / 1500));
       this.horde.noise(sx, sz, Math.min(130, 30 + count * .2), 1);
       const dist = Math.hypot(this.player.x - sx, this.player.z - sz);
       this.player.shake = Math.min(1.4, this.player.shake + Math.min(1, count / 800) * 60 / (dist + 20));
     }
-    if (count > 30) this.collapseDust(list, count);
+    if (built > 30) this.collapseDust(list, built);
   }
 
   // A collapse throws up a cloud: a wall of dust rolling out over the ground from where it came down, and then a haze that hangs over
@@ -1242,14 +1256,16 @@ class Game {
     const W = this.world, fx = this.particles, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
     let ground = y0;
     while (ground > 1 && !W.get(Math.round(cx), ground - 1, Math.round(cz))) ground--;
-    const big = !!this.heapFor, burst = Math.min(220, 6 + count * .032);
+    // The cloud is the size of what came down: a garden wall puffs, a tower block rolls out over the street.
+    const big = !!this.heapFor, span = Math.max(4, Math.max(x1 - x0, z1 - z0) + 1), k = Math.min(1, Math.sqrt(count / 2500) * .7 + span / 120);
+    const burst = Math.min(220, 3 + count * .022), size = 1.6 + k * (big ? 7 : 4), push = 1 + k * (big ? 7 : 4);
     if (Math.hypot(cx - this.player.x, cz - this.player.z) < 320) {
       for (let i = 0; i < burst; i++) {
         const x = x0 + rand() * (x1 - x0 + 1), z = z0 + rand() * (z1 - z0 + 1), dx = x - cx, dz = z - cz, l = Math.hypot(dx, dz) || 1;
-        fx.dustCloud(x, ground + .5 + rand() * 3, z, 3 + rand() * (big ? 6 : 3), 2.5 + rand() * (big ? 6 : 3), dx / l, dz / l);
+        fx.dustCloud(x, ground + .5 + rand() * (1 + k * 2), z, size * (.6 + rand() * .7), push * (.6 + rand() * .7), dx / l, dz / l);
       }
     }
-    (this.dustSites || (this.dustSites = [])).push({ x0: x0 - 2, x1: x1 + 2, z0: z0 - 2, z1: z1 + 2, y: ground, t: 0, life: big ? 100 : 20 + Math.min(25, count * .02), rate: Math.min(13, .5 + count * .0035), big });
+    (this.dustSites || (this.dustSites = [])).push({ x0: x0 - 2, x1: x1 + 2, z0: z0 - 2, z1: z1 + 2, y: ground, t: 0, life: big ? 100 : 8 + Math.min(30, count * .02), rate: Math.min(13, .2 + count * .003), big });
     if (this.dustSites.length > 12) this.dustSites.shift();
     // Wiring, gas, a stove: a building coming down sometimes starts something. It does not last; there is not much left to burn.
     if ((big ? rand() < .45 : count > 200 && rand() < .12)) {
@@ -1628,8 +1644,8 @@ class Game {
   // What a building leaves when it comes down: a mound over its footprint, one to three floors deep depending on how much building
   // there was, made of what it was made of. Anything under it when it lands stays under it.
   buildingHeap(b, list) {
-    const W = this.world, L = this.layout, H = this.horde, P = this.player, id = b.id;
-    const floors = Math.max(1, (b.top - STREET_Y) / FLOOR_H), span = Math.max(b.x1 - b.x0, b.z1 - b.z0);
+    const W = this.world, L = this.layout, H = this.horde, P = this.player, id = b.id, base = STREET_Y + (b.lift || 0);
+    const floors = Math.max(1, (b.top - base) / FLOOR_H), span = Math.max(b.x1 - b.x0, b.z1 - b.z0);
     const peak = Math.round(FLOOR_H * Math.min(3, 1 + floors / 12 + span / 45));
     const mats = this.heapMats(list);
     const cx = (b.x0 + b.x1) / 2, cz = (b.z0 + b.z1) / 2, rx = (b.x1 - b.x0) / 2 + 1, rz = (b.z1 - b.z0) / 2 + 1;
@@ -1644,27 +1660,27 @@ class Game {
     };
     // It comes down from the ground up: each layer of the mound lands when the part of the building that makes it would, so the
     // heap grows under the falling floors and reaches its full height as the roof comes in.
-    const tall = Math.max(4, b.top - STREET_Y);
-    const landAt = (y) => Math.sqrt(2 * tall * ((y - STREET_Y) / peak) / 18) + .08 + Math.random() * .25;
+    const tall = Math.max(4, b.top - base);
+    const landAt = (y) => Math.sqrt(2 * tall * ((y - base) / peak) / 18) + .08 + Math.random() * .25;
     for (let z = b.z0; z <= b.z1; z++) for (let x = b.x0; x <= b.x1; x++) {
       if (L.lot[z * WX + x] !== id) continue;
       const h = heightAt(x, z);
-      for (let y = STREET_Y; y < STREET_Y + h; y++) this.dropLater(landAt(y), x, y, z, Math.random() < .45 || !mats.length ? M.RUBBLE : mats[(Math.random() * mats.length) | 0], 35);
+      for (let y = base; y < base + h; y++) this.dropLater(landAt(y), x, y, z, Math.random() < .45 || !mats.length ? M.RUBBLE : mats[(Math.random() * mats.length) | 0], 35);
     }
     // Crushed: the dead and anyone else caught where it lands, once it has landed on them.
-    this.afterDrops(landAt(STREET_Y + 1), () => this.heapCrush(b, heightAt));
+    this.afterDrops(landAt(base + 1), () => this.heapCrush(b, heightAt));
   }
 
   heapCrush(b, heightAt) {
-    const L = this.layout, H = this.horde, id = b.id;
+    const L = this.layout, H = this.horde, id = b.id, base = STREET_Y + (b.lift || 0);
     const cx = (b.x0 + b.x1) / 2, cz = (b.z0 + b.z1) / 2, rx = (b.x1 - b.x0) / 2 + 1, rz = (b.z1 - b.z0) / 2 + 1;
     H.forRadius(cx, cz, Math.max(rx, rz) + 1, (i) => {
       const x = Math.floor(H.px[i]), z = Math.floor(H.pz[i]);
-      if (L.lot[z * WX + x] === id && H.py[i] < STREET_Y + heightAt(x, z)) H.damage(i, 9999, false, H.px[i], H.py[i] + 1, H.pz[i], false);
+      if (L.lot[z * WX + x] === id && H.py[i] < base + heightAt(x, z)) H.damage(i, 9999, false, H.px[i], H.py[i] + 1, H.pz[i], false);
     });
     for (const n of this.npcs.list) {
       if (n.dead || L.lot[Math.floor(n.z) * WX + Math.floor(n.x)] !== id) continue;
-      if (n.y < STREET_Y + heightAt(Math.floor(n.x), Math.floor(n.z))) this.npcs.hurt(n, 9999);
+      if (n.y < base + heightAt(Math.floor(n.x), Math.floor(n.z))) this.npcs.hurt(n, 9999);
     }
   }
 
@@ -1730,6 +1746,33 @@ class Game {
     }
   }
 
+  // A tree that comes down: the trunk lies where it fell, away from whoever felled it, and a scatter of its leaves lies round about.
+  treeFall(list) {
+    const W = this.world, P = this.player;
+    let tx = 0, tz = 0, tn = 0, base = 1e9;
+    for (let k = 0; k < list.length; k += 4) if (list[k + 3] === M.TRUNK) { tx += list[k]; tz += list[k + 2]; tn++; base = Math.min(base, list[k + 1]); }
+    if (tn) {
+      tx = Math.round(tx / tn); tz = Math.round(tz / tn);
+      let dx = tx - P.x, dz = tz - P.z;
+      if (Math.abs(dx) > Math.abs(dz)) { dx = Math.sign(dx) || 1; dz = 0; } else { dz = Math.sign(dz) || 1; dx = 0; }
+      for (let s = 1; s <= Math.min(10, tn); s++) {
+        const x = tx + dx * s, z = tz + dz * s;
+        let y = base + 2;
+        while (y > 1 && !W.get(x, y - 1, z)) y--;
+        if (W.get(x, y, z)) continue;
+        this.dropLater(.25 + s * .06, x, y, z, M.TRUNK);
+      }
+    }
+    for (let k = 0; k < list.length; k += 4) {
+      const id = list[k + 3];
+      if (!(FLAGS[id] & F_LEAF) || Math.random() > .12) continue;
+      const x = list[k], z = list[k + 2];
+      let y = list[k + 1];
+      while (y > 1 && !W.get(x, y - 1, z)) y--;
+      if (!W.get(x, y, z)) this.dropLater(Math.sqrt(2 * Math.max(.5, list[k + 1] - y) / 18) + .1 + Math.random() * .2, x, y, z, id);
+    }
+  }
+
   heapMats(list) {
     const mats = [], step = Math.max(1, Math.floor(list.length / 4 / 64)) * 4;
     for (let k = 3; k < list.length && mats.length < 64; k += step) {
@@ -1741,11 +1784,11 @@ class Game {
 
   onDebrisImpact(x, y, z, r, g, b, speed) {
     const W = this.world, ix = Math.floor(x), iy = Math.floor(y), iz = Math.floor(z);
-    if (rand() < .08) this.particles.dust(x, y + .5, z, 1, 2.4);
+    if (!this.collapseOrganic && rand() < .08) this.particles.dust(x, y + .5, z, 1, 2.4);
     if (this.rubbleBudget > 0 && rand() < .3) {
       let py = iy + 1;
       if (!W.get(ix, py, iz) && py < 200) {
-        W.set(ix, py, iz, M.RUBBLE);
+        W.set(ix, py, iz, this.rubbleMat && rand() < .55 ? this.rubbleMat : M.RUBBLE);
         this.rubbleBudget--;
         if (!W.get(ix, py - 1, iz)) W.floatQueue.push(ix, py, iz, 1);
       }

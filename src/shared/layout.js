@@ -227,6 +227,7 @@ export function buildLayout(seed = 1609) {
   const mark = alloc(Uint8Array, N);
   const terr = alloc(Int16Array, N);
   const rng = makeRng(seed);
+  const T0 = performance.now(), TM = {}, tick = (k) => { TM[k] = Math.round(performance.now() - T0); };
   const inside = (x, z) => x >= 0 && z >= 0 && x < WX && z < WZ;
   const cellOf = (x, z) => Math.max(0, Math.min(WZ - 1, Math.floor(z))) * WX + Math.max(0, Math.min(WX - 1, Math.floor(x)));
 
@@ -321,9 +322,12 @@ export function buildLayout(seed = 1609) {
         size++;
         if (size < 4000) cells.push(c);
         if (x === 0 || z === 0 || x === WX - 1 || z === WZ - 1) edgeHit = true;
-        for (const nb of [c - 1, c + 1, c - WX, c + WX]) {
-          if (nb < 0 || nb >= N || seen[nb] || (nb % WX === 0 && c % WX === WX - 1) || (c % WX === 0 && nb % WX === WX - 1)) continue;
-          if ((land[nb] === 0) !== wet || (!wet && land[nb] !== 1)) continue;
+        for (let q = 0; q < 4; q++) {
+          if ((q === 0 && x === 0) || (q === 1 && x === WX - 1) || (q === 2 && z === 0) || (q === 3 && z === WZ - 1)) continue;
+          const nb = q === 0 ? c - 1 : q === 1 ? c + 1 : q === 2 ? c - WX : c + WX;
+          if (seen[nb]) continue;
+          const ln = land[nb];
+          if ((ln === 0) !== wet || (!wet && ln !== 1)) continue;
           seen[nb] = 1;
           if (sp < stk.length) stk[sp++] = nb;
         }
@@ -333,6 +337,7 @@ export function buildLayout(seed = 1609) {
       else if (!wet && size < 3500) for (const c of cells) land[c] = 0;
     }
   }
+  tick('water');
   const dw = chamfer((i) => land[i] === 0);
   const dl = chamfer((i) => land[i] !== 0, 40);
 
@@ -361,20 +366,21 @@ export function buildLayout(seed = 1609) {
     }
   });
 
+  tick('towns');
   // --- Where the settlements stand ----------------------------------------------------------------
   // Each one on open ground a little way out from a town, with a road to its gate and something worth having close by.
   const around = (x, z, hw, hd, extra = {}) => ({ x0: x - hw, x1: x + hw, z0: z - hd, z1: z + hd, ...extra });
   const P_LIBRARY = { x0: 2036, x1: 2070, z0: 1348, z1: 1412 };
   const campRects = {
     bryant: { x0: 1824, x1: 2096, z0: 1240, z1: 1520, keep: [P_LIBRARY], plazaX: 1966, plazaZ: 1380 },   // Lakeshore Market: built into the south of Albion, above the lake
-    battery: around(4120, 3400, 115, 98),      // Severn Landing: built into the south side of Severn Bay, up from the marina
-    wash: around(1700, 2450, 95, 106),         // Weston Grange, in the open country between Esperance and Weston
-    union: around(560, 1990, 109, 109),        // Fort Westpoint, off the west road above the truck stop
-    sheep: around(2570, 3720, 104, 162),       // Arnhem Bastion, out among the fields
-    tompkins: around(4380, 1400, 84, 94),      // Cannery Collective: the old cannery lots in south Dayton, back from the shore
-    morning: around(2900, 560, 104, 112),      // Gibson Redoubt, on the north side at the head of the valley
-    garvey: around(1740, 3350, 106, 106),      // Carver Yard: the old mill village in the valley below Esperance, where a new life starts
-    tryon: around(560, 900, 100, 110),         // Abbey Keep: the old abbey, walled into Westmoor on Albion's west side
+    battery: around(4120, 3400, 135, 86),      // Severn Landing: built into the south side of Severn Bay, up from the marina
+    wash: around(2150, 2120, 122, 84),         // Weston Grange, under the ridge on the north side of Weston: the road from the valley runs through town to it
+    union: around(560, 1990, 94, 140),        // Fort Westpoint, off the west road above the truck stop
+    sheep: around(2570, 3720, 150, 104),       // Arnhem Bastion, out among the fields
+    tompkins: around(4380, 1400, 86, 128),      // Cannery Collective: the old cannery lots in south Dayton, back from the shore
+    morning: around(2900, 560, 138, 92),      // Gibson Redoubt, on the north side at the head of the valley
+    garvey: around(1740, 3350, 128, 96),      // Carver Yard: the old mill village in the valley below Esperance, where a new life starts
+    tryon: around(560, 900, 90, 124),         // Abbey Keep: the old abbey, walled into Westmoor on Albion's west side
   };
   const campDist = (x, z) => {
     let m = Infinity;
@@ -481,6 +487,7 @@ export function buildLayout(seed = 1609) {
   };
   const baseAt = (x, z) => sampleQ(BQ, x, z);
 
+  tick('lie');
   // --- Roads --------------------------------------------------------------------------------------
   // mask: 0 none, 1 gravel shoulder, 2 sidewalk, 3 carriageway
   const mask = new Uint8Array(N);
@@ -751,13 +758,14 @@ export function buildLayout(seed = 1609) {
     }
   }
 
+  tick('streets');
   // --- Ground classes -----------------------------------------------------------------------------
   const fieldAt = (x, z) => {
     const k = Math.max(farmK(x, z) * 1.7, sstep(1 - Math.hypot((x - 3290) / 260, (z - 700) / 170)));
     return k + (fbm2(x * .006, z * .006 + 3, 2) - .5) * .9 > .55;
   };
-  const plotMemo = new Map();
-  const plotIn = (px2, pz) => { const k = px2 * 4096 + pz; let v = plotMemo.get(k); if (v === undefined) { v = fieldAt(px2 * 92 - 30 + 46, pz * 66 + 33); plotMemo.set(k, v); } return v; };
+  const PLW = Math.ceil((WX + 30) / 92) + 1, plotMemo = new Int8Array(PLW * (Math.ceil(WZ / 66) + 1)).fill(-1);
+  const plotIn = (px2, pz) => { const k = px2 + pz * PLW; let v = plotMemo[k]; if (v < 0) { v = plotMemo[k] = fieldAt(px2 * 92 - 30 + 46, pz * 66 + 33) ? 1 : 0; } return v === 1; };
   for (let z = 0, i = 0; z < WZ; z++) for (let x = 0; x < WX; x++, i++) {
     const m = mask[i];
     if (!land[i]) {
@@ -828,6 +836,7 @@ export function buildLayout(seed = 1609) {
   }
   for (const mx of [4360, 4420, 4480]) { let z = 3420; while (z < WZ - 2 && land[z * WX + mx]) z++; pier(mx, z - 2, 0, 1, 50, 3); }
 
+  tick('ground');
   // --- Camps -------------------------------------------------------------------------------------
   // Each camp is a walled compound. Everything inside the wall is cleared except the roads, which survive as the settlement's streets.
   const campMask = new Uint8Array(N);
@@ -968,6 +977,7 @@ export function buildLayout(seed = 1609) {
   wayside('Ridge View Motel', 425, 2548, 50, 0, S.cedar);
   wayside('Valley Feed & Seed', 3560, 745, 0, 48, S.barn);
 
+  tick('camps');
   // Flood fill the remaining lot cells into blocks, then split each block into lots.
   const label = new Int32Array(N);
   const stack = new Int32Array(N >> 1);
@@ -983,9 +993,10 @@ export function buildLayout(seed = 1609) {
       const x = c % WX, z = (c / WX) | 0;
       cells++;
       if (x < x0) x0 = x; if (x > x1) x1 = x; if (z < z0) z0 = z; if (z > z1) z1 = z;
-      for (const n of [c - 1, c + 1, c - WX, c + WX]) {
-        if (n >= 0 && n < N && ground[n] === G.LOT && !lot[n] && !label[n]) { label[n] = lbl; stack[sp++] = n; }
-      }
+      if (x > 0 && ground[c - 1] === G.LOT && !lot[c - 1] && !label[c - 1]) { label[c - 1] = lbl; stack[sp++] = c - 1; }
+      if (x < WX - 1 && ground[c + 1] === G.LOT && !lot[c + 1] && !label[c + 1]) { label[c + 1] = lbl; stack[sp++] = c + 1; }
+      if (z > 0 && ground[c - WX] === G.LOT && !lot[c - WX] && !label[c - WX]) { label[c - WX] = lbl; stack[sp++] = c - WX; }
+      if (z < WZ - 1 && ground[c + WX] === G.LOT && !lot[c + WX] && !label[c + WX]) { label[c + WX] = lbl; stack[sp++] = c + WX; }
     }
     if (cells < 60) continue; // left as paved ground below
     const split = (ax, az, bx, bz) => {
@@ -1192,6 +1203,7 @@ export function buildLayout(seed = 1609) {
   const fireSpots = [];
   const campNear = (x, z, m) => CAMP_DEFS.some((d) => { const r = campRects[d.key]; return x > r.x0 - m && x < r.x1 + m && z > r.z0 - m && z < r.z1 + m; });
 
+  tick('lots');
   // --- Terrain -----------------------------------------------------------------------------------
   // Streets, lots, fields and settlements lie on the levelled ground under them; the country between carries the full relief of the land.
   for (let k = 0; k < rubble.length; k += 2) if (ground[rubble[k]] === G.WATER) ground[rubble[k]] = G.ROCK;
@@ -1214,14 +1226,20 @@ export function buildLayout(seed = 1609) {
     const k = (n - .46) * 2.2 + 1.8 * trinityK(x, z) + .8 * sstep((420 - x) / 420) + .7 * sstep((380 - z) / 380) + 1.15 * esp + .45 * pageK(x, z) - 1.1 * farmK(x, z);
     return Math.max(0, Math.min(1, k));
   };
+  const rowB = new Float32Array(QW), rowE = new Float32Array(QW);
   for (let z = 0, i = 0; z < WZ; z++) {
+    {
+      const fz = Math.min(QD - 1.001, z / 4), iz = fz | 0, uz = fz - iz;
+      for (let q = 0; q < QW; q++) { const k = q + iz * QW; rowB[q] = BQ[k] * (1 - uz) + BQ[k + QW] * uz; rowE[q] = EQ[k] * (1 - uz) + EQ[k + QW] * uz; }
+    }
     for (let x = 0; x < WX; x++, i++) {
       const g = ground[i];
       if (campMask[i] && g !== G.WATER) { terr[i] = 0; continue; }
       if (g === G.WATER) { terr[i] = -4 - Math.min(6, Math.round(dl[i] / 3)); continue; }
       if (mark[i] & 16) { terr[i] = g === G.ROAD ? -1 : 0; continue; }
       if (lot[i]) { terr[i] = buildings[lot[i] - 1].lift; continue; }
-      const b = baseAt(x, z), base = Math.round(b);
+      const fx = x / 4, ix = fx | 0, ux = fx - ix;
+      const b = rowB[ix] * (1 - ux) + rowB[ix + 1] * ux, base = Math.round(b);
       if (tun[i]) {
         terr[i] = base - 1;
         // Deep enough under the hill to have a roof: the column's top is the hillside, and the road runs through underneath.
@@ -1233,14 +1251,14 @@ export function buildLayout(seed = 1609) {
       if (g === G.PLAZA) { terr[i] = mark[i] === 4 ? base - 1 : base; continue; }
       if (g === G.SAND) { terr[i] = Math.min(base, Math.round(-3 + dw[i] * .17)); continue; }
       if (g !== G.PARK && g !== G.ROCK) { terr[i] = base; continue; }
-      const e = sampleQ(EQ, x, z);
+      const e = rowE[ix] * (1 - ux) + rowE[ix + 1] * ux;
       let t = Math.round(b + (e - b) * sstep(df[i] / BLEND));
       // Banks shelve into the water, and the marsh behind the barrier barely clears it.
       if (land[i] === 3) t = Math.min(t, -1 + (noise2(x * .1, z * .1) > .5 ? 1 : 0));
       if (dw[i] < 6 && !townId[i]) t = Math.min(t, -3 + (dw[i] >> 1));
       terr[i] = t;
       // Bare rock along the tops, on the peak, and wherever the stone breaks through.
-      if (g === G.PARK && (t > 128 + noise2(x * .02, z * .02) * 30 || (t > 70 && noise2(x * .03, z * .03) > .9))) ground[i] = G.ROCK;
+      if (g === G.PARK && t > 70 && (t > 128 + noise2(x * .02, z * .02) * 30 || noise2(x * .03, z * .03) > .9)) ground[i] = G.ROCK;
     }
   }
   for (const [i, d] of slump) terr[i] = -d;
@@ -1250,6 +1268,7 @@ export function buildLayout(seed = 1609) {
     if (Math.abs(terr[i + 2] - terr[i - 2]) + Math.abs(terr[i + 2 * WX] - terr[i - 2 * WX]) > 7) ground[i] = G.ROCK;
   }
 
+  tick('terrain');
   // --- Props ----------------------------------------------------------------------------------------
   const props = [];
   const addProp = (t, x, z, a = 0, b = 0, c = 0) => { if (inside(x, z) && !campMask[z * WX + x] && !clearMask[z * WX + x]) props.push(t, x, z, a, b, c); };
@@ -1343,6 +1362,7 @@ export function buildLayout(seed = 1609) {
   const binData = new Int32Array(total);
   for (let i = 0, k = 0; i < binLists.length; i++) for (const p of binLists[i]) binData[k++] = p;
 
+  tick('props');
   // --- Large structures (generated by bbox, a few dozen only) --------------------------------------
   const structs = [];
   for (const c of camps) structs.push({ type: 'camp', id: c.id, x0: c.x0 - 6, x1: c.x1 + 6, z0: c.z0 - 6, z1: c.z1 + 6, y1: c.maxY });
@@ -1425,6 +1445,7 @@ export function buildLayout(seed = 1609) {
     }
   }
 
+  tick('structs');
   // --- Names ------------------------------------------------------------------------------------
   // Places worth a name on the map. tier 0 shows at any zoom, tier 1 only when you are looking closely.
   const townLabel = { albion: [1127, 800], severn: [4320, 3233], esperance: [880, 3299], dayton: [4419, 915], weston: [2313, 2531], westpoint: [300, 2185], gibson: [3290, 600] };
@@ -1492,7 +1513,7 @@ export function buildLayout(seed = 1609) {
     ground, lot, edge, height, mark, terr, buildings, camps, rows, aves, structs, chunkTop, piers, places, fireSpots,
     props: propArr, binStart, binData, broadway: [], describe, areaOf, densityAt, forestAt, gx, townAt: (x, z) => townId[cellOf(x, z)] > 0, elevAt: elev0, trinityAt: trinityK, cropAt: (x, z) => { const fx = x + 30; if (!fieldAt(Math.floor(fx / 92) * 92 - 30 + 46, Math.floor(z / 66) * 66 + 33)) return 0; if (((fx % 92) + 92) % 92 < 3 || ((z % 66) + 66) % 66 < 3) return -1; const c = Math.floor(r2(Math.floor(fx / 92) * 7 + 3, Math.floor(z / 66) * 13 + 1) * 6); return c === 3 ? 0 : c + 1; }, coastAt: (z) => coastX[Math.max(0, Math.min(WZ - 1, z | 0))], mountain: MT,
     towns: TOWNS.map((t) => ({ key: t.key, name: t.name, x0: t.x0, x1: t.x1, z0: t.z0, z1: t.z1 })),
-    pleasurePier: PLEASURE,
+    pleasurePier: PLEASURE, timings: TM,
     spawn: { x: camps[0].cx, z: camps[0].cz, y: STREET_Y + 1 },
   };
 }

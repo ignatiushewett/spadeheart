@@ -54,6 +54,8 @@ export class FarCity {
     const pal = (c) => { let p = cache.get(c); if (!p) { p = palette(c); cache.set(c, p); } return p; };
 
     const verts = Array.from({ length: Math.ceil(WZ / BUCKET) }, () => []);
+    // The ground itself goes in buckets of its own: it is drawn, but it casts no shadow worth the cost of a second and third pass.
+    const tverts = Array.from({ length: Math.ceil(WZ / BUCKET) }, () => []);
     const used = new Uint8Array(W * D);
     const quad = (out, p, n, col, glass) => {
       for (const v of p) {
@@ -117,7 +119,7 @@ export class FarCity {
         const col = g === G.ROCK ? rock : trees > 4 ? wood : patch(x, z);
         const y = (t, k) => STREET_Y - 1 + Math.max(t, -1) + k;
         const nx = (a + c - b - e) / 2, nz = (a + b - c - e) / 2, nl = Math.hypot(nx, T, nz);
-        quad(verts[Math.min(verts.length - 1, Math.floor(z / BUCKET))], [[x, y(c, tc), z + T], [x + T, y(e, te), z + T], [x + T, y(b, tb), z], [x, y(a, ta), z]], [nx / nl, T / nl, nz / nl], col, .3);
+        quad(tverts[Math.min(tverts.length - 1, Math.floor(z / BUCKET))], [[x, y(c, tc), z + T], [x + T, y(e, te), z + T], [x + T, y(b, tb), z], [x, y(a, ta), z]], [nx / nl, T / nl, nz / nl], col, .3);
       }
       // Past the edges of the world the country carries on: woods rising and falling away from whatever the edge was, out to the
       // horizon, so that from a hill the state does not end in open sea on three sides.
@@ -142,7 +144,7 @@ export class FarCity {
         const a = skirtH(x, z), b = skirtH(x + S, z), c = skirtH(x, z + S), e = skirtH(x + S, z + S);
         const y = (t) => STREET_Y - 1 + t;
         const nx = (a + c - b - e) / 2, nz = (a + b - c - e) / 2, nl = Math.hypot(nx, S, nz);
-        const bucket = verts[Math.max(0, Math.min(verts.length - 1, Math.floor(z / BUCKET)))];
+        const bucket = tverts[Math.max(0, Math.min(tverts.length - 1, Math.floor(z / BUCKET)))];
         quad(bucket, [[x, y(c), z + S], [x + S, y(e), z + S], [x + S, y(b), z], [x, y(a), z]], [nx / nl, S / nl, nz / nl], woodC[Math.floor(h2n(x, z) * 3)], .3);
       }
     }
@@ -185,8 +187,8 @@ export class FarCity {
       }
     }
 
-    for (let b = 0; b < verts.length; b++) {
-      const arr = verts[b];
+    for (let bb = 0; bb < verts.length * 2; bb++) {
+      const ground = bb >= verts.length, b = bb % verts.length, arr = ground ? tverts[b] : verts[b];
       if (!arr.length) continue;
       const vertCount = arr.length / 10;
       const buf = new ArrayBuffer(vertCount * 20);
@@ -215,7 +217,7 @@ export class FarCity {
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib);
       gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, idx, gl.STATIC_DRAW);
       gl.bindVertexArray(null);
-      this.buckets.push({ vao, count: idx.length, z0: b * BUCKET, z1: (b + 1) * BUCKET, first: b === 0, last: b === verts.length - 1 });
+      this.buckets.push({ vao, count: idx.length, z0: b * BUCKET, z1: (b + 1) * BUCKET, first: b === 0, last: b === verts.length - 1, ground });
     }
   }
 
@@ -227,8 +229,9 @@ export class FarCity {
     quad(out, [[x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]], [0, 0, 1], col, 0);
   }
 
-  draw(gl, planes) {
+  draw(gl, planes, shadow = false) {
     for (const b of this.buckets) {
+      if (shadow && b.ground) continue;
       if (!aabbInFrustum(planes, -3200, 0, b.z0 - (b.first ? 3200 : 0), WX, 256, b.z1 + (b.last ? 3200 : 0))) continue;
       gl.bindVertexArray(b.vao);
       gl.drawElements(gl.TRIANGLES, b.count, gl.UNSIGNED_INT, 0);
@@ -236,7 +239,7 @@ export class FarCity {
   }
 
   drawShadow(gl, planes) {
-    this.draw(gl, planes);
+    this.draw(gl, planes, true);
   }
 }
 

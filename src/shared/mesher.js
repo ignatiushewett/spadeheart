@@ -15,6 +15,10 @@ const AXES = [
   { n: [0, 0, -1], u: [0, 1, 0], v: [1, 0, 0], ni: 5 },
 ];
 
+// The leaves of trees, as against standing crops: walking through a field you see the stalks round you; nobody stands inside a canopy.
+const TREE_LEAF = new Uint8Array(256);
+TREE_LEAF[M.LEAF] = TREE_LEAF[M.LEAF2] = TREE_LEAF[M.LEAF3] = 1;
+
 export function makeMesher(L) {
   const { height, terr, lot, edge } = L;
   const mask = new Int32Array(CS * CS);
@@ -124,7 +128,7 @@ export function makeMesher(L) {
               vis = nb === 0 || (nbG && !selfG) || (selfG && nbG && (PANE[nb] || nb) !== (PANE[id] || id));
               // Leaves and crops can be walked into, so with your head in one you are looking at everything round it from the inside:
               // the faces of the leaves next to it, the branch it grows off, the ground under a crop. Those are drawn, not culled.
-              if (!vis && (FLAGS[nb] & F_LEAF)) vis = true;
+              if (!vis && (FLAGS[nb] & F_LEAF) && !(TREE_LEAF[nb] && TREE_LEAF[id])) vis = true;
             }
             if (vis) {
               const sx = x + nx, sy = y + ny, sz = z + nz;

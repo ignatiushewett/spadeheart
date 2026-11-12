@@ -349,6 +349,7 @@ float blowIn(vec3 p){
 void main(){
   vec4 pal=texelFetch(uPalette,ivec2(vId,0),0);
   int flags=int(pal.a*255.+.5);
+  if((flags&8)!=0&&uGlassPass==0&&hash12(floor(gl_FragCoord.xy)+vec2(vId*7))<.13) discard;
   vec3 col=pow(pal.rgb,vec3(2.2));
   vec3 n=vNormal;
   float dist=length(vWorld-uCam);

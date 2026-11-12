@@ -940,6 +940,9 @@ export class CampSim {
     if (g.player.home === c.id) {
       g.jobs.startMigrate(c, refuge);
       if (!this.passing) g.ui.banner(`${c.name} is falling`, refuge ? `Survivors are running for ${refuge.name}. It is marked on your map.` : 'There is nowhere left to run to.');
+    } else if (refuge && !this.passing) {
+      // Anyone's people on the road can use someone with a gun walking alongside.
+      g.jobs.startMigrate(c, refuge, true);
     }
     if (s.real) g.npcs.evacuate(c, refuge);
   }
@@ -1592,7 +1595,7 @@ export class CampSim {
     s.opNext = null;
     g.jobs.campFell(c);
     if (g.player.home === c.id) {
-      if (!g.jobs.active.some((j) => j.type === 'migrate')) g.jobs.startMigrate(c, refuge);
+      g.jobs.startMigrate(c, refuge);
       g.player.home = -1;
     }
     g.horde.campStatusChanged();

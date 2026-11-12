@@ -1050,7 +1050,7 @@ export class NPCs {
     P.home = id;
     P.discovered[id] = true;
     g.dialogue.addStanding(id, Math.max(0, 10 - (P.campRep[id] || 0)));
-    const j = g.jobs.active.find((a) => a.type === 'migrate');
+    const j = g.jobs.active.find((a) => a.type === 'migrate' && !a.escort);
     if (j) g.jobs.active.splice(g.jobs.active.indexOf(j), 1);
     g.audio.simple('coin');
     g.ui.banner(`${c.name} is home now`, 'Their fight is yours, and so is whatever happens to them.');
@@ -4284,14 +4284,18 @@ export class Jobs {
   }
 
   // Walking away from a wall that has failed, towards one that hasn't yet.
-  startMigrate(from, to) {
-    if (this.active.some((a) => a.type === 'migrate')) return;
-    if (!to) return;
-    this.active.push({
+  // Somebody else's people on the road: walk with them, get them there, and the camp that takes them in pays for it.
+  startMigrate(from, to, escort = false) {
+    if (!to || this.active.some((a) => a.type === 'migrate' && (a.fromId === from.id || (!escort && !a.escort)))) return;
+    this.active.push(escort ? {
+      id: this.nextId++, type: 'migrate', escort: true, campId: to.id, fromId: from.id, title: `See ${from.name}'s people to ${to.name}`,
+      desc: `${from.name} has fallen. Everyone who got out is on the road to ${to.name}, through whatever lies between. Walk with them, keep them alive, and ${to.name} will pay when you get there.`,
+      reward: 320, status: 'active', x: to.cx, z: to.cz, y: STREET_Y,
+    } : {
       id: this.nextId++, type: 'migrate', campId: to.id, fromId: from.id, title: `Get to ${to.name}`, desc: `${from.name} is gone. Find a group: everyone who got out is meeting up and making for ${to.name} together. They may take you in.`,
       reward: 0, status: 'active', x: to.cx, z: to.cz, y: STREET_Y,
     });
-    this.g.ui.toast(`New objective: Get to ${to.name}`, 'good');
+    this.g.ui.toast(`New objective: ${this.active[this.active.length - 1].title}`, 'good');
   }
 
   // A favour for someone who is not around any more isn't owed to anyone.
@@ -4884,8 +4888,15 @@ export class Jobs {
           // It went while you were on your way. The road goes on.
           const next = g.campSim.refugeFor(to), from = g.layout.camps[j.fromId];
           this.active.splice(this.active.indexOf(j), 1);
-          if (next) { this.startMigrate(from, next); g.ui.banner(`${to.name} is gone too`, `Keep walking. Next is ${next.name}.`); }
-        } else if (H.campAt(P.x, P.z, 6) && H.inCamp(P.x, P.z, 6) === to) {
+          if (next) { this.startMigrate(from, next, j.escort); g.ui.banner(`${to.name} is gone too`, `Keep walking. Next is ${next.name}.`); }
+        } else if (j.escort && H.campAt(P.x, P.z, 6) && H.inCamp(P.x, P.z, 6) === to) {
+          // You brought them in. The Town Hall pays out, like any other job.
+          j.status = 'done';
+          if (to.clerk) { j.x = to.clerk.x; j.z = to.clerk.z; }
+          P.discovered[to.id] = true;
+          g.ui.banner(`${g.layout.camps[j.fromId].name}'s people are safe`, `Collect your pay at the ${to.name} Town Hall.`);
+          g.audio.simple('coin');
+        } else if (!j.escort && H.campAt(P.x, P.z, 6) && H.inCamp(P.x, P.z, 6) === to) {
           this.active.splice(this.active.indexOf(j), 1);
           P.discovered[to.id] = true;
           g.ui.banner(`You made it to ${to.name}`, g.npcs.admitted(to.id) ? 'The Town Hall can put your name down, if you want a place here.' : `They want ${g.npcs.citizenFee(to.id).toLocaleString('en-US')} spades at the gate. Their patrols sell papers.`);
