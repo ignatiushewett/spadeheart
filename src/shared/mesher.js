@@ -1,5 +1,6 @@
 // Greedy voxel mesher with per-vertex ambient occlusion and a coarse sky-visibility term.
-// Vertex layout (8 bytes): x,y,z,normal | id,ao,sky,lift (1 on a grass block's top edge: the shader raises it in the wind)
+// Vertex layout (8 bytes): x,y,z,normal | id,ao,sky,lift (bit 0 on a grass block's top edge: the shader raises it in the wind;
+// bit 1 on leaves meshed for distance, which hold still)
 import { CS, WX, WZ, STREET_Y } from './constants.js';
 import { FLAGS, F_GLASS, F_LEAF, M, PANE } from './materials.js';
 
@@ -38,6 +39,7 @@ export function makeMesher(L) {
     t.buf = nb;
   }
 
+  let still = 0;   // set while meshing at distance: the leaves there are merged into big faces and must not sway apart
   function quad(t, x, y, z, ax, du, dv, n, id, ao, sky) {
     grow(t, 32);
     const b = t.buf;
@@ -48,10 +50,10 @@ export function makeMesher(L) {
     const a0 = ao & 3, a1 = (ao >> 2) & 3, a2 = (ao >> 4) & 3, a3 = (ao >> 6) & 3;
     // Rotate the quad diagonal so AO gradients interpolate without the usual seam.
     const flip = a0 + a2 < a1 + a3;
-    const wave = WAVE[id], topY = y + Math.max(0, uy) + Math.max(0, vy);
+    const wave = WAVE[id], topY = y + Math.max(0, uy) + Math.max(0, vy), hold = still && (FLAGS[id] & F_LEAF) ? 2 : 0;
     const emit = (px, py, pz, a) => {
       b[i++] = px; b[i++] = py; b[i++] = pz; b[i++] = ni;
-      b[i++] = id; b[i++] = a; b[i++] = sky; b[i++] = wave && py === topY ? 1 : 0;
+      b[i++] = id; b[i++] = a; b[i++] = sky; b[i++] = (wave && py === topY ? 1 : 0) | hold;
     };
     if (flip) {
       emit(x + ux, y + uy, z + uz, a1);
@@ -71,6 +73,7 @@ export function makeMesher(L) {
   return function mesh(data, cx, cy, cz, lod) {
     opaque.n = 0;
     glass.n = 0;
+    still = lod ? 1 : 0;
     const ox = cx * CS, oy = cy * CS, oz = cz * CS;
     for (let z = -7; z < 39; z++) for (let x = -7; x < 39; x++) {
       const wx = ox + x, wz = oz + z;
@@ -167,8 +170,10 @@ export function makeMesher(L) {
         for (let j = 0; j < CS; j++) for (let i = 0; i < CS; ) {
           const v = mask[i + j * CS];
           if (!v) { i++; continue; }
-          // Grass is kept to small pieces, so the wave can bend it.
-          const cap = WAVE[v & 255] ? 4 : CS;
+          // Grass is kept to small pieces, so the wave can bend it. Leaves near enough to sway are kept to single faces: every corner
+          // is then shared outright with the faces round it and they all move as one, where a big merged face would bend in a straight
+          // line past its neighbours' corners and open slits between them.
+          const cap = WAVE[v & 255] ? 4 : !lod && (FLAGS[v & 255] & F_LEAF) ? 1 : CS;
           let w = 1;
           while (i + w < CS && w < cap && mask[i + w + j * CS] === v) w++;
           let h = 1;

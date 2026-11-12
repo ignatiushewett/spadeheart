@@ -283,9 +283,10 @@ export function planCamp(def, id, r, ground) {
     }
     // The first and best spot on the market is the camp's doctor.
     const doctor = !hasDoctor;
-    // Once every kind of trader the town has is set up, the next spot along goes to its mechanic: one in every town, a little way out
-    // from the middle where there is room to wheel a bike out into the street.
-    const role = doctor ? 'medic' : stalls < def.stalls.length ? def.stalls[stalls] : ((r) => stalls === def.stalls.length ? 'mechanic' : r)(def.stalls[Math.floor(rng() * def.stalls.length)]);
+    // One mechanic in every town, well out from the middle where the market thins and there is room to wheel a bike out into the street,
+    // and away from the rest of the traders so the market does not all huddle in one place.
+    const mechAt = def.stalls.length + Math.floor((def.stallCount - def.stalls.length) * .6);
+    const role = doctor ? 'medic' : stalls < def.stalls.length ? def.stalls[stalls] : ((r) => stalls === mechAt ? 'mechanic' : r)(def.stalls[Math.floor(rng() * def.stalls.length)]);
     const style = doctor ? 'clinic' : STALL_STYLES[role][Math.floor(rng() * STALL_STYLES[role].length)];
     add('stall', b.x0, b.z0, b.x1, b.z1, 7, { sign: ROLE_SIGN[role], face: s.face, role, style });
     const cx = (b.x0 + b.x1 + 1) / 2, cz = (b.z0 + b.z1 + 1) / 2;

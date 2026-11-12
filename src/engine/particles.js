@@ -229,10 +229,11 @@ export class Particles {
   }
 
   // A falling slab from a collapse: every voxel keeps its colour on the way down.
-  falling(x, y, z, id, delay) {
+  // vx, vz: the drift it goes down with, the way the whole thing is leaning and a little of its own.
+  falling(x, y, z, id, delay, vx = 0, vz = 0) {
     const r = PALETTE[id * 4] / 255, g = PALETTE[id * 4 + 1] / 255, b = PALETTE[id * 4 + 2] / 255;
     const life = 3.5 + rand() * 1.5;
-    this.cube(x + .5, y + .5, z + .5, (rand() - .5) * .35, -rand() * .6 - delay, (rand() - .5) * .35, .98, r, g, b, life, 0, 2);
+    this.cube(x + .5, y + .5, z + .5, vx + (rand() - .5) * .35, -rand() * .6 - delay, vz + (rand() - .5) * .35, .98, r, g, b, life, 0, 2);
   }
 
   update(dt) {

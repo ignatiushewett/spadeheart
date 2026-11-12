@@ -282,7 +282,19 @@ function buildVariantTexture(gl) {
     civ: (o) => { const s = rng.pick(FLANNEL); o.shirt = s; o.vest = rng() < .5 ? rng.pick(LEATHER) : s; o.shirt2 = [70, 70, 74]; o.pants = rng.pick(JEANS); o.shoes = [50, 38, 28]; if (rng() < .3) { o.hat = rng.pick(WORN); o.flags |= 1; } if (rng() < .6) o.flags |= 4; },
     mil: (o) => { const s = rng.pick(CAMO); o.shirt = s; o.vest = [44, 48, 36]; o.shirt2 = [38, 42, 30]; o.pants = rng.pick(CAMO); o.shoes = [28, 24, 20]; o.hat = rng.pick(CAMO); if (rng() < .8) o.flags |= 1; if (rng() < .7) o.flags |= 4; },
     scrap: (o) => { const s = rng.pick(LEATHER); o.shirt = rng.pick(WORN); o.vest = s; o.shirt2 = rng.pick(WORN); o.pants = rng.pick([[30, 30, 34], [50, 44, 40], [66, 46, 36]]); o.shoes = [24, 20, 18]; if (rng() < .7) o.flags |= 4; },
-    raider: (o) => { const s = rng.pick([[28, 26, 26], [42, 36, 32], [34, 38, 34]]); o.shirt = s; o.vest = rng.pick(LEATHER); o.shirt2 = [20, 18, 18]; o.pants = rng.pick([[30, 30, 34], [44, 38, 34]]); o.shoes = [20, 18, 16]; if (rng() < .5) o.hair = s; if (rng() < .5) o.flags |= 4; },   // no hats: half of them have a hood up instead
+    // Raiders: scavenged leather and road dirt, with a splash of rust-red or ochre on most of them (a painted vest, a patched jacket),
+    // so a crew reads as a crew at a distance without anyone wearing a uniform. Some padded out, some in a beanie or a hood.
+    raider: (o) => {
+      const loud = rng.pick([[118, 44, 28], [132, 92, 34], [96, 30, 30], [70, 62, 40], [140, 66, 26]]);
+      o.shirt = rng() < .7 ? loud : rng.pick([[58, 50, 40], [70, 62, 44]]);
+      o.vest = rng.pick(LEATHER);
+      o.shirt2 = rng() < .5 ? loud : rng.pick([[28, 26, 26], [46, 38, 32]]);
+      o.pants = rng.pick([[30, 30, 34], [44, 38, 34], [52, 46, 36], [38, 34, 30]]);
+      o.shoes = rng.pick([[20, 18, 16], [44, 30, 22]]);
+      if (rng() < .35) o.flags |= 16;
+      const r = rng();
+      if (r < .3) { o.hat = rng.pick([[30, 28, 26], [96, 30, 30], [60, 52, 40]]); o.flags |= 1; } else if (r < .6) o.flags |= 4;
+    },
     med: (o) => { const s = rng.pick([[150, 148, 138], [92, 112, 108], [138, 136, 128]]); o.shirt = s; o.vest = s; o.shirt2 = [118, 56, 50]; o.pants = rng.pick([[84, 102, 98], [60, 66, 72]]); o.shoes = [72, 68, 62]; if (rng() < .3) o.flags |= 4; },
     // Plate carriers and helmets: the best the camp has, on the people standing out in front of it. Flag 8: the whole torso is the
     // carrier, not a shirt. Flag 16: bulked out under it.

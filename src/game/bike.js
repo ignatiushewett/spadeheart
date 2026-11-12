@@ -9,6 +9,7 @@ import { G, WX, STREET_Y } from '../shared/constants.js';
 
 const VS = .125;            // one voxel of the model, in blocks: the same as a person
 const MAX = 19, BACK = 5;   // blocks a second, flat out forward and in reverse
+const TANK = 2400;          // blocks on a full tank: right across the island and a good way back
 const OPEN = 9, OPEN_T = 5; // held flat out and straight, it keeps winding on: this much more, over this many seconds
 const TREE = new Set([M.LEAF, M.LEAF2, M.LEAF3]);   // leaves are up in the trees, except in a field, where the crops are made of them too
 const WR = 5.5;             // wheel radius, in voxels
@@ -164,6 +165,7 @@ class Bike {
     this.x = x; this.y = y; this.z = z; this.yaw = yaw;
     this.v = 0; this.vy = 0; this.spin = 0; this.rev = 0; this.load = 0; this.straight = 0; this.thrashT = 0;
     this.lean = 0;             // over to the right, in radians: into the turn
+    this.fuel = 1;             // how much is in the tank, 0 to 1
     this.sy = y;               // where it is drawn, and you with it: eased up a kerb rather than snapped (it can sink into the step a little)
     this.light = false;        // the headlamp: switched on and off from the bars, and left however you leave it
   }
@@ -184,10 +186,10 @@ export class Bikes {
     this.ride = null;
   }
 
-  toSave() { return this.list.map(b => [+b.x.toFixed(2), +b.y.toFixed(2), +b.z.toFixed(2), +b.yaw.toFixed(3), b.light ? 1 : 0, b.owned ? 1 : 0]); }
+  toSave() { return this.list.map(b => [+b.x.toFixed(2), +b.y.toFixed(2), +b.z.toFixed(2), +b.yaw.toFixed(3), b.light ? 1 : 0, b.owned ? 1 : 0, +b.fuel.toFixed(3)]); }
   fromSave(s) {
     this.clear();
-    if (Array.isArray(s)) for (const [x, y, z, yaw, light, owned] of s) if (isFinite(x + y + z + yaw)) { const b = new Bike(x, y, z, yaw); b.light = !!light; b.owned = !!owned; this.list.push(b); }
+    if (Array.isArray(s)) for (const [x, y, z, yaw, light, owned, fuel] of s) if (isFinite(x + y + z + yaw)) { const b = new Bike(x, y, z, yaw); b.light = !!light; b.owned = !!owned; b.fuel = isFinite(fuel) ? fuel : 1; this.list.push(b); }
   }
 
   // A new one stood on the ground a couple of steps in front of you, side on, so you can see it and swing a leg over.
@@ -243,6 +245,11 @@ export class Bikes {
     this.list.push(b);
     this.trim();
     return b;
+  }
+
+  // The bikes standing near a mechanic that could do with filling, nearest first.
+  needingFuel(x, z, r = 30) {
+    return this.list.filter((b) => b !== this.ride && b.fuel < .98 && Math.hypot(b.x - x, b.z - z) < r).sort((a, b) => Math.hypot(a.x - x, a.z - z) - Math.hypot(b.x - x, b.z - z));
   }
 
   // Where yours is, from here.
@@ -393,7 +400,10 @@ export class Bikes {
     }
     if (!b) return;
     const g = this.g, P = g.player, W = g.world;
-    const fw = (keys.KeyW ? 1 : 0) - (keys.KeyS ? 1 : 0), st = (keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0);
+    // Out of petrol, the throttle does nothing: it coasts, and the brake still works.
+    const dry = b.fuel <= 0;
+    const fw = (keys.KeyW && !dry ? 1 : 0) - (keys.KeyS ? 1 : 0), st = (keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0);
+    if (dry && keys.KeyW && !b.dryTold) { b.dryTold = true; g.ui.toast('Out of petrol. A mechanic will fill it up, for a price.', 'bad'); }
     // Flat out in a straight line it keeps winding on past its usual top speed; any real turn or letting off and that is lost.
     if (fw > 0 && !st && b.v > MAX * .9) b.straight = Math.min(OPEN_T, b.straight + dt);
     else b.straight = Math.max(0, b.straight - dt * (st ? 2.5 : 1.5));
@@ -462,6 +472,13 @@ export class Bikes {
     }
     b.sy = b.y < b.sy ? b.y : b.sy + (b.y - b.sy) * Math.min(1, dt * (7 + Math.abs(b.v) * .35));
     b.spin += b.v * dt / (WR * VS);
+    // Petrol goes with the miles, a little more with the throttle open, and a trickle just ticking over.
+    if (!dry) {
+      const was = b.fuel;
+      b.fuel = Math.max(0, b.fuel - (Math.abs(b.v) * dt * (fw > 0 ? 1.15 : .85) + dt * .15) / TANK);
+      if (was > .1 && b.fuel <= .1) g.ui.toast('Petrol is low.', 'bad');
+      if (b.fuel > 0) b.dryTold = false;
+    }
     // Crops go down under it: anything soft and leafy that is not up a tree, the whole plant, anywhere under its length and width.
     // Cut a little ahead of the front wheel, more the faster it goes, so they burst as it hits them and not a moment after.
     if (Math.abs(b.v) > .3) {

@@ -65,7 +65,19 @@ export const MODELS = {
     [0, .072, .05, .03, .016, .03, DARK], [-.012, .094, .05, .008, .034, .016, DARK], [.012, .094, .05, .008, .034, .016, DARK],
     [0, .042, .09, .044, .012, .016, STEEL], [.029, .036, .025, .012, .016, .03, MID], [.0255, .034, -.06, .002, .018, .075, STEEL], [-.026, -.02, -.075, .004, .012, .012, STEEL],
   ],
-  hunting: [[0, .0, -.06, .046, .056, .38, WOOD], [0, .012, -.42, .02, .02, .46, STEEL], [0, -.04, .2, .05, .09, .24, WOOD], [0, .085, -.08, .028, .028, .3, DARK], [0, .085, -.24, .044, .044, .05, DARK], [0, .085, .08, .04, .04, .05, DARK], [0, .05, -.06, .02, .03, .04, STEEL], [0, -.055, -.06, .03, .03, .1, WOOD_D]],
+  // Bolt-action with a scope: walnut stock, a steel receiver along the top of it, the barrel out of the front, and the scope sat on a
+  // rail and two ring mounts right down on the receiver, so there is no daylight anywhere between the glass and the gun.
+  hunting: [
+    [0, 0, -.12, .046, .056, .34, WOOD], [0, -.006, -.31, .04, .044, .04, WOOD_D],
+    [0, .036, -.02, .032, .026, .2, STEEL], [0, .03, -.4, .02, .02, .58, STEEL], [0, .03, -.675, .026, .026, .03, DARK],
+    [0, -.034, .1, .042, .072, .1, WOOD], [0, -.03, .25, .05, .1, .2, WOOD], [0, -.03, .354, .052, .104, .012, 0x1a1a1a],
+    [0, .055, -.06, .018, .014, .19, DARK], [0, .066, -.13, .02, .022, .026, DARK], [0, .066, .02, .02, .022, .026, DARK],
+    [0, .085, -.06, .03, .03, .3, DARK], [0, .085, -.13, .036, .036, .018, DARK], [0, .085, .02, .036, .036, .018, DARK],
+    [0, .085, -.245, .046, .046, .07, DARK], [0, .085, .115, .04, .04, .05, DARK],
+    [0, .104, -.06, .014, .012, .016, MID], [.021, .085, -.06, .012, .014, .016, MID],
+    [.026, .036, .06, .022, .01, .01, STEEL], [.04, .036, .06, .014, .014, .014, STEEL],
+    [0, -.035, .03, .006, .024, .05, STEEL], [0, -.05, -.06, .03, .03, .1, WOOD_D],
+  ],
   // M249: square receiver, carry handle and heat shield over a long barrel, gas tube and folded bipod under it, polymer stock. The feed
   // cover and the ammunition box are their own pieces (LMG_COVER, LMG_BOX), so a reload can open the one and swap the other.
   lmg: [
@@ -124,7 +136,7 @@ const POSES = {
 // The mouth of each barrel, in the model's own space: the flash comes out of it.
 const MUZZLE = {
   pistol: [0, .017, -.215], revolver: [0, .02, -.305], smg: [0, .012, -.4], shotgun: [0, .018, -.605], rifle: [0, .014, -.63],
-  hunting: [0, .012, -.655], lmg: [0, .012, -.635],
+  hunting: [0, .03, -.69], lmg: [0, .012, -.635],
 };
 // How big each gun's flash is, against the rifle's. A shotgun throws a great ragged ball of it; the scoped rifle and the magnum a lot.
 const FLASH_SIZE = { shotgun: 2.1, hunting: 1.45, revolver: 1.4, lmg: 1.15, pistol: 1, smg: .9 };

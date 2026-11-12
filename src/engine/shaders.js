@@ -260,7 +260,7 @@ void main(){
   // Leaves and standing crops move in the air: each corner on its own slow loop, worked out from where it is, so faces that share a
   // corner move together and nothing opens up between them. Harder in a wind.
   int flags=int(texelFetch(uPalette,ivec2(int(aInfo.x),0),0).a*255.+.5);
-  if((flags&8)!=0&&uSway>0.){
+  if((flags&8)!=0&&uSway>0.&&(aInfo.w&2u)==0u){
     float t=uTime,k=uSway;
     p.x+=(sin(t*.85+p.x*.31+p.y*.19+p.z*.13)*.65+sin(t*1.45+p.z*.53)*.35)*.13*k;
     p.z+=(cos(t*.7+p.z*.29+p.y*.23+p.x*.11)*.65+sin(t*1.6+p.x*.47)*.35)*.13*k;
@@ -268,7 +268,7 @@ void main(){
   }
   // Grass in the wind: the top edge of each grass block lifted up to a fifth of a block and let down again, in long waves running
   // across the ground on the diagonal. Only what is drawn moves; nothing anyone stands on or bumps into does.
-  if(aInfo.w>0u){
+  if((aInfo.w&1u)!=0u){
     float ph=uGrassT*.9-(p.x+p.z)*.075;
     p.y+=.05+(.5+.5*sin(ph))*.17;   // never right down: always a little proud of the path or kerb beside it
   }
@@ -1129,30 +1129,17 @@ layout(location=0) out vec4 outCol;
 void main(){
   vec3 col=vSlot==15?pow(uFactions[clamp(vFaction,0,9)],vec3(2.2)):pow(texelFetch(uVariants,ivec2(vSlot,vVariant),0).rgb,vec3(2.2));
   // Chunky voxel grime and blood splatter, different per body.
-  // Raiders cover their faces: a black hood with one of a few masks on it, so you can tell them from anyone else at a distance.
-  if(vVariant>=232&&vVariant<240&&vLocal.y>2.08&&(vSlot==0||vSlot==5||vSlot==6||vSlot==8||vSlot==9)){
+  // Raiders show their faces, but they have the look of people who live out there: goggles shoved up on the forehead, a stripe of
+  // red across the eyes, a red rag knotted at the throat, or nothing at all, on scavenged leather and road-dirty colours.
+  if(vVariant>=232&&vVariant<240&&vLocal.y>1.98&&(vSlot==0||vSlot==5||vSlot==6||vSlot==8||vSlot==9)){
     int mx=int(floor(vLocal.x*10.)),my=int(floor(vLocal.y*10.)),style=vVariant%4;
-    bool eyes=my==24&&(mx==-2||mx==-3||mx==1||mx==0);
-    col=vec3(.012,.012,.015);
-    if(vLocal.z>.24&&my<27){
-      if(style==0){        // Skull: bone, black sockets, a row of teeth.
-        col=vec3(.66,.63,.52);
-        if(eyes||(my==23&&mx>=-1&&mx<=0)) col=vec3(.006);
-        if(my==21&&(mx&1)==0) col=vec3(.01);
-      } else if(style==1){ // Red bandana, up over the nose.
-        col=my<=23?vec3(.5,.035,.03):my==24?vec3(.3,.2,.14):vec3(.012);
-        if(my==24&&(mx==-2||mx==1)) col=vec3(.006);
-      } else if(style==2){ // Hockey mask, with a slash of red paint across it.
-        col=vec3(.72,.7,.6);
-        if(eyes) col=vec3(.006);
-        if(my==22&&(mx&1)!=0) col=vec3(.03);
-        if(mx-my==-24||mx-my==-25) col=vec3(.5,.04,.03);
-      } else {             // Gas mask: rubber, two yellow lenses and a filter.
-        col=vec3(.04,.05,.03);
-        if(eyes) col=vec3(.78,.55,.08);
-        if(my<=22&&mx>=-1&&mx<=0) col=vec3(.26,.26,.28);
-      }
-    }
+    bool front=vLocal.z>.24;
+    if(style==0&&my==26){                  // Goggles up on the forehead, on a strap round the head.
+      col=vec3(.03,.028,.025);
+      if(front&&(mx==-3||mx==-2||mx==0||mx==1)) col=vec3(.5,.36,.1);
+    } else if(style==1&&front&&my==24&&mx>=-4&&mx<=2&&!(mx==-2||mx==-3||mx==1||mx==0)) col=vec3(.42,.03,.02);   // war paint
+    else if(style==1&&front&&my==23&&mx>=-4&&mx<=2) col=mix(col,vec3(.42,.03,.02),.85);
+    else if(style==2&&my==20) col=vec3(.46,.06,.04);   // a red rag at the throat
   }
   vec3 q=floor(vLocal*10.);
   float h=hash12(q.xy+q.z*11.3+float(vVariant)*3.1);

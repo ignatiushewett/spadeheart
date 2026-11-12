@@ -890,7 +890,8 @@ export class Player {
     this.fireCd = .55;
     this.swing = .3;
     this.swingDur = .3;
-    this.remove(id, 1);
+    // Infinite ammo covers what you throw as well: grenades and charges never run out.
+    if (!(this.g.cheats && this.g.cheats.ammo)) this.remove(id, 1);
     this.g.audio.simple('swing');
   }
 

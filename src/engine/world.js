@@ -611,6 +611,24 @@ export class World {
   }
 
   // Line of sight between two points (coarse, half-voxel steps).
+  // What someone can actually see, as against what a round could pass through: walls stop it, and so does foliage after the first
+  // leaf or two (the ones right at either end, someone standing in a crop, do not count).
+  sight(ax, ay, az, bx, by, bz) {
+    const dx = bx - ax, dy = by - ay, dz = bz - az;
+    const d = Math.hypot(dx, dy, dz);
+    if (d < .01) return true;
+    const steps = Math.min(300, Math.ceil(d * 1.5));
+    let leaf = 0;
+    for (let i = 1; i < steps; i++) {
+      const t = i / steps;
+      const id = this.get(Math.floor(ax + dx * t), Math.floor(ay + dy * t), Math.floor(az + dz * t));
+      if (!id || (FLAGS[id] & F_GLASS)) continue;
+      if (FLAGS[id] & F_LEAF) { if (t * d > 1.6 && (1 - t) * d > 1.6 && ++leaf >= 2) return false; continue; }
+      return false;
+    }
+    return true;
+  }
+
   los(ax, ay, az, bx, by, bz) {
     const dx = bx - ax, dy = by - ay, dz = bz - az;
     const d = Math.hypot(dx, dy, dz);

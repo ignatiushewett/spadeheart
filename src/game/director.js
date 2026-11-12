@@ -331,7 +331,7 @@ export class Director {
     });
     const id = this.pick(weights);
     if (id < 0) { this.raidAt = now + .1; return; }
-    this.raidAt = now + 2.2 + rand() * 2.4;
+    this.raidAt = now + 1.2 + rand() * 1.6;   // a crew comes over somebody's wall every day or two
     sim.startRaid(id, 6 + Math.floor(rand() * 5) + Math.min(5, Math.floor(g.day / 5)));
   }
 

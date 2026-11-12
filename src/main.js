@@ -45,7 +45,7 @@ const SETTINGS_KEY = 'acez.settings.v2';
 const OLD_SETTINGS_KEY = 'acez.settings.v1';
 const DB_NAME = 'acez';
 const MENU_SHOT = { angle: .62, dist: 185, height: 88, turn: .46, pitch: -.14, fov: 1.05, flight: 125, startHeight: 30, startOff: 44, startPitch: -.1 };
-export const VERSION = 'v0.66';
+export const VERSION = 'v0.67';
 const SAVE_KEY = 'slot15';  // bumped whenever the map changes: old voxel edits no longer line up
 export const SLOTS = 3;
 // Slot 1 keeps the plain key, so a save from before there were slots simply becomes the first character.
@@ -140,8 +140,8 @@ class Game {
   }
 
   defaultSettings() {
-    return { quality: 'high', view: 320, scale: 1, cap: 24000, fov: 105, sens: 1, volume: .8, motion: false, dof: true, fpsCap: 0, muteSiren: false, uiScale: 1, clock24: false, drips: true, grain: .3, minimap: true, chatterNoHud: true, hitmarker: false, crosshair: true,
-      brightness: 1, bob: 1, shake: 1, music: 1, adsSens: 1, invertY: false, toggleAim: false, toggleCrouch: false, showFps: false, defaultsV: 4 };
+    return { quality: 'high', view: 320, scale: 1, cap: 24000, fov: 105, sens: 1, volume: .8, motion: false, dof: true, fpsCap: 0, muteSiren: false, uiScale: 1, clock24: false, drips: true, grain: .3, minimap: true, chatterNoHud: true, hitmarker: false, crosshair: false,
+      brightness: 1, bob: 1, shake: 1, music: 1, adsSens: 1, invertY: false, toggleAim: false, toggleCrouch: false, showFps: false, defaultsV: 5 };
   }
 
   loadSettings() {
@@ -163,6 +163,8 @@ class Game {
         }
         // The minimap is back on by default, once, for everyone; turn it off again and it stays off.
         if ((mine.defaultsV ?? 0) < 4) { s.minimap = true; s.defaultsV = 4; }
+        // The crosshair is off by default now, once, for everyone; turn it back on and it stays on.
+        if ((mine.defaultsV ?? 0) < 5) { s.crosshair = false; s.defaultsV = 5; }
         return s;
       }
       // Older settings carry over, except motion blur, which now starts off for everyone.
@@ -1236,11 +1238,19 @@ class Game {
     if (!count) return;
     if (this.campSim) this.campSim.noteCollapse(list);
     this.afterCollapse(list);
-    let sx = 0, sy = 0, sz = 0;
+    let sx = 0, sy = 0, sz = 0, y0 = 1e9;
+    for (let k = 1; k < list.length; k += 4) if (list[k] < y0) y0 = list[k];
+    // Nothing comes straight down. The whole of it goes over a little one way, a few degrees off the plumb, so the higher a piece
+    // started the further over it lands (a tall one visibly leans as it goes); and every piece wanders a little on its own as well.
+    const la = rand() * 6.283, tilt = .1 + rand() * .12;
+    this.collapseLean = { x: Math.cos(la), z: Math.sin(la), t: tilt, y0 };
     const step = Math.max(1, Math.floor(count / 5500));
     for (let k = 0; k < list.length; k += 4) {
       sx += list[k]; sy += list[k + 1]; sz += list[k + 2];
-      if ((k / 4) % step === 0) this.particles.falling(list[k], list[k + 1], list[k + 2], list[k + 3], rand() * .4);
+      if ((k / 4) % step === 0) {
+        const v = tilt * 3 * Math.sqrt(Math.max(0, list[k + 1] - y0));
+        this.particles.falling(list[k], list[k + 1], list[k + 2], list[k + 3], rand() * .4, Math.cos(la) * v + (rand() - .5) * 1.3, Math.sin(la) * v + (rand() - .5) * 1.3);
+      }
     }
     sx /= count; sy /= count; sz /= count;
     this.player.voxelsBroken += count;
@@ -1535,14 +1545,17 @@ class Game {
         (this.floatSweeps || (this.floatSweeps = [])).push({ t: 1.5, x0: x - 8, x1: x + 8, z0: z - 8, z1: z + 8, y0: STREET_Y - 1, y1: STREET_Y + 18, camp: true, edges: true });
       }
     }
-    if (this.lotFalling || y < STREET_Y || y > STREET_Y + 3) return;
+    if (this.lotFalling || y < STREET_Y) return;
+    const upper = y > STREET_Y + 3;
     const lot = this.layout.lot[z * WX + x];
-    if (!lot) { this.campPartLost(x, y, z); return; }
+    if (!lot) { if (!upper) this.campPartLost(x, y, z); return; }
     const m = this.lotHurt || (this.lotHurt = new Map());
     let e = m.get(lot);
     if (!e) { e = { lost: 0, base: 0, down: false }; m.set(lot, e); }
     if (e.down) return;
-    e.lost++;
+    // The ground floor carries the rest, so a block out of it counts in full. Anything higher up weakens it as well, by less: enough
+    // of a building taken apart from above (by hand, or by a charge on an upper floor) brings the rest of it down the same way.
+    e.lost += upper ? .3 : 1;
     (this.lotDirty || (this.lotDirty = new Set())).add(lot);
   }
 
@@ -1666,7 +1679,8 @@ class Game {
     const floors = Math.max(1, (b.top - base) / FLOOR_H), span = Math.max(b.x1 - b.x0, b.z1 - b.z0);
     const peak = Math.round(FLOOR_H * Math.min(3, 1 + floors / 12 + span / 45));
     const mats = this.heapMats(list);
-    const cx = (b.x0 + b.x1) / 2, cz = (b.z0 + b.z1) / 2, rx = (b.x1 - b.x0) / 2 + 1, rz = (b.z1 - b.z0) / 2 + 1;
+    const lean = this.collapseLean || { x: 0, z: 0, t: 0 }, shift = Math.min(span * .35, lean.t * Math.max(4, b.top - base) * .3);
+    const cx = (b.x0 + b.x1) / 2 + lean.x * shift, cz = (b.z0 + b.z1) / 2 + lean.z * shift, rx = (b.x1 - b.x0) / 2 + 1, rz = (b.z1 - b.z0) / 2 + 1;
     const heightAt = (x, z) => {
       const nx = (x + .5 - cx) / rx, nz = (z + .5 - cz) / rz;
       const box = Math.max(Math.abs(nx), Math.abs(nz)), round = Math.hypot(nx, nz);
@@ -1680,10 +1694,17 @@ class Game {
     // heap grows under the falling floors and reaches its full height as the roof comes in.
     const tall = Math.max(4, b.top - base);
     const landAt = (y) => Math.sqrt(2 * tall * ((y - base) / peak) / 18) + .08 + Math.random() * .25;
-    for (let z = b.z0; z <= b.z1; z++) for (let x = b.x0; x <= b.x1; x++) {
-      if (L.lot[z * WX + x] !== id) continue;
-      const h = heightAt(x, z);
-      for (let y = base; y < base + h; y++) this.dropLater(landAt(y), x, y, z, Math.random() < .45 || !mats.length ? M.RUBBLE : mats[(Math.random() * mats.length) | 0], 35);
+    const S = Math.ceil(shift) + 1;
+    for (let z = b.z0 - S; z <= b.z1 + S; z++) for (let x = b.x0 - S; x <= b.x1 + S; x++) {
+      if (x < 0 || z < 0 || x >= WX || z >= WZ) continue;
+      const mine = L.lot[z * WX + x] === id;
+      // Off its own lot only on the side it fell, onto open street: not into the next building or over a camp's wall.
+      if (!mine && (L.lot[z * WX + x] || (x - (b.x0 + b.x1) / 2) * lean.x + (z - (b.z0 + b.z1) / 2) * lean.z <= 0 || H.inCamp(x + .5, z + .5, 0))) continue;
+      const h = mine ? heightAt(x, z) : Math.max(0, heightAt(x, z) - 1);
+      if (!h) continue;
+      let y0 = base;
+      if (!mine) { y0 = base + 3; while (y0 > 1 && !W.get(x, y0 - 1, z)) y0--; if (W.get(x, y0, z)) continue; }
+      for (let y = y0; y < y0 + h; y++) this.dropLater(landAt(base + (y - y0)), x, y, z, Math.random() < .45 || !mats.length ? M.RUBBLE : mats[(Math.random() * mats.length) | 0], 35);
     }
     // Crushed: the dead and anyone else caught where it lands, once it has landed on them.
     this.afterDrops(landAt(base + 1), () => this.heapCrush(b, heightAt));
@@ -1750,12 +1771,17 @@ class Game {
       if (e) { e.n++; e.y = Math.min(e.y, list[k + 1]); e.top = Math.max(e.top, list[k + 1]); } else cols.set(key, { x: list[k], z: list[k + 2], y: list[k + 1], top: list[k + 1], n: 1 });
     }
     if (solid < 12) return;
-    const mats = this.heapMats(list);
+    const mats = this.heapMats(list), lean = this.collapseLean || { x: 0, z: 0, t: 0 };
     for (const e of cols.values()) {
       let h = Math.min(5, Math.floor(e.n * .2 + Math.random()));
       if (!h) continue;
+      // Where this column lands: over the way it leaned, by as much as it was tall, and a little either side.
+      const over = lean.t * (e.top - e.y) * .6;
+      e.x = Math.round(e.x + lean.x * over + (Math.random() - .5) * 1.2);
+      e.z = Math.round(e.z + lean.z * over + (Math.random() - .5) * 1.2);
       let y = e.y;
       while (y > 1 && !W.get(e.x, y - 1, e.z)) y--;
+      while (W.get(e.x, y, e.z) && y < e.y + 8) y++;
       // Each block of the pile is down when the stretch of the column it stands for has fallen that far.
       for (let k = 0; k < h; k++, y++) {
         const from = e.y + (e.top - e.y) * (k + 1) / h;

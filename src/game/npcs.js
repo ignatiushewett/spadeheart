@@ -59,6 +59,10 @@ const DEFEND_REAL_HELP = 30;   // kills it takes before your help buys the camp 
 const SPADE = '\u2660\ufe0e';
 // What share of a person's health one point of weapon damage takes: 80 damage is a fatal wound.
 const BODY_HIT = 1 / 80;
+const FF_GRACE = 600;
+// What people put their weapon away to do.
+const STOW_TASKS = { sleep: 1, work: 1, farm: 1, sit: 1, teach: 1, class: 1, shop: 1, warm: 1, play: 1 };
+const WATCH_SIGHT = 85;   // how far out the watch on a wall picks targets: what they could make out well enough to hit   // seconds of play between stray rounds that are let go without harm
 // Said round a fire, to whoever else is there.
 const WARM_LINES = ['Nights are getting colder.', 'Do not let it go out, whatever you do.', 'Feels like the first warm thing in a week.', 'Remember takeout? I would kill for takeout.',
   'Pass me that log.', 'Hands are finally working again.', 'Who is on the wall tonight?', 'You smell that? Somebody is burning a tyre again.', 'My dad used to do this every summer. Upstate.'];
@@ -100,6 +104,12 @@ const RAIDER_CREWS = [
 ];
 // What one hit costs you, before armour.
 const RAIDER_DAMAGE = { pistol: 9, smg: 6, shotgun: 20, rifle: 13, sniper: 28, lmg: 5 };
+// What a raider's gun does to you: how far it reaches at all, how likely a round is to land up close, and how hard it hits (a shotgun
+// loses its punch over fall blocks). Beyond its range they close in rather than throw rounds away.
+const RAIDER_GUN = {
+  pistol: { range: 38, acc: .42, dmg: 11 }, smg: { range: 42, acc: .3, dmg: 8 }, shotgun: { range: 22, acc: .72, dmg: 26, fall: 26 },
+  rifle: { range: 75, acc: .44, dmg: 15 }, sniper: { range: 120, acc: .6, dmg: 34 }, lmg: { range: 65, acc: .26, dmg: 9 },
+};
 const RAIDER_NAMES = ['Crow', 'Dutch', 'Rat', 'Knuckles', 'Tiny', 'Spook', 'Mace', 'Lefty', 'Boots', 'Sully', 'Razor', 'Ghost', 'Pike', 'Wes', 'Hatch', 'Cricket', 'Nine', 'Dolly', 'Sparks', 'Mouse', 'Preacher', 'Vee', 'Bones', 'Junior', 'Ash', 'Bishop', 'Blue', 'Bricks', 'Buck', 'Chalk', 'Chicago', 'Cinder', 'Cutter', 'Deuce', 'Dice', 'Duke', 'Fang', 'Flint', 'Fox', 'Grease', 'Hollow', 'Jinx', 'Judge', 'Kid', 'Lark', 'Latch', 'Lucky', 'Magpie', 'Monk', 'Moth', 'Needles', 'Nickel', 'Patch', 'Pepper', 'Queens', 'Rabbit', 'Reno', 'Rook', 'Rust', 'Saint', 'Scratch', 'Shiv', 'Smoke', 'Snake', 'Socks', 'Stitch', 'Tack', 'Tallboy', 'Termite', 'Trey', 'Tuesday', 'Viper', 'Wire', 'Wolf', 'Yonkers', 'Zero'];
 const RAIDER_IDLE = ["This block's picked clean.", "Keep it down, they can hear you.", 'I told you, nothing on 9th.', "Where's the rest of the crew?", "I'm so sick of canned peaches.", "Somebody's been through here.", 'Watch the windows.', 'We should have gone north.'];
 const RAIDER_BREAK = ['Forget this!', "I'm out!", 'Not worth it!', 'Go, go, go!'];
@@ -1946,12 +1956,11 @@ export class NPCs {
         g.audio.simple('swing', n.x, n.y, n.z);
         return;
       }
-      if (n.armed && dp < n.gun.range && this.clearShot(n, P.x, P.y + 1.6, P.z)) {
+      if (n.armed && dp < (RAIDER_GUN[n.weaponName] || RAIDER_GUN.pistol).range && this.clearShot(n, P.x, P.y + 1.6, P.z)) {
         n.cd *= 1.4;
-        this.fire(n, P.x, P.y + 1.6, P.z, n.gun, true);
+        this.raiderShoot(n, dp);
         R.shots++;
         H.noise(n.x, n.z, 26, .3);
-        if (rand() < .16 * Math.max(.4, 1 - dp / 60) * (P.sprinting ? .7 : 1) * (P.crouch ? .8 : 1)) P.damage((RAIDER_DAMAGE[n.weaponName] || 8) * this.raiderHits(), n.x, n.z, 'shot');
         return;
       }
     }
@@ -2832,17 +2841,10 @@ export class NPCs {
             g.audio.simple('swing', n.x, n.y, n.z);
             n.aim = .4;
           }
-        } else if (n.canSee && dp < reach && this.clearShot(n, P.x, P.y + 1.6, P.z)) {
-          n.cd = n.gun.rate * (n.gun.rate < .4 ? 2.2 + rand() : 1.6 + rand());
-          this.fire(n, P.x, P.y + 1.6, P.z, n.gun, true);
+        } else if (n.canSee && dp < Math.min(reach, (RAIDER_GUN[n.weaponName] || RAIDER_GUN.pistol).range) && this.clearShot(n, P.x, P.y + 1.6, P.z)) {
+          n.cd = n.gun.rate * (n.gun.rate < .4 ? 2.6 + rand() * 1.2 : 1.6 + rand());
+          this.raiderShoot(n, dp);
           g.horde.noise(n.x, n.z, 24, .4);
-          // Better up close, worse at someone running, and worse again at someone keeping low.
-          // A big crew gets in its own way: that many guns are more about keeping your head down than aiming.
-          const odds = .3 * Math.max(.3, 1 - dp / (reach * 1.25)) * (n.weaponName === 'sniper' ? 1.3 : 1) * (P.sprinting ? .7 : 1) * (P.crouch ? .8 : 1) * Math.min(1, Math.sqrt(4.5 / n.crew));
-          if (rand() < odds) {
-            const falloff = n.weaponName === 'shotgun' ? Math.max(.3, 1 - dp / 34) : 1;
-            P.damage((RAIDER_DAMAGE[n.weaponName] || 8) * falloff * this.raiderHits(), n.x, n.z, 'shot');
-          }
         } else n.cd = .3;
       }
     } else {
@@ -2872,6 +2874,19 @@ export class NPCs {
 
   // Nobody out here is a soldier. They hit softer than they used to, though they do get harder to shrug off as the weeks go on.
   raiderHits() { return .68 * (1 + Math.min(.5, this.g.day * .02)); }
+
+  // One raider round at you. Whether it lands is settled first, by the gun, how far, and what you are doing (running, keeping low),
+  // and then the shot is drawn to match: at you if it hit, past you if it did not. A big crew gets in its own way a little.
+  raiderShoot(n, dp) {
+    const P = this.g.player, gun = RAIDER_GUN[n.weaponName] || RAIDER_GUN.pistol;
+    const far = Math.min(1, dp / gun.range);
+    const p = gun.acc * (1 - Math.pow(far, 1.5) * .8) * (P.sprinting ? .7 : 1) * (P.crouch ? .8 : 1) * Math.max(.6, Math.min(1, Math.sqrt(4.5 / (n.crew || 1))));
+    const hit = rand() < p;
+    let tx = P.x, ty = P.y + 1.5, tz = P.z;
+    if (!hit) { const a = rand() * 6.283, r = .9 + rand() * 1.8; tx += Math.cos(a) * r; tz += Math.sin(a) * r; ty += (rand() - .3) * 1.6; }
+    this.fire(n, tx, ty, tz, n.gun, true);
+    if (hit) P.damage(gun.dmg * (gun.fall ? Math.max(.35, 1 - dp / gun.fall) : 1) * this.raiderHits(), n.x, n.z, 'shot');
+  }
 
   // A lob that lands about where you are standing now, not where you are going.
   throwGrenade(n, dp) {
@@ -3182,7 +3197,7 @@ export class NPCs {
       // People with guns shoot back. They come first.
       if (raiders.length && (rand() < .7 || !threats.length)) {
         const r = raiders[Math.floor(rand() * raiders.length)];
-        if (!r.dead && (r.x - n.x) ** 2 + (r.z - n.z) ** 2 < (gun.range * 1.4) ** 2 && W.los(n.x, n.y + 2.3, n.z, r.x, r.y + 1.8, r.z)) {
+        if (!r.dead && (r.x - n.x) ** 2 + (r.z - n.z) ** 2 < Math.min(gun.range * 1.4, WATCH_SIGHT) ** 2 && W.sight(n.x, n.y + 2.3, n.z, r.x, r.y + 1.8, r.z)) {
           if (!this.squareUp(n, r.x, r.z)) { n.cd = .1; continue; }
           n.cd = gun.rate * (1 + rand() * .5);
           S.ammo = Math.max(0, S.ammo - .008);
@@ -3193,7 +3208,7 @@ export class NPCs {
         if (!threats.length) { n.cd = .2; continue; }
       }
       // A thin line on the wall: everyone leans out and shoots along it, well past their own stretch.
-      let best = -1, bd = (gun.range * 1.8) ** 2;
+      let best = -1, bd = Math.min(gun.range * 1.8, WATCH_SIGHT) ** 2;
       // Anything inside the wall takes priority over what is still outside it,
       // but a guard with nothing inside in range turns back to the wall.
       for (let k = 0; k < 16; k++) {
@@ -3208,8 +3223,10 @@ export class NPCs {
       // Outward shots start past the parapet, or nobody could hit the foot of their own wall.
       const by = n.baseYaw ?? 0;
       const within = H.campAt(tx, tz);
-      const off = within ? 0 : 5;
-      if (!W.los(n.x + Math.sin(by) * off, n.y + 2.3, n.z + Math.cos(by) * off, tx, ty, tz)) { n.cd = .2; continue; }
+      // Only what they can see from up there: not through a tree, a house, or the far side of a rise. Looking out from just over the
+      // parapet, so the foot of the wall can still be seen.
+      const off = within ? 0 : 2.2;
+      if (!W.sight(n.x + Math.sin(by) * off, n.y + 2.3, n.z + Math.cos(by) * off, tx, ty, tz)) { n.cd = .2; continue; }
       if (!this.squareUp(n, tx, tz)) { n.cd = .1; continue; }
       n.cd = gun.rate * (.8 + rand() * .4) * (dry ? 3 : 1);
       S.ammo = Math.max(0, S.ammo - .008);
@@ -3927,6 +3944,16 @@ export class NPCs {
       if (g.time - (n.ffSaid ?? -99) > 6) { n.ffSaid = g.time; g.ui.floatSay(n, pickOf(['Watch your fire!', 'Other way!', 'Careful!']), 1.4); }
       return;
     }
+    // The first stray round in a long while is let go: it finds a sleeve, a pack strap, a near miss, and they only shout. A slip of the
+    // finger coming out of a menu should not cost a character. All of one shot (every pellet of it) goes the same way.
+    const graceT = P.ffGraceT ?? -1e9;
+    if (g.time - graceT > FF_GRACE || g.time - graceT < .06) {
+      if (g.time - graceT > FF_GRACE) {
+        P.ffGraceT = g.time;
+        g.ui.floatSay(n, pickOf(['Hey! Watch it!', 'Whoa! Point that somewhere else!', 'That nearly had me!', 'Careful with that thing!']), 1.8);
+      }
+      return;
+    }
     // Out in the streets everyone is shooting at something, and a round that goes astray is half expected.
     const outside = !g.horde.inCamp(n.x, n.z, 0);
     let close = 0;
@@ -4158,10 +4185,16 @@ export class NPCs {
         const kick = n.shotAt !== undefined ? Math.max(0, 1 - (now - n.shotAt) / .14) * (n.weaponId === 3 || n.weaponId === 5 ? .2 : .1) : 0;
         q = Math.max(0, Math.min(63, Math.round(((n.pitchA || 0) + kick + .8) / 1.2 * 63)));
       }
-      const extra = n.weaponId * 2 + (n.kid ? 32 : 0) + faction * 64 + lit + Math.min(7, Math.round(n.wet * 8)) * 4096 + q * 32768 + (ready ? 2097152 : 0);
+      // Put away: in bed, at work round the settlement (the bench, the garden, the class, a seat by the fire), or behind a counter, as
+      // long as nothing is happening. The moment there is trouble, or they have just been shooting, it is back in their hands.
+      const job = n.arrived && n.task && STOW_TASKS[n.task.kind];
+      const calm = !n.alarmed && !n.threat && !n.flee && !n.fighting && !(n.busyT > 0) && !ready && !lit && n.state !== 3;
+      const stowed = abed || (calm && n.camp >= 0 && (n.kind === 'resident' ? !!job : n.kind === 'vendor' || n.kind === 'clerk'));
+      const wid = stowed ? 0 : n.weaponId;
+      const extra = wid * 2 + (n.kid ? 32 : 0) + faction * 64 + lit + Math.min(7, Math.round(n.wet * 8)) * 4096 + q * 32768 + (ready ? 2097152 : 0);
       // A blade or a bat is swung, not pointed: from the moment of the blow, the shader is told how far through the swing they are.
       let st = n.state || 0;
-      if (n.weaponId >= 8 && (st === 3 || n.swingAt !== undefined) && st !== 7 && st !== 5) {
+      if (wid >= 8 && (st === 3 || n.swingAt !== undefined) && st !== 7 && st !== 5) {
         const s = n.swingAt !== undefined ? .22 + (now - n.swingAt) / .5 : 1;   // the blow lands as the swing comes down
         if (s >= 0 && s < 1) st = 9 + s * .99;
         else if (st === 3) st = 0;
@@ -4204,12 +4237,14 @@ export class Jobs {
     let x = c.cx, z = c.cz;
     // Someone new to a camp gets errands, not expeditions, and is paid partly in what they lack.
     const green = g.player.loadout !== 'veteran' && g.dialogue.standing(c.id) < 10;
-    // Measured from the wall, and a walk away, not a trek. Your first few are just outside. A cull needs to be far
-    // enough out that there is something left to cull.
-    const first = g.stats.jobs < 3;
-    // Raiders keep well clear of a wall full of rifles, so a bounty is further out than the rest.
-    // The first few are close enough to see the wall from, and paid like it.
-    const near = type === 'bounty' ? (first ? 85 : 130) : type === 'kill' ? (first ? 50 : 90) : first ? 40 : 70, far = type === 'bounty' ? (first ? 160 : 300) : first ? 105 : 280;
+    // How far along you are with this kind of work: the jobs you have done anywhere, and how well this town knows you. The board grows
+    // with you, a little at a time: the first jobs are round the corner from the wall, and the ones after them go further out, ask for
+    // more, and pay for it. Each offer on a board sits somewhere near that line, a bit either side, so there is a choice.
+    const prog = Math.max(0, Math.min(1, (g.stats.jobs + Math.max(0, g.dialogue.standing(c.id)) / 6) / 32));
+    const p = Math.max(0, Math.min(1, prog + (rand() - .5) * .3));
+    // Measured from the wall. Raiders keep well clear of a wall full of rifles, so a bounty starts further out than the rest; a cull
+    // needs to be far enough out that there is something left to cull. Most of how hard a job is, is how far it is.
+    const near = (type === 'bounty' ? 80 : type === 'kill' ? 45 : 35) + p * 300, far = near + 50 + p * 220;
     const hx = (c.x1 - c.x0) / 2, hz = (c.z1 - c.z0) / 2;
     for (let t = 0; t < 120; t++) {
       const a = rand() * 6.283, ca = Math.cos(a), sa = Math.sin(a);
@@ -4224,27 +4259,21 @@ export class Jobs {
     const place = L.describe(x, z);
     const where = place.cross ? `${place.cross}, ${place.district}` : place.district;
     const title = JOB_TITLES[type][Math.floor(rand() * JOB_TITLES[type].length)];
-    const base = (140 + dist * .35) * (first ? .65 : 1);
+    // Pay is for the work: so much for every block of the way out (and back), and so much for what has to be done there. A job round the
+    // corner pays about what a shift on the wall does; a long way out into the city, with a lot to do, pays several times that.
+    const base = 25 + dist * .42;
     let job;
     if (type === 'kill') {
-      const n = green ? 10 + Math.floor(rand() * 15) : 25 + Math.floor(rand() * 45);
-      job = { type, title, need: n, got: 0, reward: Math.round(base + n * 1.8), desc: `Kill ${n} infected around ${where}. We need that block quiet.`, where };
+      const n = Math.round(10 + p * 45 + rand() * (8 + p * 12));
+      job = { type, title, need: n, got: 0, reward: Math.round(base + n * 2), desc: `Kill ${n} infected around ${where}. We need that block quiet.`, where };
     } else if (type === 'fetch') {
-      job = { type, title, reward: Math.round(base * 1.25), desc: `A cache was left at ${where} when the last team got swarmed. Get it. It is marked on your map.`, where };
+      job = { type, title, reward: Math.round(base * 1.3 + 15), desc: `A cache was left at ${where} when the last team got swarmed. Get it. It is marked on your map.`, where };
     } else if (type === 'bounty') {
-      const gang = green ? 1 + Math.floor(rand() * 2) : 2 + Math.floor(rand() * 6);
+      const gang = Math.max(1, Math.min(7, Math.round(1 + p * 4.5 + (rand() - .3) * 1.6)));
       const boss = pickOf(RAIDER_NAMES);
-      job = { type, title: `${title}: ${boss}`, gang, left: gang, spawned: false, reward: Math.round((90 + gang * 45) * (first ? .65 : 1) + base * .6), desc: `${boss} and ${gang - 1 > 1 ? `${gang - 1} others have` : gang > 1 ? 'one other has' : 'nobody else has'} been robbing our people around ${where}. Put a stop to it.`, where };
+      job = { type, title: `${title}: ${boss}`, gang, left: gang, spawned: false, reward: Math.round(base * 1.1 + gang * 38), desc: `${boss} and ${gang - 1 > 1 ? `${gang - 1} others have` : gang > 1 ? 'one other has' : 'nobody else has'} been robbing our people around ${where}. Put a stop to it.`, where };
     } else {
-      job = { type, title, time: 40, held: 0, reward: Math.round(base * 1.5), desc: `Run a relay at ${where} and keep within range for 40 seconds. The transmitter is loud, so expect company.`, where };
-    }
-    // What it pays goes by how hard it is: the long way out, the big cull, the bigger gang pay what they always did, and the easy ones
-    // around the corner from the wall pay a good deal less.
-    {
-      let hard = Math.max(0, Math.min(1, (dist - 40) / 240));
-      if (type === 'kill') hard = Math.max(hard, Math.min(1, (job.need - 10) / 60));
-      if (type === 'bounty') hard = Math.max(hard, Math.min(1, (job.gang - 1) / 4));
-      job.reward = Math.round(job.reward * (.72 + .28 * hard));
+      job = { type, title, time: 40, held: 0, reward: Math.round(base * 1.35 + 20), desc: `Run a relay at ${where} and keep within range for 40 seconds. The transmitter is loud, so expect company.`, where };
     }
     job.id = this.nextId++;
     job.x = x; job.z = z;

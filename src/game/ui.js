@@ -712,6 +712,8 @@ export class UI {
     else if (need.hungry) status += `<div class="need"><b>Hungry</b><span>Health and stamina recover a little slower. Eat something.</span></div>`;
     if (need.exhausted) status += `<div class="need"><b>Exhausted</b><span>Slower, shakier aim, and you tire fast. You are losing health. Find a bed.</span></div>`;
     else if (need.tired) status += `<div class="need"><b>Tired</b><span>A little slower, and your aim wanders. Find somewhere to sleep.</span></div>`;
+    const ride = g.bikes && g.bikes.ride;
+    if (ride) status += `<div class="need"><b>${ride.fuel <= 0 ? 'Out of petrol' : ride.fuel <= .1 ? 'Low petrol' : 'Petrol'}</b><span>${Math.round(ride.fuel * 100)}% in the tank.${ride.fuel <= .1 ? ' A mechanic will fill it up.' : ''}</span></div>`;
     if (P.carryWeight() > P.carryCap()) status += `<div class="need"><b>Overweight</b><span>${P.carryWeight().toFixed(1)} / ${P.carryCap()} kg. You are slowed down. Drop or stash something.</span></div>`;
     this.hudCamp = faction;
     $('status').innerHTML = status;
@@ -1383,6 +1385,7 @@ export class UI {
     const list = [];
     if (n.doctor) list.push(this.treatment(n));
     if (n.role) list.push({ label: n.doctor ? 'Buy medicine' : 'Trade', cls: n.doctor ? '' : 'primary', fn: () => this.openTrade(n) });
+    if (n.role === 'mechanic') list.push(this.refuel(n));
     // Anyone working a contract for the camp gets a box from the traders, once a day.
     if (n.role && !n.doctor && n.camp >= 0 && g.jobs.perkFree(n.camp, 'box')) list.push({ label: 'Contract supplies (free today)', cls: 'quest', fn: () => {
       g.jobs.usePerk(n.camp, 'box');
@@ -1449,6 +1452,23 @@ export class UI {
   }
 
   // Patching people up is the job. It costs what the supplies cost, and less if they know you.
+  // The mechanic fills whatever bike you have brought round to the garage, by the litre.
+  refuel(n) {
+    const g = this.g, P = g.player;
+    const bike = g.bikes.needingFuel(n.x, n.z)[0];
+    if (!bike) return { label: 'Fill up a motorbike', cls: 'seen', fn: () => this.say('Fill up what? Bring it round the front where I can get the can to it.') };
+    const fee = Math.max(8, Math.ceil((1 - bike.fuel) * 140));
+    return { label: `Fill up the motorbike (${fee} spades)`, cls: 'primary', fn: () => {
+      if (P.scrip < fee) { this.say(`That is ${fee} for a full tank. Petrol does not grow on trees. Nothing grows on trees any more.`); return; }
+      P.scrip -= fee;
+      bike.fuel = 1;
+      bike.dryTold = false;
+      g.audio.simple('coin');
+      this.say(((l) => l[Math.floor(Math.random() * l.length)])(['There. Full. Try not to run it dry out in the middle of nowhere, I am not coming to get you.', 'Brim full. It drinks, that one. Go easy on the throttle if you want it to last.', 'Done. Do not tell anyone where I keep the cans.']));
+      this.renderOptions();
+    } };
+  }
+
   treatment(n) {
     const g = this.g, P = g.player;
     const v = g.dialogue.standing(n.camp), hurt = 100 - P.health, bad = P.infection;
@@ -1561,22 +1581,18 @@ export class UI {
     const signed = j && j.plan === 'vanguard', target = op || next;
     const dd = op ? g.campSim.opDayOf(op) : null;
     this.say(op ? `Operation ${op.name}, ${dd.text.toLowerCase()}.${dd.over ? ' It is running long. Anyone on a contract can take an early payout from me, at a cut.' : ` It is ${g.campSim.opLength(op.predict)}, if it goes to plan.`} It is not too late to sign on. Patrols and night shifts are always open.` : next ? `Operation ${next.name} is on the board, ${g.campSim.opLength(next.predict)}. It starts in about ${g.campSim.opNoticeHours(s)} hours, and you can sign for it now. Patrols and night shifts are always open.` : 'Nothing on the board for an operation yet. You will hear when there is. Patrols and night shifts are always open.');
-    const list = [
-      pat ? { label: 'Patrol contract (signed)', off: true }
-        : patJob ? { label: 'Patrol contract (pay waiting)', off: true }
-          : signed || clr ? { label: 'Patrol contract (under contract)', off: true }
-            : { label: `Patrol contract (${SP} ${OP_PAY.shift} a shift)`, cls: 'quest', fn: () => this.contractCard(n, 'patrol') },
-      clr ? { label: 'Night shift contract (signed)', off: true }
-        : nightJob ? { label: 'Night shift contract (pay waiting)', off: true }
-          : signed || pat ? { label: 'Night shift contract (under contract)', off: true }
-            : { label: `Night shift contract (${SP} ${OP_PAY.shift} a shift)`, cls: 'quest', fn: () => this.contractCard(n, 'night') },
-      signed ? { label: `Joined Operation ${target ? target.name : ''}`, off: true }
-        : !target ? { label: 'No operation posted', off: true }
-          : pat || clr ? { label: `Join Operation ${target.name} (under contract)`, off: true }
-            : j && j.void ? { label: `Join Operation ${target.name} (terminated)`, off: true }
-              : { label: `Join Operation ${target.name} (${SP} ${OP_PAY.vanguard} a kill)`, cls: 'quest', fn: () => this.contractCard(n, 'vanguard') },
+    const shift = `${SP} ${OP_PAY.shift} a shift`;
+    const cards = [
+      { tag: 'Patrol', title: 'Patrol contract', pay: shift, meta: 'Walk the corners round the settlement and keep them clear.',
+        state: pat ? 'Signed' : patJob ? 'Pay waiting' : signed || clr ? 'Under contract' : '', off: pat || !!patJob || signed || clr, fn: () => this.contractCard(n, 'patrol') },
+      { tag: 'Night shift', title: 'Night shift contract', pay: shift, meta: 'Hold the wall through the night and make your quota.',
+        state: clr ? 'Signed' : nightJob ? 'Pay waiting' : signed || pat ? 'Under contract' : '', off: clr || !!nightJob || signed || pat, fn: () => this.contractCard(n, 'night') },
+      { tag: 'Operation', title: target ? `Operation ${target.name}` : 'No operation posted', pay: target ? `${SP} ${OP_PAY.vanguard} a kill` : '',
+        meta: target ? (op ? 'Under way now.' : `Starts in about ${g.campSim.opNoticeHours(s)} hours.`) : 'You will hear on the radio when there is one.',
+        state: signed ? 'Joined' : !target ? '' : pat || clr ? 'Under contract' : j && j.void ? 'Terminated' : '', off: !target || signed || pat || clr || !!(j && j.void), fn: () => this.contractCard(n, 'vanguard') },
     ];
-    this.setChoices(list, { label: 'Back', fn: () => { this.say(this.smallTalk()); this.renderOptions(); } });
+    this.board(cards);
+    this.setChoices([], { label: 'Back', fn: () => { $('dlg-jobs').innerHTML = ''; this.say(this.smallTalk()); this.renderOptions(); } });
   }
 
   workMenu() {
@@ -1594,13 +1610,33 @@ export class UI {
       // Operation pay is not something you take on, so it does not fill your hands.
       const full = g.jobs.active.filter((a) => a.type !== 'defend' && a.type !== 'defended' && a.type !== 'visit' && a.type !== 'migrate').length >= 5;
       if (full) words.push('You already have your hands full. Finish something first.');
-      else {
-        if (!op) words.push(offers.length ? (g.dialogue.loreOf(n)?.jobIntro || 'Here is what the board says today.') : 'Nothing else until tomorrow.');
-        for (const job of offers) list.push({ label: `${job.title} (${SP} ${fmt(job.reward)})`, cls: 'quest', fn: () => this.jobCard(n, job) });
-      }
+      else if (!op) words.push(offers.length ? (g.dialogue.loreOf(n)?.jobIntro || 'Here is what the board says today.') : 'Nothing else until tomorrow.');
+      const TAG = { kill: 'Cull', fetch: 'Fetch', hold: 'Relay', bounty: 'Bounty' };
+      const out = (job) => Math.max(0, Math.round(Math.max(c.x0 - job.x, job.x - c.x1, c.z0 - job.z, job.z - c.z1)));
+      const task = (job) => job.type === 'kill' ? `${job.need} infected` : job.type === 'bounty' ? (job.gang > 1 ? `${job.gang} raiders` : 'one raider') : job.type === 'hold' ? `${job.time} seconds on the relay` : 'one cache';
+      this.board(offers.map((job) => ({ tag: TAG[job.type] || 'Work', state: `${out(job)} m out`, title: job.title, pay: `${SP} ${fmt(job.reward)}${job.bonus ? ` + ${ITEMS[job.bonus].name}` : ''}`,
+        meta: `${task(job)}, ${job.where}`, off: full, fn: () => this.jobCard(n, job) })));
       this.say(words.join(' '));
     }
     this.setChoices(list, back);
+  }
+
+  // A board of cards in the dialog: one for each thing on offer, laid out side by side, as many as there are. Each card is
+  // { tag, state, title, pay, meta, off, fn }: what kind of work, a word on where it stands, what it is, what it pays, and the details.
+  board(cards) {
+    const box = $('dlg-jobs');
+    box.innerHTML = '';
+    const grid = document.createElement('div');
+    grid.className = 'board';
+    for (const c of cards) {
+      const b = document.createElement('button');
+      b.className = `card${c.off ? ' off' : ''}`;
+      b.innerHTML = `<span class="tag"><span>${c.tag}</span>${c.state ? `<i>${c.state}</i>` : ''}</span><b>${c.title}</b>${c.pay ? `<span class="pay">${c.pay}</span>` : ''}${c.meta ? `<span class="meta">${c.meta}</span>` : ''}`;
+      if (c.off) b.disabled = true;
+      else b.addEventListener('click', () => { this.finishLine(); this.g.audio.simple('ui'); c.fn(); });
+      grid.appendChild(b);
+    }
+    box.appendChild(grid);
   }
 
   // What you would be signing, in writing, before you sign it.

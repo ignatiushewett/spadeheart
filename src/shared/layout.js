@@ -829,7 +829,8 @@ export function buildLayout(seed = 1609) {
     return !!o && o[1](x, z) && townEdge[i] < o[0] * (.65 + .7 * noise2(x * .008 + 11, z * .008));
   };
   const fieldAt = (x, z) => {
-    const k = Math.max(farmK(x, z) * 1.7, sstep(1 - Math.hypot((x - 3290) / 260, (z - 700) / 170)));
+    // Gibson Valley farms the valley floor: a long strip of fields east and west along the road through it, not much wider than the valley.
+    const k = Math.max(farmK(x, z) * 1.7, sstep(1 - Math.hypot((x - 3300) / 980, (z - 745) / 165)) * 1.7);
     return k + (fbm2(x * .006, z * .006 + 3, 2) - .5) * .9 > .55;
   };
   // The fields are laid out in sections a quarter-mile or so across, with a track round each; a section is one big field, or split into

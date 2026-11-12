@@ -387,6 +387,18 @@ body.talking #hud > *:not(#caption) { visibility: hidden; }
 #caption { position: absolute; left: 50%; bottom: 13%; transform: translateX(-50%); max-width: 720px; text-align: center; font-size: 15px; padding: 4px 12px; background: rgba(0,0,0,.45); opacity: 0; transition: opacity .25s; }
 #caption b { color: var(--amber); font-weight: 600; margin-right: 4px; }
 .job { border-left: 2px solid var(--amber-d); padding: 2px 10px; margin: 6px 0 10px; }
+/* The board: every job on offer as a card of its own, side by side, as many as there are, nothing behind a "More". */
+.board { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; margin: 2px 0 12px; max-height: 34vh; overflow-y: auto; }
+.board .card { display: flex; flex-direction: column; gap: 3px; text-align: left; padding: 9px 11px 10px; font: inherit; color: inherit; background: rgba(255,255,255,.035); border: 1px solid rgba(255,255,255,.08); border-left: 3px solid #9fd0ff; cursor: pointer; }
+.board .card:hover { background: rgba(159,208,255,.09); border-color: rgba(159,208,255,.35); border-left-color: #9fd0ff; }
+.board .card .tag { font-family: var(--mono); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--dim); display: flex; justify-content: space-between; gap: 6px; }
+.board .card .tag i { font-style: normal; color: #9fd0ff; }
+.board .card b { color: var(--ink); font-size: 15px; font-weight: 600; line-height: 1.25; }
+.board .card .pay { color: var(--amber); font-family: var(--mono); font-size: 13px; }
+.board .card .meta { color: var(--dim); font-size: 12px; line-height: 1.35; }
+.board .card.off { cursor: default; opacity: .5; border-left-color: rgba(255,255,255,.22); }
+.board .card.off:hover { background: rgba(255,255,255,.035); border-color: rgba(255,255,255,.08); border-left-color: rgba(255,255,255,.22); }
+.board .card.off .tag i { color: var(--dim); }
 .job b { color: var(--ink); }
 .job p { margin: 2px 0; color: var(--dim); font-size: 13px; }
 .job .pay { color: var(--amber); font-family: var(--mono); font-size: 12px; }
