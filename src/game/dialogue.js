@@ -33,7 +33,8 @@ export class Dialogue {
   greeting(npc) {
     const P = this.g.player, flags = P.dlg.met;
     const key = npc.loreId || npc.personaId;
-    const first = !flags[key];
+    // Once you are Trusted somewhere, everybody there knows who you are, whether or not you have spoken before.
+    const first = !flags[key] && !(npc.camp >= 0 && this.standing(npc.camp) >= 25);
     flags[key] = (flags[key] || 0) + 1;
     if (npc.kind === 'roamer' && npc.factionId && this.g.npcs.owesBail(npc.factionId - 1)) return `You are on the list at ${npc.campName}. ${this.g.npcs.bailFor(npc.factionId - 1)} spades squares it, then you can walk back in. Nobody out here is going to shoot you over it.`;
     if (npc.kind === 'roamer' && P.wanted[-1] > 0) return 'You have got some nerve, after that.';

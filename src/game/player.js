@@ -10,7 +10,7 @@ const HEIGHT = 2.72, CROUCH_H = 1.8;
 const EYE = 2.45, CROUCH_EYE = 1.5;
 const rand = Math.random;
 // Full to empty in about three in-game days.
-const HUNGER_RATE = 100 / 4500;
+const HUNGER_RATE = 100 / 4000;
 // Rest runs down while you are awake: a full night's sleep lasts about a day and a half before you are running on nothing.
 const REST_RATE = 100 / 2400;
 
@@ -274,6 +274,14 @@ export class Player {
   update(dt, input, locked) {
     const g = this.g, w = g.world;
     if (!this.alive) { this.deadUpdate(dt); return; }
+    // Standing in a fire burns: a hurt every half second for as long as you are touching it.
+    {
+      let burning = false;
+      for (const ox of [-R, R]) for (const oz of [-R, R]) for (let y = Math.floor(this.y - .5); y <= Math.floor(this.y + 1.6) && !burning; y++) {
+        if (w.get(Math.floor(this.x + ox), y, Math.floor(this.z + oz)) === M.FIRE) burning = true;
+      }
+      if (burning) { this.fireT = (this.fireT || 0) + dt; if (this.fireT >= .5) { this.fireT -= .5; this.damage(5, null, null, 'fire'); } } else this.fireT = .45;
+    }
     if (locked) {
       const sens = input.sens * (1 + ((input.adsSens ?? 1) - 1) * (this.ads || 0));
       this.yaw += input.mouseDX * sens;
@@ -761,8 +769,10 @@ export class Player {
     const npcHit = g.npcs.raycast(o[0], o[1], o[2], dx, dy, dz, Math.min(maxD, endT));
     if (npcHit) {
       const raider = npcHit.kind === 'raider', head = npcHit.hy > npcHit.y + (npcHit.kid ? 1.5 : 2.25);
-      g.npcs.playerHit(npcHit, it.dmg * (head ? (raider ? 2.2 : 3) : 1));
-      g.particles.blood(npcHit.hx, npcHit.hy, npcHit.hz, dx, dy, dz, 8, 4);
+      // A round through the head that would take a zombie's head off takes a person's off too.
+      g.npcs.playerHit(npcHit, it.dmg * (head ? (raider ? 2.2 : 3) : 1), head && it.dmg * 2.6 > 60);
+      g.particles.blood(npcHit.hx, npcHit.hy, npcHit.hz, dx, dy, dz, head ? 12 : 8, 4);
+      if (npcHit.dead && npcHit.headless) g.particles.gore(npcHit.hx, npcHit.hy, npcHit.hz, 10);
       endT = npcHit.t;
       hit = null;
     }

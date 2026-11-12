@@ -1376,7 +1376,14 @@ export function buildLayout(seed = 1609) {
   const forestAt = (x, z) => {
     const n = fbm2(x * .0045 + 3, z * .0045 + 8, 3);
     const esp = sstep((z - 2600) / 500) * sstep((1700 - x) / 700) * (.55 + .45 * Math.max(sstep((700 - x) / 500), sstep((z - 3500) / 450)));
-    const k = (n - .46) * 2.2 + 1.8 * trinityK(x, z) + .8 * sstep((420 - x) / 420) + .7 * sstep((380 - z) / 380) + 1.15 * esp + .45 * pageK(x, z) - 1.1 * farmK(x, z);
+    let k = (n - .46) * 2.2 + 1.8 * trinityK(x, z) + .8 * sstep((420 - x) / 420) + .7 * sstep((380 - z) / 380) + 1.15 * esp + .45 * pageK(x, z) - 1.1 * farmK(x, z);
+    // Past the edges of the map the country goes on in woods and clearings: big stands of forest with open ground between, carrying on
+    // from whatever the edge was doing.
+    const out = Math.max(0, -x, -z, z - WZ);
+    if (out > 0) {
+      const patch = (fbm2(x * .0024 + 41, z * .0024 + 17, 3) - .44) * 3.4 + .35 * sstep((-x - 300) / 900);
+      k += (patch - k) * sstep(out / 420);
+    }
     return Math.max(0, Math.min(1, k));
   };
   const rowB = new Float32Array(QW), rowE = new Float32Array(QW);

@@ -414,7 +414,7 @@ export const LORE = {
     ],
     barks: {
       guard: ["Coach says hold the line, so we hold the line.", "I got him, I got him.", "Buses are shaking on 124th.", "I can smell Tiny from up here. Lord."],
-      folk: ["You eat yet?", "Choir's at five.", "Who's got next on the court?", "That boy's got a jump shot, I'm telling you.", "Coach said so.", "Y'all save me a plate.", "That's my grandbaby up on that wall."],
+      folk: ["You eat yet?", "Choir's at five.", "Who's got next on the court?", "That boy's got a jump shot, I'm telling you.", "Coach said so.", "Y'all save me a plate."],
     },
   },
 

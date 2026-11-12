@@ -145,6 +145,7 @@ select { background: #1c1b18; color: var(--ink); border: 1px solid var(--line); 
 #hp-num { font-size: 38px; font-weight: 600; line-height: 1; }
 .vit-row { display: flex; align-items: baseline; justify-content: space-between; }
 #armor-tag { color: var(--dim); font-size: 12px; }
+#menu-version { position: absolute; right: 18px; bottom: 14px; color: var(--dim); font-size: 12px; letter-spacing: .04em; opacity: .7; }
 #weapon-box { position: absolute; right: 26px; bottom: 24px; text-align: right; text-shadow: 0 1px 2px #000; }
 #ammo { font-size: 42px; font-weight: 600; line-height: 1; }
 #ammo small { font-size: 18px; color: var(--dim); font-weight: 400; }
@@ -187,14 +188,14 @@ select { background: #1c1b18; color: var(--ink); border: 1px solid var(--line); 
 #status .need b { display: block; color: #ff8a7a; font-size: 15px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
 #status .need span { display: block; margin-top: 2px; color: var(--dim); font-size: 12px; line-height: 1.3; white-space: normal; }
 .trk.op.lost b { color: #ff7a6a; }
-#right-col { position: absolute; right: 22px; top: 222px; width: 270px; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+#right-col { position: absolute; right: 22px; top: 256px; width: 270px; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
 #hud.no-map #minimap { display: none; }
 /* F1: nothing on screen but the world and what you are holding. The screen fade and a scope still show. */
 #hud.hud-off > :not(#sleep-veil):not(#scope):not(#overhead) { visibility: hidden !important; }
 /* ...and what people are saying only if the setting keeps it: the words over their heads, never the marks. */
 #hud.hud-off:not(.keep-chatter) > #overhead { visibility: hidden !important; }
 #hud.hud-off #overhead .npc-mark { visibility: hidden !important; }
-#hud.no-map #right-col { top: 16px; }
+#hud.no-map #right-col { top: 56px; }
 #tracker { display: flex; flex-direction: column; gap: 5px; }
 .trk { padding: 4px 9px 5px; background: rgba(0,0,0,.42); border-left: 2px solid #6ec6ff; font-size: 12px; text-shadow: 0 1px 2px #000; }
 .trk.done { border-left-color: var(--green); }
@@ -221,7 +222,11 @@ select { background: #1c1b18; color: var(--ink); border: 1px solid var(--line); 
 .trk .rows.more { margin-top: 9px; }
 .trk .rows { display: grid; grid-template-columns: 1fr auto; gap: 1px 10px; font-size: 12px; color: var(--dim); }
 .trk .rows span:nth-child(even) { color: var(--ink); text-align: right; font-family: var(--mono); font-size: 11px; }
-#minimap { position: absolute; top: 16px; right: 22px; width: 196px; height: 196px; box-sizing: border-box; border: 1px solid rgba(255,255,255,.2); background: #0a0a0a; }
+/* The minimap, and under it, joined on and the same width, where you are. */
+#mapbox { position: absolute; top: 16px; right: 22px; width: 196px; }
+#minimap { display: block; width: 196px; height: 196px; box-sizing: border-box; border: 1px solid rgba(255,255,255,.2); background: #0a0a0a; }
+#mapbox #loc { box-sizing: border-box; width: 196px; padding: 5px 8px; background: rgba(10,10,10,.72); border: 1px solid rgba(255,255,255,.2); border-top: 0; text-align: center; font-size: 13px; line-height: 1.3; text-shadow: 0 1px 2px #000; }
+#hud.no-map #mapbox #loc { border-top: 1px solid rgba(255,255,255,.2); }
 #prompt { position: absolute; left: 50%; bottom: 25%; transform: translateX(-50%); padding: 5px 12px; background: rgba(0,0,0,.6); display: none; white-space: nowrap; }
 #toasts { position: absolute; left: 26px; bottom: 150px; display: flex; flex-direction: column; gap: 3px; width: 420px; }
 #toasts div { background: rgba(0,0,0,.5); padding: 3px 9px; font-size: 13px; width: fit-content; animation: toast 3.8s forwards; border-left: 2px solid var(--amber); }
@@ -387,15 +392,18 @@ body.talking #hud > *:not(#caption) { visibility: hidden; }
 .job .pay { color: var(--amber); font-family: var(--mono); font-size: 12px; }
 
 /* Map */
-#map-panel { width: 94vw; height: 90vh; }
-#map-wrap { display: grid; grid-template-columns: minmax(0, 1fr) 30px 280px; grid-template-rows: minmax(0, 1fr); min-height: 0; flex: 1; }
+/* The map shares its screen with its notes, side by side like the inventory and the radio, a little bigger than those. */
+#map-panel { width: min(1000px, calc(94vw - 414px)); height: min(740px, 90vh); flex: none; }
+#map-info { width: 400px; height: min(740px, 90vh); margin-left: 14px; flex: none; }
+@media (max-width: 1100px) { #map-info { width: 280px; } #map-panel { width: calc(94vw - 294px); } }
+#map-wrap { display: grid; grid-template-columns: minmax(0, 1fr) 30px; grid-template-rows: minmax(0, 1fr); min-height: 0; flex: 1; }
 #map-rail { position: relative; background: #0b1216; border-left: 1px solid var(--line); cursor: pointer; user-select: none; }
 #map-thumb { position: absolute; left: 5px; right: 5px; background: rgba(233, 228, 216, .22); border: 1px solid rgba(233, 228, 216, .5); border-radius: 3px; }
 #map-you { position: absolute; left: 2px; right: 2px; height: 3px; margin-top: -1px; background: #e8b04a; pointer-events: none; }
 .map-key { display: grid; grid-template-columns: 12px 1fr; gap: 3px 8px; align-items: center; font-size: 12px; color: var(--dim); margin-bottom: 4px; }
 .map-key i { display: block; width: 8px; height: 8px; }
 #bigmap { width: 100%; height: 100%; display: block; background: #152c37; cursor: grab; }
-#map-side { padding: 14px 16px; overflow: auto; border-left: 1px solid var(--line); }
+#map-side { padding: 6px 16px 14px; overflow: auto; flex: 1; min-height: 0; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
 
 /* Loading / death */
 #loading { flex-direction: column; align-items: center; justify-content: center; background: #000; }
@@ -431,8 +439,8 @@ body.talking #hud > *:not(#caption) { visibility: hidden; }
   <div id="hitmark"></div>
   <div id="dmg"></div>
   <div id="status"></div>
-  <div id="topbar"><canvas id="compass" width="840" height="52"></canvas><div id="loc"></div><div id="gate-note"></div><div id="mag-bar"></div><div id="siren-bar"></div></div>
-  <canvas id="minimap" width="392" height="392"></canvas>
+  <div id="topbar"><canvas id="compass" width="840" height="52"></canvas><div id="gate-note"></div><div id="mag-bar"></div><div id="siren-bar"></div></div>
+  <div id="mapbox"><canvas id="minimap" width="392" height="392"></canvas><div id="loc"></div></div>
   <div id="vitals">
     <div class="vit-row"><div id="hp-num">100</div><div id="armor-tag"></div></div>
     <div id="bar-hp" class="bar"><i></i></div>
@@ -462,7 +470,7 @@ body.talking #hud > *:not(#caption) { visibility: hidden; }
   <div class="dev-label">Time</div>
   <div class="dev-row"><button data-dev="t:.27">Morning</button><button data-dev="t:.5">Noon</button><button data-dev="t:.74">Dusk</button><button data-dev="t:.9">Night</button><button data-dev="day">Next day</button></div>
   <div class="dev-label">Player</div>
-  <div class="dev-row"><button data-dev="s:100">+100 &#9824;</button><button data-dev="s:1000">+1000 &#9824;</button><button data-dev="fly" id="dev-fly">Fly: off</button></div>
+  <div class="dev-row"><button data-dev="s:100">+100 &#9824;</button><button data-dev="s:1000">+1000 &#9824;</button><button data-dev="fly" id="dev-fly">Fly: off</button><button data-dev="bike">Motorbike</button></div>
   <div class="dev-label">Cheats</div>
   <div class="dev-row"><button data-dev="c:god" id="dev-c-god">God</button><button data-dev="c:ammo" id="dev-c-ammo">Infinite ammo</button><button data-dev="c:spades" id="dev-c-spades">Infinite spades</button><button data-dev="c:ignore" id="dev-c-ignore">Zombies ignore you</button></div>
   <div class="dev-label">World</div>
@@ -481,6 +489,7 @@ body.talking #hud > *:not(#caption) { visibility: hidden; }
     <button id="m-settings">Settings</button>
     <button id="m-controls">Controls</button>
   </div>
+  <div id="menu-version"></div>
 </div>
 
 <div id="characters" class="screen center">
@@ -642,9 +651,12 @@ body.talking #hud > *:not(#caption) { visibility: hidden; }
     <div id="map-wrap">
       <div style="position:relative;min-height:0;overflow:hidden"><canvas id="bigmap" style="position:absolute;inset:0"></canvas></div>
       <div id="map-rail"><div id="map-thumb"></div><div id="map-you"></div></div>
-      <div id="map-side"></div>
     </div>
     <div class="panel-foot"><button class="btn primary" data-close>Close</button></div>
+  </div>
+  <div class="panel" id="map-info">
+    <div class="panel-head"><h2>Info</h2></div>
+    <div class="panel-body" id="map-side"></div>
   </div>
 </div>
 

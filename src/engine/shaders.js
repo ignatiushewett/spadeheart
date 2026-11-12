@@ -244,6 +244,7 @@ layout(location=1) in uvec4 aInfo;
 uniform vec3 uOrigin;
 uniform sampler2D uPalette;
 uniform float uSway;
+uniform float uGrassT;
 out vec3 vWorld;
 out vec3 vNormal;
 out float vAO;
@@ -260,6 +261,12 @@ void main(){
     p.x+=(sin(t*.85+p.x*.31+p.y*.19+p.z*.13)*.65+sin(t*1.45+p.z*.53)*.35)*.13*k;
     p.z+=(cos(t*.7+p.z*.29+p.y*.23+p.x*.11)*.65+sin(t*1.6+p.x*.47)*.35)*.13*k;
     p.y+=sin(t*1.05+p.x*.4+p.z*.4)*.035*k;
+  }
+  // Grass in the wind: the top edge of each grass block lifted up to a third of a block and let down again, in long waves running
+  // across the ground on the diagonal. Only what is drawn moves; nothing anyone stands on or bumps into does.
+  if(aInfo.w>0u){
+    float ph=uGrassT*.9-(p.x+p.z)*.075;
+    p.y+=(.5+.5*sin(ph))*.333;
   }
   vWorld=p;
   vNormal=NORMALS[aPos.w];
@@ -1210,9 +1217,11 @@ out vec3 vCol;
 out float vGlow;
 void main(){
   float a=iCol.a, c=cos(a), s=sin(a);
-  mat3 R=mat3(c,0,-s, 0,1,0, s,0,c)*mat3(1,0,0, 0,c,s, 0,-s,c);
+  // A glow below zero marks a part of something built (a vehicle): turned about the vertical only, not tumbling. Its glow is -1 - that.
+  bool built=iGlow<-.5;
+  mat3 R=built?mat3(c,0,-s, 0,1,0, s,0,c):mat3(c,0,-s, 0,1,0, s,0,c)*mat3(1,0,0, 0,c,s, 0,-s,c);
   vec3 p=R*(aPos*iPos.w)+iPos.xyz;
-  vWorld=p; vNormal=R*aNormal; vCol=iCol.rgb; vGlow=iGlow;
+  vWorld=p; vNormal=R*aNormal; vCol=iCol.rgb; vGlow=built?-1.-iGlow:iGlow;
   gl_Position=uViewProj*vec4(p,1.);
 }`;
 

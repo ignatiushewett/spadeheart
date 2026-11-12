@@ -1,5 +1,5 @@
 // HTML overlay: HUD, menus, inventory, trading, dialogue, maps.
-import { WX, WZ } from '../shared/constants.js';
+import { WX, WZ, CS } from '../shared/constants.js';
 import { ROLES } from '../shared/layout.js';
 import { ITEMS, WEAPON_ORDER, KITS, CAMP_START, TRUST_LOCK, START_CAMP, startingGear } from './items.js';
 import { DIFFICULTY } from './horde.js';
@@ -13,6 +13,7 @@ const $ = (id) => document.getElementById(id);
 // The water as the map canvas paints it, so nothing shows where the map runs out.
 const OCEAN = '#152c37';
 const SHOW_INFECTED_ON_MAP = false;   // the red wash and the dots for the dead, on the big map
+const SHOW_WORLD_MARKERS = false;    // quest markers floating in the 3D view (the compass and the map carry them instead)
 const fmt = (n) => Math.round(n).toLocaleString('en-US');
 // A camp with nothing happening at it, as the player reads it.
 // A day's patrol that is done has nothing left to point at until tomorrow, and a night shift never has one spot to point at.
@@ -79,6 +80,12 @@ const iconFor = (id) => {
   if (iconCache[id] === undefined) iconCache[id] = silhouette(id);
   return `<svg viewBox="0 0 32 16" shape-rendering="crispEdges" aria-hidden="true"><path fill="currentColor" d="${iconCache[id]}"/></svg>`;
 };
+
+// Real time spent on a character, the way a person would say it.
+function playTime(secs) {
+  const m = Math.floor(secs / 60), h = Math.floor(m / 60);
+  return h ? `${h}h ${m % 60}m` : m ? `${m}m` : 'under a minute';
+}
 
 function playedAgo(at) {
   const mins = Math.floor((Date.now() - at) / 60000);
@@ -434,6 +441,7 @@ export class UI {
         line('small', `${(KITS[s.kit] || { name: 'Unknown' }).name}, day ${s.day}, ${kills}, ${s.scrip.toLocaleString('en-US')} \u2660`);
         button('Play', true, () => g.continueGame(s.n));
       }
+      if (s.playSecs) line('small', `Played for ${playTime(s.playSecs)}`);
       if (s.savedAt) line('small', `Last played ${playedAgo(s.savedAt)}`);
       // Deleting takes a second press, and the first press wears off.
       let armed = 0;
@@ -662,7 +670,8 @@ export class UI {
     $('bar-inf').style.display = P.infection > 0 ? 'block' : 'none';
     $('bar-inf').firstElementChild.style.width = `${P.infection}%`;
     const over = P.carryWeight() > P.carryCap();
-    $('armor-tag').textContent = [P.armor ? ITEMS[P.armor].name : '', P.infection > 0 ? `Infected ${Math.round(P.infection)}%` : '', over ? 'Overloaded' : '', P.stim > 0 ? 'Adrenaline' : '', eats && P.hunger <= 0 ? 'Starving' : eats && P.hunger <= 25 ? 'Hungry' : '', eats && P.rest <= 0 ? 'Exhausted' : eats && P.rest <= 35 ? 'Tired' : ''].filter(Boolean).join(' / ');
+    // The armour and status line under your health is off for now: the corner up top says what matters.
+    if (false) $('armor-tag').textContent = [P.armor ? ITEMS[P.armor].name : '', P.infection > 0 ? `Infected ${Math.round(P.infection)}%` : '', over ? 'Overloaded' : '', P.stim > 0 ? 'Adrenaline' : '', eats && P.hunger <= 0 ? 'Starving' : eats && P.hunger <= 25 ? 'Hungry' : '', eats && P.rest <= 0 ? 'Exhausted' : eats && P.rest <= 35 ? 'Tired' : ''].filter(Boolean).join(' / ');
     if (it) {
       $('wname').textContent = it.name;
       if (it.type === 'gun') {
@@ -700,7 +709,10 @@ export class UI {
     // Starving or out on your feet: up here in the corner where it cannot be missed, with what it is doing to you, until it is dealt with.
     const need = P.needs();
     if (need.starving) status += `<div class="need"><b>Starving</b><span>Stamina recovers slowly and runs out early. You are losing health. Eat something.</span></div>`;
+    else if (need.hungry) status += `<div class="need"><b>Hungry</b><span>Health and stamina recover a little slower. Eat something.</span></div>`;
     if (need.exhausted) status += `<div class="need"><b>Exhausted</b><span>Slower, shakier aim, and you tire fast. You are losing health. Find a bed.</span></div>`;
+    else if (need.tired) status += `<div class="need"><b>Tired</b><span>A little slower, and your aim wanders. Find somewhere to sleep.</span></div>`;
+    if (P.carryWeight() > P.carryCap()) status += `<div class="need"><b>Overweight</b><span>${P.carryWeight().toFixed(1)} / ${P.carryCap()} kg. You are slowed down. Drop or stash something.</span></div>`;
     this.hudCamp = faction;
     $('status').innerHTML = status;
     this.renderTracker();
@@ -860,15 +872,25 @@ export class UI {
       x.fillStyle = l === 'N' ? `rgba(232,176,74,${1 - Math.abs(r) / fov})` : `rgba(233,228,216,${1 - Math.abs(r) / fov})`;
       x.fillText(l, px, 18);
     }
+    // Where the work is: a blue square on the compass, and how far, the way a breach is shown. Nothing is drawn out in the world itself.
+    x.font = '600 17px Quantico, Bahnschrift, Segoe UI, sans-serif';
     for (const j of this.g.jobs.active) {
       if (j.status !== 'active' || unpointed(j)) continue;
       let r = Math.atan2(j.x - P.x, -(j.z - P.z)) - yaw;
       while (r > Math.PI) r -= Math.PI * 2;
       while (r < -Math.PI) r += Math.PI * 2;
       if (Math.abs(r) > fov) continue;
-      const px = W / 2 + r / fov * W / 2;
+      const px = W / 2 + r / fov * W / 2, dist = Math.round(Math.hypot(j.x - P.x, j.z - P.z));
       x.fillStyle = '#6ec6ff';
-      x.fillRect(px - 5, 2, 10, 10);
+      x.fillRect(px - 6, 5, 12, 12);
+      x.strokeStyle = 'rgba(8,14,20,.9)'; x.lineWidth = 2; x.strokeRect(px - 6, 5, 12, 12);
+      const label = j.type === 'patrol' && j.posts ? `${j.posts[j.next].name}, ${dist}m` : `${dist}m`;
+      x.textAlign = 'left';
+      x.lineWidth = 4; x.strokeStyle = 'rgba(10,8,6,.8)';
+      x.strokeText(label, px + 12, 12);
+      x.fillStyle = '#a8dcff';
+      x.fillText(label, px + 12, 12);
+      x.textAlign = 'center';
     }
     // Holes in the wall of any camp you know of, nearby: a red diamond, and how far.
     const g = this.g;
@@ -919,7 +941,8 @@ export class UI {
     // Map canvas is half resolution of the world. Filtered, or the streets shimmer as it turns.
     x.imageSmoothingEnabled = true;
     const sur = g.mapSurround;
-    if (sur) x.drawImage(sur, -P.x - sur.span, -P.z - sur.span, WX + sur.span * 2, WZ + sur.span * 2);
+    // The surround is square, 16 to the pixel: drawn at its own size, so its country lines up with the map's.
+    if (sur) x.drawImage(sur, -P.x - sur.span, -P.z - sur.span, sur.width * 16, sur.height * 16);
     const mg = g.mapMargin;
     if (mg) x.drawImage(mg, mg.x0 - P.x, mg.z0 - P.z, mg.width * 2, mg.height * 2);
     x.drawImage(g.mapCanvas, -P.x, -P.z, WX, WZ);
@@ -984,6 +1007,8 @@ export class UI {
   }
 
   updateMarkers() {
+    // Quest markers live on the compass and the map now, not hanging in the air.
+    if (SHOW_WORLD_MARKERS === false) { for (const el of this.markerEls) el.style.display = 'none'; return; }
     const g = this.g, r = g.renderer;
     const host = $('markers');
     const vp = r.viewProj;
@@ -1090,7 +1115,7 @@ export class UI {
     $('inv-stats').innerHTML = [
       ['Health', `${Math.ceil(P.health)} / 100`], ['Infection', `${Math.round(P.infection)}%`], ['Armour', A ? `${A.name}, ${Math.round(A.armor * 100)}%` : 'None'],
       ['Reputation', P.rep <= -30 ? 'Marked' : P.rep < 0 ? 'Distrusted' : P.rep < 25 ? 'Neutral' : P.rep < 60 ? 'Respected' : 'Well known'],
-      ['Zombies killed', fmt(P.kills)], ['Headshots', fmt(P.headshots)], ['Voxels broken', fmt(P.voxelsBroken)], ['Commissions', fmt(this.g.stats.jobs)], ['Operations', fmt(this.g.stats.ops || 0)],
+      ['Zombies killed', fmt(P.kills)], ['Headshots', fmt(P.headshots)], ['Voxels broken', fmt(P.voxelsBroken)], ['Commissions', fmt(this.g.stats.jobs)], ['Time played', playTime(this.g.stats.playSecs || 0)], ['Operations', fmt(this.g.stats.ops || 0)],
     ].map(([a, b]) => `${a.padEnd(16, ' ')}<b>${b}</b>`).join('<br>');
     if (detail) this.itemDetail('inv-detail', detail);
   }
@@ -1851,19 +1876,32 @@ export class UI {
     x.setTransform(s, 0, 0, s, c.width / 2 - v.x * s, c.height / 2 - v.z * s);
     x.imageSmoothingEnabled = s > 1 ? false : true;
     const sur = g.mapSurround;
-    if (sur) { x.imageSmoothingEnabled = true; x.drawImage(sur, -sur.span, -sur.span, WX + sur.span * 2, WZ + sur.span * 2); x.imageSmoothingEnabled = s > 1 ? false : true; }
+    if (sur) { x.imageSmoothingEnabled = true; x.drawImage(sur, -sur.span, -sur.span, sur.width * 16, sur.height * 16); x.imageSmoothingEnabled = s > 1 ? false : true; }
     const mg = g.mapMargin;
     if (mg) x.drawImage(mg, mg.x0, mg.z0, mg.width * 2, mg.height * 2);
     x.drawImage(g.mapCanvas, 0, 0, WX, WZ);
     x.setTransform(1, 0, 0, 1, 0, 0);
     const P = g.player;
     const tx = (px) => c.width / 2 + (px - v.x) * s, tz = (pz) => c.height / 2 + (pz - v.z) * s;
+    // The chunk grid: every chunk close in, every second, fourth and so on further out, so the lines never crowd.
+    {
+      let step = CS;
+      while (step * s < 9) step *= 2;
+      // Out over the country past the edges as well, so the squares carry on across all of it.
+      const x0 = Math.floor((v.x - c.width / 2 / s) / step) * step, x1 = v.x + c.width / 2 / s;
+      const z0 = Math.floor((v.z - c.height / 2 / s) / step) * step, z1 = v.z + c.height / 2 / s;
+      const top = 0, bot = c.height, lef = 0, rig = c.width;
+      x.lineWidth = 1;
+      for (let gx = x0; gx <= x1; gx += step) { x.strokeStyle = gx % (step * 8) === 0 ? 'rgba(255,255,255,.13)' : 'rgba(255,255,255,.06)'; const p = Math.round(tx(gx)) + .5; x.beginPath(); x.moveTo(p, top); x.lineTo(p, bot); x.stroke(); }
+      for (let gz = z0; gz <= z1; gz += step) { x.strokeStyle = gz % (step * 8) === 0 ? 'rgba(255,255,255,.13)' : 'rgba(255,255,255,.06)'; const p = Math.round(tz(gz)) + .5; x.beginPath(); x.moveTo(lef, p); x.lineTo(rig, p); x.stroke(); }
+    }
     this.drawGates(x, tx, tz, s);
     x.textBaseline = 'middle';
     // Camps and jobs get first claim on the space. The city's own names only go where that leaves room.
     const labels = this.layoutMapLabels(x, c, tx, tz);
     const taken = (ax, ay, w, h) => labels.boxes.some((b) => ax < b.x + b.w && ax + w > b.x && ay < b.y + b.h && ay + h > b.y);
     // Street numbers, neighbourhoods at any zoom, landmarks as you look closer. Drawn once the crowd is down, so no name ends up underneath it.
+    const towns = [];
     const drawCity = () => {
     x.textBaseline = 'middle';
     x.font = '12px Quantico, Bahnschrift, Segoe UI, sans-serif';
@@ -1877,26 +1915,23 @@ export class UI {
     x.lineWidth = 3;
     x.strokeStyle = 'rgba(8,10,12,.7)';
     for (const p of g.layout.places) {
-      if (p.tier && s < .34) continue;
+      // Every name at every zoom, where there is room for it.
       const px = tx(p.x), pz = tz(p.z);
       if (px < -60 || pz < -20 || px > c.width + 60 || pz > c.height + 20) continue;
       // The five towns, big enough to read from across the map.
+      // The five towns, big enough to read from across the map, and written over everything else: kept for the very end.
       if (p.kind === 'town') {
         x.font = `700 ${Math.round(Math.max(18, Math.min(30, 20 * Math.sqrt(s * 2.2))))}px Quantico, Bahnschrift, Segoe UI, sans-serif`;
         const name = p.name.toUpperCase(), w = x.measureText(name).width;
         labels.boxes.push({ x: px - w / 2 - 4, y: pz - 14, w: w + 8, h: 28 });
-        x.lineWidth = 5; x.strokeStyle = 'rgba(8,10,12,.82)';
-        x.strokeText(name, px, pz);
-        x.fillStyle = '#f3ecd9';
-        x.fillText(name, px, pz);
-        x.lineWidth = 3; x.strokeStyle = 'rgba(8,10,12,.7)';
+        towns.push([name, px, pz, x.font]);
         continue;
       }
       if (p.kind === 'area') {
-        x.font = '600 12px Quantico, Bahnschrift, Segoe UI, sans-serif';
+        x.font = '600 10px Quantico, Bahnschrift, Segoe UI, sans-serif';
         const name = p.name.toUpperCase(), w = x.measureText(name).width;
-        if (taken(px - w / 2, pz - 7, w, 14)) continue;
-        labels.boxes.push({ x: px - w / 2 - 3, y: pz - 7, w: w + 6, h: 14 });
+        if (taken(px - w / 2, pz - 6, w, 12)) continue;
+        labels.boxes.push({ x: px - w / 2 - 3, y: pz - 6, w: w + 6, h: 12 });
         x.fillStyle = 'rgba(233,228,216,.58)';
         x.strokeText(name, px, pz);
         x.fillText(name, px, pz);
@@ -2013,6 +2048,16 @@ export class UI {
     }
     // Last of all, so nothing on the map ever ends up on top of the words.
     this.drawMapLabels(x, labels);
+    // And the towns over even those.
+    x.textAlign = 'center'; x.textBaseline = 'middle'; x.lineJoin = 'round';
+    for (const [name, px, pz, font] of towns) {
+      x.font = font;
+      x.lineWidth = 5; x.strokeStyle = 'rgba(8,10,12,.82)';
+      x.strokeText(name, px, pz);
+      x.fillStyle = '#f3ecd9';
+      x.fillText(name, px, pz);
+    }
+    x.textAlign = 'left';
   }
 
   // The way in and out of every camp: a bar across the wall where the gate is, and a notch pointing out. Red while it will not open

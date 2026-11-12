@@ -31,8 +31,8 @@ const NPC_GUNS = {
 export const OP_PAY = {
   commission: 1,               // spades a kill, for anyone who fights, if the camp holds
   vanguard: 4,                 // spades a kill under a Vanguard contract, if the camp holds and every day's quota was met
-  shift: 90,                   // a shift, patrol or night, in ordinary times
-  shiftOp: 120,                // and while the camp has an operation on
+  shift: 115,                  // a shift, patrol or night, in ordinary times
+  shiftOp: 150,                // and while the camp has an operation on
   days: 3,                     // a patrol contract is this many days in a row
   patrolStart: 5 / 24,         // a patrol day runs from five in the morning to five the next
   nights: 3,                   // a night shift contract is this many nights in a row
@@ -3717,7 +3717,7 @@ export class NPCs {
       if (n.grenades > 0 && rand() < .7) g.addPickup(n.x - .5, n.y + .4, n.z + .5, { id: 'grenade', count: n.grenades });
       if (boss) g.addPickup(n.x + .5, n.y + .4, n.z + .5, { id: pickOf(['riot', 'jacket', 'medkit', 'stim']), count: 1 });
     }
-    g.horde.addBody(n.x, n.y, n.z, n.yaw, n.variant, false, 0, n.kid);
+    g.horde.addBody(n.x, n.y, n.z, n.yaw, n.variant, !!n.headless, 0, n.kid);
     if (n.task && n.task.poi && n.task.poi.by === n) n.task.poi.by = null;
     const fi = this.followers.indexOf(n);
     if (fi >= 0) { this.followers.splice(fi, 1); g.ui.toast(`${n.name} is dead.`, 'bad'); }
@@ -3908,7 +3908,7 @@ export class NPCs {
   // Bullets go astray in a crowded fight, and people know it. A stray round near the dead or at a
   // breach is shrugged off. The same shots in a quiet street are not, and nor is hosing down the
   // same person with the dead all around. Enough of that and everyone with a gun turns on you.
-  playerHit(n, dmg) {
+  playerHit(n, dmg, behead = false) {
     if (n.dead) return;
     const g = this.g, P = g.player;
     // Raiders are fair game, and nobody is keeping score.
@@ -3918,7 +3918,7 @@ export class NPCs {
       else if (!n.aggro) this.raiderAlert(n);
       // Tough enough to last against a camp full of cooks. Not against someone who does this for a living.
       n.hp -= dmg * (n.raidCamp !== undefined ? 2 : 1.35);
-      if (n.hp <= 0) this.kill(n, true);
+      if (n.hp <= 0) { n.headless = behead; this.kill(n, true); }
       return;
     }
     const S = n.camp >= 0 ? g.campSim.state[n.camp] : null;
@@ -3948,6 +3948,7 @@ export class NPCs {
         if (n.camp >= 0) g.dialogue.addStanding(n.camp, -18);
         g.ui.toast(`You killed ${n.name}. People saw it.`, 'bad');
       }
+      n.headless = behead;
       this.kill(n, true);
       this.addGrief(n, (fighting && !deliberate ? 1.5 * ease : 6) + (n.kid ? 4 : 0), outside);
       return;
@@ -4236,6 +4237,14 @@ export class Jobs {
       job = { type, title: `${title}: ${boss}`, gang, left: gang, spawned: false, reward: Math.round((90 + gang * 45) * (first ? .65 : 1) + base * .6), desc: `${boss} and ${gang - 1 > 1 ? `${gang - 1} others have` : gang > 1 ? 'one other has' : 'nobody else has'} been robbing our people around ${where}. Put a stop to it.`, where };
     } else {
       job = { type, title, time: 40, held: 0, reward: Math.round(base * 1.5), desc: `Run a relay at ${where} and keep within range for 40 seconds. The transmitter is loud, so expect company.`, where };
+    }
+    // What it pays goes by how hard it is: the long way out, the big cull, the bigger gang pay what they always did, and the easy ones
+    // around the corner from the wall pay a good deal less.
+    {
+      let hard = Math.max(0, Math.min(1, (dist - 40) / 240));
+      if (type === 'kill') hard = Math.max(hard, Math.min(1, (job.need - 10) / 60));
+      if (type === 'bounty') hard = Math.max(hard, Math.min(1, (job.gang - 1) / 4));
+      job.reward = Math.round(job.reward * (.72 + .28 * hard));
     }
     job.id = this.nextId++;
     job.x = x; job.z = z;

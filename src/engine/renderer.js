@@ -671,7 +671,14 @@ export class Renderer {
     gl.activeTexture(gl.TEXTURE1);
     gl.bindTexture(gl.TEXTURE_2D, this.texPalette);
     gl.uniform1i(p.u.uPalette, 1);
-    if (p.u.uSway) gl.uniform1f(p.u.uSway, 1 + Math.min(1.6, Math.hypot(this.windX || 0, this.windZ || 0) * .25 + (this.rain || 0) * .8));
+    const sway = 1 + Math.min(1.6, Math.hypot(this.windX || 0, this.windZ || 0) * .25 + (this.rain || 0) * .8);
+    if (p.u.uSway) gl.uniform1f(p.u.uSway, sway);
+    // The grass waves run on their own clock, which goes faster the harder the weather: wound on a frame at a time, so a change in the
+    // wind speeds them up or slows them down without them jumping.
+    const gdt = Math.max(0, Math.min(.1, this.time - (this.grassLast ?? this.time)));
+    this.grassLast = this.time;
+    this.grassT = ((this.grassT || 0) + gdt * sway) % 6283.18;
+    if (p.u.uGrassT) gl.uniform1f(p.u.uGrassT, this.grassT);
     gl.uniform1i(p.u.uGlassPass, 0);
     this.bindRainMap(p); this.bindBlood(p);
     gl.activeTexture(gl.TEXTURE0);

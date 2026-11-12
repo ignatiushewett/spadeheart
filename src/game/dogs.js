@@ -100,15 +100,20 @@ export class Dogs {
     }
     // In a panic, nobody's dog sits about: it keeps close and moving.
     if (panic > .4) settle = 0;
-    const dx = d.tx - d.x, dz = d.tz - d.z, dist = Math.hypot(dx, dz);
+    const dist = Math.hypot(d.tx - d.x, d.tz - d.z);
     const want = dist < .5 ? 0 : dist > 7 || panic > .4 ? 4.6 : dist > 2.5 ? 2.6 : 1.4;
     d.v += (want - d.v) * Math.min(1, dt * (want > d.v ? 3 : 5));
     if (d.v > .05 && dist > .05) {
-      const sx = dx / dist * d.v * dt, sz = dz / dist * d.v * dt;
+      // Straight there when it can see the way; otherwise round by the paths the people use, and it keeps to them until it is
+      // clear again rather than nosing at the wall.
+      const [ax, az] = this.steer(d, c, dt);
+      const dx = ax - d.x, dz = az - d.z, dd = Math.hypot(dx, dz) || 1;
+      const sx = dx / dd * d.v * dt, sz = dz / dd * d.v * dt;
       if (this.open(c, d.x + sx, d.z + sz)) { d.x += sx; d.z += sz; }
       else if (this.open(c, d.x + sx, d.z)) d.x += sx;
       else if (this.open(c, d.x, d.z + sz)) d.z += sz;
-      else { d.v = 0; if (!o && d.mode === 'idle') this.wander(d, c); }
+      else { d.path = null; d.repath = 0; d.stuck = (d.stuck || 0) + dt; }
+      if (d.stuck > 1.2) { d.stuck = 0; d.v = 0; if (!o && d.mode !== 'pet') this.wander(d, c); }
       d.yaw = Math.atan2(dx, dz);
       d.phase += d.v * dt * 2.8;
     }
@@ -118,6 +123,28 @@ export class Dogs {
       const gy = w.groundBelow ? w.groundBelow(d.x, d.y + .6, d.z, 5) : w.terrainTop(Math.floor(d.x), Math.floor(d.z));
       d.y += Math.sign(gy - d.y) * Math.min(Math.abs(gy - d.y), dt * 10);
     }
+  }
+
+  // Where to head right now: the target itself if nothing is in the way, or the next point on a path round whatever is.
+  steer(d, c, dt) {
+    const clear = (x0, z0, x1, z1) => {
+      const n = Math.ceil(Math.hypot(x1 - x0, z1 - z0) / .8);
+      for (let k = 1; k <= n; k++) if (!this.open(c, x0 + (x1 - x0) * k / n, z0 + (z1 - z0) * k / n)) return false;
+      return true;
+    };
+    if (clear(d.x, d.z, d.tx, d.tz)) { d.path = null; return [d.tx, d.tz]; }
+    d.repath = (d.repath || 0) - dt;
+    const moved = d.path && Math.hypot(d.pgx - d.tx, d.pgz - d.tz) > 2.5;
+    if (!d.path || moved || d.repath <= 0) {
+      d.path = this.g.npcs.findPath(c, d.x, d.z, d.tx, d.tz);
+      d.pi = 0; d.pgx = d.tx; d.pgz = d.tz; d.repath = 1.5 + rand();
+      if (!d.path) return [d.tx, d.tz];
+    }
+    const P = d.path;
+    // Skip ahead to the furthest point on the path it can already see.
+    for (let k = 0; k < 6 && d.pi + 2 < P.length && clear(d.x, d.z, P[d.pi + 2], P[d.pi + 3]); k++) d.pi += 2;
+    if (Math.hypot(P[d.pi] - d.x, P[d.pi + 1] - d.z) < .6 && d.pi + 2 < P.length) d.pi += 2;
+    return [P[d.pi], P[d.pi + 1]];
   }
 
   // Somewhere else in camp to be. Now and then, someone standing about to go and see, or a child to run about with.

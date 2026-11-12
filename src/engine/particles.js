@@ -293,8 +293,9 @@ export class Particles {
     this.sn = m;
   }
 
-  drawCubes(gl, renderer) {
-    if (!this.cn) return;
+  // extra: more cubes to draw this frame only, already laid out as instances (a vehicle, say). They are not simulated.
+  drawCubes(gl, renderer, extra = null, extraN = 0) {
+    if (!this.cn && !extraN) return;
     const c = this.c, CF = this.CF, o = this.cubeInst;
     for (let i = 0; i < this.cn; i++) {
       const k = i * CF, q = i * CUBE_STRIDE;
@@ -302,12 +303,15 @@ export class Particles {
       o[q + 4] = c[k + 7]; o[q + 5] = c[k + 8]; o[q + 6] = c[k + 9]; o[q + 7] = c[k + 10];
       o[q + 8] = c[k + 13];
     }
+    const xn = Math.min(extraN, CUBE_CAP - this.cn);
+    if (xn > 0) o.set(extra.subarray(0, xn * CUBE_STRIDE), this.cn * CUBE_STRIDE);
+    const total = this.cn + Math.max(0, xn);
     gl.bindBuffer(gl.ARRAY_BUFFER, this.cubeBuf);
-    gl.bufferSubData(gl.ARRAY_BUFFER, 0, o, 0, this.cn * CUBE_STRIDE);
+    gl.bufferSubData(gl.ARRAY_BUFFER, 0, o, 0, total * CUBE_STRIDE);
     const p = renderer.pCube.use();
     renderer.frameUniforms(p);
     gl.bindVertexArray(this.cubeVAO);
-    gl.drawArraysInstanced(gl.TRIANGLES, 0, 36, this.cn);
+    gl.drawArraysInstanced(gl.TRIANGLES, 0, 36, total);
     renderer.stats.draws++;
   }
 

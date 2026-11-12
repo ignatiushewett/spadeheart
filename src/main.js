@@ -23,6 +23,7 @@ import { Weather } from './game/weather.js';
 import { RainMap } from './engine/rainmap.js';
 import { Drips } from './game/drips.js';
 import { Dogs } from './game/dogs.js';
+import { Bike } from './game/bike.js';
 import { Director } from './game/director.js';
 import { LORE } from './game/camplore.js';
 import { damp } from './engine/math.js';
@@ -44,6 +45,7 @@ const SETTINGS_KEY = 'acez.settings.v2';
 const OLD_SETTINGS_KEY = 'acez.settings.v1';
 const DB_NAME = 'acez';
 const MENU_SHOT = { angle: .62, dist: 185, height: 88, turn: .46, pitch: -.14, fov: 1.05, flight: 125, startHeight: 30, startOff: 44, startPitch: -.1 };
+export const VERSION = 'v0.65';
 const SAVE_KEY = 'slot15';  // bumped whenever the map changes: old voxel edits no longer line up
 export const SLOTS = 3;
 // Slot 1 keeps the plain key, so a save from before there were slots simply becomes the first character.
@@ -138,8 +140,8 @@ class Game {
   }
 
   defaultSettings() {
-    return { quality: 'high', view: 320, scale: 1, cap: 24000, fov: 105, sens: 1, volume: .8, motion: false, dof: true, fpsCap: 0, muteSiren: false, uiScale: 1, clock24: false, drips: true, grain: .3, minimap: false, chatterNoHud: true, hitmarker: false, crosshair: true,
-      brightness: 1, bob: 1, shake: 1, music: 1, adsSens: 1, invertY: false, toggleAim: false, toggleCrouch: false, showFps: false, defaultsV: 3 };
+    return { quality: 'high', view: 320, scale: 1, cap: 24000, fov: 105, sens: 1, volume: .8, motion: false, dof: true, fpsCap: 0, muteSiren: false, uiScale: 1, clock24: false, drips: true, grain: .3, minimap: true, chatterNoHud: true, hitmarker: false, crosshair: true,
+      brightness: 1, bob: 1, shake: 1, music: 1, adsSens: 1, invertY: false, toggleAim: false, toggleCrouch: false, showFps: false, defaultsV: 4 };
   }
 
   loadSettings() {
@@ -159,6 +161,8 @@ class Game {
           if (was[s.view]) s.view = was[s.view];
           s.defaultsV = 3;
         }
+        // The minimap is back on by default, once, for everyone; turn it off again and it stays off.
+        if ((mine.defaultsV ?? 0) < 4) { s.minimap = true; s.defaultsV = 4; }
         return s;
       }
       // Older settings carry over, except motion blur, which now starts off for everyone.
@@ -244,6 +248,7 @@ class Game {
     this.player = new Player(this);
     this.npcs = new NPCs(this);
     this.dogs = new Dogs(this);
+    this.bike = new Bike(this);
     this.jobs = new Jobs(this);
     this.dialogue = new Dialogue(this);
     this.campSim = new CampSim(this);
@@ -534,7 +539,9 @@ class Game {
       }
       const grain = land ? .94 + hash(wx, wz) * .12 : 1;
       img.data[o] = Math.min(255, rgb[0] * grain); img.data[o + 1] = Math.min(255, rgb[1] * grain); img.data[o + 2] = Math.min(255, rgb[2] * grain);
-      img.data[o + 3] = edgeIn < 0 ? 255 : Math.round(255 * (1 - edgeIn / 28) ** 1.5);
+      // And at its own outer edge it fades into the coarser country beyond, so neither edge shows.
+      const outer = Math.min(1, Math.min(wx - X0, wz - Z0, Z1 - wz) / 160);
+      img.data[o + 3] = Math.round((edgeIn < 0 ? 255 : 255 * (1 - edgeIn / 28) ** 1.5) * outer);
     }
     x.putImageData(img, 0, 0);
     const P = (wx, wz) => [(wx - X0) / 2, (wz - Z0) / 2];
@@ -786,6 +793,9 @@ class Game {
       }
       if (best) { sim.evacuate(best, sim.state[best.id]); note(`${best.name} is evacuating.`); }
       else note('No settlement left to evacuate.');
+    } else if (kind === 'bike') {
+      if (this.bike.on) { this.bike.dismount(); note('Off the bike. V gets you back on when you are next to it.'); }
+      else { this.bike.spawn(); note('Motorbike: W and S throttle and brake, A and D steer, V to get off and on.'); }
     } else if (kind === 'fly') {
       P.fly = !P.fly;
       P.vx = P.vy = P.vz = 0;
@@ -835,6 +845,7 @@ class Game {
     }
     if (ui.modal || !P.alive) return;
     if (e.code === 'KeyE') this.interact();
+    else if (e.code === 'KeyV' && this.bike.here) { if (this.bike.on) this.bike.dismount(); else if (this.bike.near(P)) this.bike.mount(); }
     else if (e.code === 'KeyF') P.toggleFlashlight();
     else if (e.code === 'KeyH') P.quickHeal();
     else if (e.code === 'KeyB') P.selectBlocks();
@@ -1883,6 +1894,7 @@ class Game {
 
   newGame(diff, campId = 0, kit = 'veteran') {
     const P = this.player;
+    this.bike.here = this.bike.on = false;
     this.difficulty = diff;
     this.horde.menu = false;
     this.horde.applyDifficulty(diff);
@@ -1978,7 +1990,7 @@ class Game {
       const s = await dbGet(slotKey(n)).catch(() => null);
       if (!s) { out.push({ n, empty: true }); continue; }
       const P = s.player || {};
-      out.push({ n, empty: false, name: P.charName || `Character ${n}`, kit: P.loadout, day: s.day, kills: P.kills || 0, scrip: P.scrip || 0, savedAt: s.savedAt || 0, dead: !!s.permaDead, lived: Math.max(1, (s.day || 1) - (P.bornDay || 1) + 1) });
+      out.push({ n, empty: false, name: P.charName || `Character ${n}`, kit: P.loadout, day: s.day, kills: P.kills || 0, scrip: P.scrip || 0, savedAt: s.savedAt || 0, playSecs: (s.stats && s.stats.playSecs) || 0, dead: !!s.permaDead, lived: Math.max(1, (s.day || 1) - (P.bornDay || 1) + 1) });
     }
     return out;
   }
@@ -2451,6 +2463,9 @@ class Game {
       this.nextFrameAt = Math.max((this.nextFrameAt || 0) + gap, now - gap);
     }
     const dt = Math.min(.05, Math.max(0, now - this.last) / 1000) || 0;
+    // Real time spent playing this character: in the game, not paused, and the tab in view.
+    const realDt = Math.min(1, Math.max(0, now - this.last) / 1000) || 0;
+    if (this.state === 'play' && this.ui.modal !== 'pause' && document.visibilityState === 'visible' && this.stats) this.stats.playSecs = (this.stats.playSecs || 0) + realDt;
     this.last = now;
     this.frame++;
     this.fpsN++;
@@ -2694,6 +2709,7 @@ class Game {
     // Cheats belong to the game they were typed in. A new game, a new character or a loaded one starts without them, and locked.
     this.devUnlocked = false;
     this.devTyped = '';
+    if (this.bike) this.bike.here = this.bike.on = false;
     this.drops = []; this.dropsAfter = []; this.dropClock = 0;
     this.partHurt = new Map();
     this.rubbleFires = []; this.dustSites = [];
@@ -2734,7 +2750,12 @@ class Game {
     H.nightK = night;
 
     const talking = this.ui.modal === 'dialog' && this.ui.dlgNpc;
+    // On the bike, your feet are off the ground and your hands are on the bars: the keys drive it, the mouse still looks about.
+    if (!P.alive) this.bike.on = false;
+    const riding = this.bike.on, keys = this.input.keys, mouse = this.input.mouse;
+    if (riding) { this.input.keys = {}; this.input.mouse = [false, false, false]; }
     P.update(dt, this.input, this.locked && !talking && !this.sleepFx && !this.wakeFx);
+    if (riding) { this.input.keys = keys; this.input.mouse = mouse; this.bike.update(dt, this.locked && !talking ? keys : {}); }
     if (talking) {
       // Turn to face whoever you are talking to.
       const n = this.ui.dlgNpc;
@@ -3151,7 +3172,8 @@ class Game {
     r.renderWorld(this.world, this.far,
       (g) => {
         this.actors.draw(g, r);
-        this.particles.drawCubes(g, r);
+        this.bike.build();
+        this.particles.drawCubes(g, r, this.bike.cubes, this.bike.n);
         if (this.state === 'play') this.viewModel.drawThrown(g, r, P);
       },
       (g) => { this.particles.drawSprites(g, r); r.drawBeams(); r.drawRain(); });
@@ -3169,7 +3191,7 @@ class Game {
       // Noticeable in a drizzle, stronger in a downpour, by day only, and weaker indoors.
       rainTint: (this.weather.rain > .04 ? .3 + .45 * Math.min(1, Math.max(0, (this.weather.rain - .2) / .7)) : this.weather.rain / .04 * .3) * (1 - this.renderer.sky.night),   // the grey-blue light of a wet day comes in through the windows too: no less of it indoors
     };
-    const drawVM = isPlay && P.alive && !this.wakeFx && modal !== 'dialog' && !(P.ads > .85 && P.weapon && ITEMS[P.weapon].scope);
+    const drawVM = isPlay && P.alive && !this.wakeFx && !this.bike.on && modal !== 'dialog' && !(P.ads > .85 && P.weapon && ITEMS[P.weapon].scope);
     r.post(drawVM ? (g) => this.viewModel.draw(g, r, P, paused ? 0 : dt) : null, fx);
     r.lightCount = 0;
     r.spotN = 0;
@@ -3180,6 +3202,7 @@ class Game {
 
 const game = new Game();
 window.ACEZ = game;
+{ const v = document.getElementById('menu-version'); if (v) v.textContent = VERSION; }
 game.boot().catch((e) => {
   console.error(e);
   const el = document.getElementById('error');

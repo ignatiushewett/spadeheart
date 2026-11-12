@@ -1331,6 +1331,8 @@ function stampPart(p, c, box, put, car, letterAt) {
           if (!open) C(v, y, u, brick(u, y, v));
         }
       }
+      // Its two inside corners stand on timber posts down to the floor.
+      for (const u of [mid - 3, mid + 3]) for (let y = YB; y < YB + 6; y++) C(8, y, u, M.LOG);
       for (let v = 3; v <= 8; v++) for (let u = mid - 3; u <= mid + 3; u++) if (h2(u, v) % 5) C(v, YB + 23, u, M.ROOF_TAR);
       for (let y = YB + 24; y <= YB + 28; y++) C(5, y, mid, M.IRON);
       for (const k of [-1, 1]) C(5, YB + 26, mid + k, M.IRON);

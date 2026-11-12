@@ -1,5 +1,5 @@
 // Greedy voxel mesher with per-vertex ambient occlusion and a coarse sky-visibility term.
-// Vertex layout (8 bytes): x,y,z,normal | id,ao,sky,0
+// Vertex layout (8 bytes): x,y,z,normal | id,ao,sky,lift (1 on a grass block's top edge: the shader raises it in the wind)
 import { CS, WX, WZ, STREET_Y } from './constants.js';
 import { FLAGS, F_GLASS, F_LEAF, M, PANE } from './materials.js';
 
@@ -18,6 +18,9 @@ const AXES = [
 // The leaves of trees, as against standing crops: walking through a field you see the stalks round you; nobody stands inside a canopy.
 const TREE_LEAF = new Uint8Array(256);
 TREE_LEAF[M.LEAF] = TREE_LEAF[M.LEAF2] = TREE_LEAF[M.LEAF3] = 1;
+// Grass that rides the wind: its top edge is lifted and let down in long slow waves by the shader. Paths, soil and the rest stay put.
+const WAVE = new Uint8Array(256);
+WAVE[M.GRASS] = WAVE[M.GRASS2] = WAVE[M.GRASS_DRY] = 1;
 
 export function makeMesher(L) {
   const { height, terr, lot, edge } = L;
@@ -45,9 +48,10 @@ export function makeMesher(L) {
     const a0 = ao & 3, a1 = (ao >> 2) & 3, a2 = (ao >> 4) & 3, a3 = (ao >> 6) & 3;
     // Rotate the quad diagonal so AO gradients interpolate without the usual seam.
     const flip = a0 + a2 < a1 + a3;
+    const wave = WAVE[id], topY = y + Math.max(0, uy) + Math.max(0, vy);
     const emit = (px, py, pz, a) => {
       b[i++] = px; b[i++] = py; b[i++] = pz; b[i++] = ni;
-      b[i++] = id; b[i++] = a; b[i++] = sky; b[i++] = 0;
+      b[i++] = id; b[i++] = a; b[i++] = sky; b[i++] = wave && py === topY ? 1 : 0;
     };
     if (flip) {
       emit(x + ux, y + uy, z + uz, a1);
@@ -129,6 +133,9 @@ export function makeMesher(L) {
               // Leaves and crops can be walked into, so with your head in one you are looking at everything round it from the inside:
               // the faces of the leaves next to it, the branch it grows off, the ground under a crop. Those are drawn, not culled.
               if (!vis && (FLAGS[nb] & F_LEAF) && !(TREE_LEAF[nb] && TREE_LEAF[id])) vis = true;
+              // Grass beside a path or anything else at the same height: its side is drawn too, so when the wind lifts the grass there is
+              // a side under it and not a slit.
+              if (!vis && ny === 0 && WAVE[id] && !WAVE[nb] && !at(x, y + 1, z) && !at(x + nx, y + 1, z + nz)) vis = true;
             }
             if (vis) {
               const sx = x + nx, sy = y + ny, sz = z + nz;
@@ -158,10 +165,12 @@ export function makeMesher(L) {
         for (let j = 0; j < CS; j++) for (let i = 0; i < CS; ) {
           const v = mask[i + j * CS];
           if (!v) { i++; continue; }
+          // Grass is kept to small pieces, so the wave can bend it.
+          const cap = WAVE[v & 255] ? 4 : CS;
           let w = 1;
-          while (i + w < CS && mask[i + w + j * CS] === v) w++;
+          while (i + w < CS && w < cap && mask[i + w + j * CS] === v) w++;
           let h = 1;
-          outer: for (; j + h < CS; h++) {
+          outer: for (; j + h < CS && h < cap; h++) {
             for (let k = 0; k < w; k++) if (mask[i + k + (j + h) * CS] !== v) break outer;
           }
           for (let q = 0; q < h; q++) for (let k = 0; k < w; k++) mask[i + k + (j + q) * CS] = 0;

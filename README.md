@@ -8,5 +8,4 @@ https://ignatiushewett.github.io/spadeheart/
 <img src="shpreview6.png" alt="Preview">
 <img src="shpreview4.png" alt="Preview">
 <img src="shpreview7.png" alt="Preview">
-
-
+<img src="shmap.png" alt="Map">
