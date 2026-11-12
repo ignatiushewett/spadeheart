@@ -171,8 +171,8 @@ vec3 dynLights(vec3 wp, vec3 n){
     // that throws a long way (a vehicle's headlamp): it falls off far more slowly than a hand torch.
     float sk=uSpots[i].w;
     // And it does not end at a line out in the open: it thins away into the dark, and is gentler on whatever is right in front of it.
-    float lt=sk<0.?smoothstep(135.,30.,l)*(.35+.65*smoothstep(.5,6.,l)):1.;
-    sum+=uSpotCols[i]*abs(sk)*lt*cone*max(dot(n,-v)*.72+.28,0.)/(1.+l*l*(sk<0.?.0016:.014))*smoothstep(range+3.,range,l);
+    float lt=sk<0.?smoothstep(100.,12.,l)*(.35+.65*smoothstep(.5,6.,l)):1.;
+    sum+=uSpotCols[i]*abs(sk)*lt*cone*max(dot(n,-v)*.72+.28,0.)/(1.+l*l*(sk<0.?.0045:.014))*smoothstep(range+3.,range,l);
   }
   return sum;
 }

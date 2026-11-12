@@ -358,9 +358,10 @@ export class Bikes {
       const S = r.spotPos.length / 4;
       r.spotPos.copyWithin(4, 0, (S - 1) * 4); r.spotDir.copyWithin(4, 0, (S - 1) * 4); r.spotCol.copyWithin(3, 0, (S - 1) * 3);
       // A strength below zero tells the shader it is a long throw.
-      r.spotPos.set([ox, oy, oz, -3.2], 0); r.spotDir.set([ux, uy, uz, len], 0); r.spotCol.set([1, .95, .84], 0);
+      r.spotPos.set([ox, oy, oz, -4.6], 0); r.spotDir.set([ux, uy, uz, len], 0); r.spotCol.set([1, .95, .84], 0);
       r.spotN = Math.min(S, r.spotN + 1);
-      r.addBeam(ox, oy, oz, ux, uy, uz, Math.min(len + .5, 110), Math.min(len + .5, 110) * .12, .16, .15, .13);
+      // The visible shaft starts at the lamp itself, low on the front of the bike, short and faint, not a bar of light over your head.
+      r.addBeam(ox, base, oz, fx, -.045, fz, Math.min(len + .5, 45), Math.min(len + .5, 45) * .09, .07, .066, .058);
       r.addLight(ox + fx * 1.2, oy - .3, oz + fz * 1.2, 2.2, .35, .33, .28);
       n++;
     }
