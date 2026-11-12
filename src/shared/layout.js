@@ -64,6 +64,7 @@ export const ROLES = {
   junk: { title: 'Scrap Merchant', sign: M.CANVAS },
   food: { title: 'Food Stall', sign: M.CONT_O },
   builder: { title: 'Lumber and Block', sign: M.PLANK },
+  mechanic: { title: 'Mechanic', sign: M.PAINT_Y },
 };
 
 // What gets built where. f: floors, lot: plot size, house: the yard left round a detached house.

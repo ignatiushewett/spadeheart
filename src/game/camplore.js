@@ -293,7 +293,7 @@ export const LORE = {
         favours: { tompkins_csquat: { title: 'Clear the Foundry squat', type: 'kill', u: .7617, v: .0854, need: 35, reward: 320, desc: 'Kill thirty-five infected on the Foundry Street block around the squat, and find out what became of the people inside.' } },
       },
       {
-        id: 'sprocket', name: 'Sprocket', role: 'junk', title: 'Bike Mechanic', weapon: 'axe', wardrobe: 'scrap',
+        id: 'sprocket', name: 'Sprocket', role: 'mechanic', title: 'Bike Mechanic', weapon: 'axe', wardrobe: 'scrap',
         greet: { first: 'Sprocket. She/they, whatever, I have got my hands full. Bike courier, eight years, before all of it. I can get across this town without touching the ground, and I can fix anything with a chain.', again: ['You got parts? I will give you more than Bits does.', 'Hold this. No, not like that.'] },
         topics: [{ id: 'roofs', ask: 'Without touching the ground?', say: 'Roofs. Fire escapes. Below 14th it is one continuous playground if you are not afraid of it. They are not good on stairs when you have a lead. Their real trick is that they never get bored. Do not be there when they catch up.', standing: 1 }],
       },

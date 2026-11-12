@@ -1083,7 +1083,7 @@ export class UI {
 
   renderInventory(detail) {
     const P = this.g.player;
-    const groups = [['Weapons and tools', ['melee', 'gun', 'throw', 'block', 'tool']], ['Armour', ['armor', 'pack']], ['Medicine and food', ['med', 'food']], ['Ammunition', ['ammo']], ['Papers', ['papers']], ['Junk', ['junk']]];
+    const groups = [['Weapons and tools', ['melee', 'gun', 'throw', 'block', 'tool']], ['Armour', ['armor', 'pack']], ['Medicine and food', ['med', 'food']], ['Ammunition', ['ammo']], ['Papers and keys', ['papers', 'keys']], ['Junk', ['junk']]];
     const box = $('inv-list');
     box.innerHTML = '';
     for (const [title, types] of groups) {
@@ -1104,7 +1104,7 @@ export class UI {
         b.addEventListener('click', () => { P.useItem(id); this.renderInventory(id); });
         b.addEventListener('contextmenu', (e) => {
           e.preventDefault();
-          if (it.type === 'papers') { this.toast('You are keeping those.'); return; }
+          if (it.type === 'papers' || it.type === 'keys') { this.toast('You are keeping those.'); return; }
           if (P.remove(id, 1)) { this.g.addPickup(P.x, P.y + .5, P.z, { id, count: 1 }); this.renderInventory(id); }
         });
         box.appendChild(b);
@@ -1144,7 +1144,7 @@ export class UI {
 
   priceSell(id, role) {
     const it = ITEMS[id];
-    if (it.type === 'block' || it.type === 'papers') return 0;
+    if (it.type === 'block' || it.type === 'papers' || it.type === 'keys') return 0;
     const bonus = role === 'junk' && it.type === 'junk' ? 1.45 : 1;
     const mod = (.42 + Math.max(-30, Math.min(60, this.tradeStanding())) * .003) * bonus;
     return Math.max(1, Math.floor(it.value * mod));
@@ -1205,6 +1205,10 @@ export class UI {
     P.scrip -= can * price;
     P.gain(id, can);
     stock[id] -= can;
+    if (ITEMS[id].type === 'keys') {
+      for (let i = 0; i < can; i++) this.g.bikes.deliver(this.tradeNpc);
+      this.toast('It is out in the street in front of the garage.');
+    }
     this.g.audio.simple('coin');
     this.renderTrade();
   }
@@ -2025,10 +2029,12 @@ export class UI {
         if (c2.clerk) pin(c2.clerk.x, c2.clerk.z, '!', '#6ec6ff', 'Town Hall');
         for (const v of c2.vendors) if (v.doctor) pin(v.x, v.z, '+', '#ff8a7a', 'Doctor');
         for (const v of c2.vendors) if (v.role === 'arms') pin(v.x, v.z, 'W', '#f0b35a', 'Weapons');
+        for (const v of c2.vendors) if (v.role === 'mechanic') pin(v.x, v.z, 'M', '#c9d27a', 'Mechanic');
         // A leader with a favour still to ask of you.
         const lead = LORE[c2.key].cast.find((m) => m.role === 'leader');
         if (lead && lead.favours && !g.campSim.dead[lead.id] && Object.keys(lead.favours).some((k) => !P.dlg.flags[`${k}_paid`])) pin(c2.boss.x + .5, c2.boss.z + .5, '!', '#6ec6ff', lead.name);
       }
+      for (const b of g.bikes.list) if (b.owned) pin(b.x, b.z, 'B', '#9fd4ff', 'Your motorbike');
       for (const q of pins) drawPin(q);
       // Then the names, on top of the pins, and only where one fits without covering another pin or name. The pin is there either way.
       if (sc >= 2) {

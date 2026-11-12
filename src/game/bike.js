@@ -1,6 +1,6 @@
 import { SKIN_TONES } from './viewmodel.js';
 import { FLAGS, F_GLASS, F_LEAF, M } from '../shared/materials.js';
-import { G, WX } from '../shared/constants.js';
+import { G, WX, STREET_Y } from '../shared/constants.js';
 
 // Motorbikes. The dev menu puts one down in front of you; from then on it is a thing in the world like any other: walk up to it and
 // E gets you on, E again gets you off, and it stays where you leave it, in the save too. A rough old scrambler: knobbly tyres, a
@@ -164,6 +164,7 @@ class Bike {
     this.x = x; this.y = y; this.z = z; this.yaw = yaw;
     this.v = 0; this.vy = 0; this.spin = 0; this.rev = 0; this.load = 0; this.straight = 0; this.thrashT = 0;
     this.lean = 0;             // over to the right, in radians: into the turn
+    this.sy = y;               // where it is drawn, and you with it: eased up a kerb rather than snapped (it can sink into the step a little)
     this.light = false;        // the headlamp: switched on and off from the bars, and left however you leave it
   }
 }
@@ -183,10 +184,10 @@ export class Bikes {
     this.ride = null;
   }
 
-  toSave() { return this.list.map(b => [+b.x.toFixed(2), +b.y.toFixed(2), +b.z.toFixed(2), +b.yaw.toFixed(3), b.light ? 1 : 0]); }
+  toSave() { return this.list.map(b => [+b.x.toFixed(2), +b.y.toFixed(2), +b.z.toFixed(2), +b.yaw.toFixed(3), b.light ? 1 : 0, b.owned ? 1 : 0]); }
   fromSave(s) {
     this.clear();
-    if (Array.isArray(s)) for (const [x, y, z, yaw, light] of s) if (isFinite(x + y + z + yaw)) { const b = new Bike(x, y, z, yaw); b.light = !!light; this.list.push(b); }
+    if (Array.isArray(s)) for (const [x, y, z, yaw, light, owned] of s) if (isFinite(x + y + z + yaw)) { const b = new Bike(x, y, z, yaw); b.light = !!light; b.owned = !!owned; this.list.push(b); }
   }
 
   // A new one stood on the ground a couple of steps in front of you, side on, so you can see it and swing a leg over.
@@ -194,10 +195,66 @@ export class Bikes {
     const P = this.g.player;
     const x = P.x + Math.sin(P.yaw) * 3, z = P.z - Math.cos(P.yaw) * 3;
     const b = new Bike(x, 0, z, P.yaw + Math.PI / 2);
-    b.y = this.ground(x, z, P.y + 2);
+    b.y = b.sy = this.ground(x, z, P.y + 2);
     this.list.push(b);
-    if (this.list.length > 12) this.list.shift();
+    this.trim();
     return b;
+  }
+
+  // Never more than a dozen about. The ones you paid for are the last to go.
+  trim() {
+    while (this.list.length > 12) {
+      const i = this.list.findIndex((o) => !o.owned && o !== this.ride);
+      this.list.splice(i >= 0 ? i : 0, 1);
+    }
+  }
+
+  // Bought from a mechanic: one of theirs, wheeled out and stood in the street in front of the garage, side on to it.
+  deliver(npc) {
+    const g = this.g, W = g.world, c = npc.camp >= 0 ? g.layout.camps[npc.camp] : null;
+    const v = c && c.vendors.find((q) => q.role === 'mechanic' && Math.hypot(q.x - npc.x, q.z - npc.z) < 8);
+    const vx = v ? v.x : npc.x, vz = v ? v.z : npc.z;
+    let ox = 0, oz = 0;
+    if (v && v.browse && v.browse.length) {
+      for (const p of v.browse) { ox += p.x - vx; oz += p.z - vz; }
+    } else { ox = Math.sin(npc.yaw); oz = -Math.cos(npc.yaw); }
+    const ol = Math.hypot(ox, oz) || 1;
+    ox /= ol; oz /= ol;
+    // Along the street: forward is (sin yaw, -cos yaw), and the street runs across the front of the stall.
+    const yaw = Math.atan2(-oz, -ox), fx = Math.sin(yaw), fz = -Math.cos(yaw);
+    const clear = (x, z, y) => {
+      for (let t = -2.1; t <= 2.11; t += .5) {
+        const px = Math.floor(x + fx * t), pz = Math.floor(z + fz * t);
+        if (W.solid(px, y, pz) || W.solid(px, y + 1, pz) || W.solid(px, y + 2, pz) || Math.abs(this.ground(x + fx * t, z + fz * t, y + 1.5) - y) > .6) return false;
+      }
+      return !this.list.some((o) => Math.hypot(o.x - x, o.z - z) < 2.6);
+    };
+    let at = null;
+    for (const d of [4.5, 5.5, 3.6, 6.5, 7.5]) {
+      for (const s of [0, 2.5, -2.5, 5, -5, 7.5, -7.5]) {
+        const x = vx + ox * d - oz * s, z = vz + oz * d + ox * s, y = this.ground(x, z, STREET_Y + 3);
+        if (clear(x, z, y)) { at = [x, y, z]; break; }
+      }
+      if (at) break;
+    }
+    if (!at) at = [vx + ox * 4.5, this.ground(vx + ox * 4.5, vz + oz * 4.5, STREET_Y + 3), vz + oz * 4.5];
+    const b = new Bike(at[0], at[1], at[2], yaw);
+    b.owned = true;
+    this.list.push(b);
+    this.trim();
+    return b;
+  }
+
+  // Where yours is, from here.
+  whereIs() {
+    const P = this.g.player;
+    let best = null, bd = 1e9;
+    for (const b of this.list) if (b.owned) { const d = Math.hypot(b.x - P.x, b.z - P.z); if (d < bd) { bd = d; best = b; } }
+    if (!best) { this.g.ui.toast('Whatever these were the keys to, it is not there any more.'); return; }
+    if (bd < 6) { this.g.ui.toast('Your motorbike is right here.'); return; }
+    const a = Math.atan2(best.x - P.x, -(best.z - P.z));
+    const dir = ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west'][((Math.round(a / (Math.PI / 4)) % 8) + 8) % 8];
+    this.g.ui.toast(`Your motorbike: ${Math.round(bd)} m ${dir}.`);
   }
 
   mount(b) {
@@ -205,6 +262,9 @@ export class Bikes {
     if (this.ride || !b) return;
     this.ride = b;
     b.v = 0; b.vy = 0;
+    // Both hands on the bars: the torch goes away, and comes back out the way it was when you get off.
+    this.torchWas = P.flashlight;
+    P.flashlight = false;
     P.yaw = b.yaw; P.fly = false; P.crouch = false; P.sitting = false;
     this.seat(b);
     this.g.audio.engineStart(b.x, b.y, b.z);
@@ -229,6 +289,7 @@ export class Bikes {
     // Jumping off at speed keeps a little of it.
     P.vx = fx * b.v * .3; P.vz = fz * b.v * .3; P.vy = 0;
     P.eyeSmooth = SIT_EYE;
+    P.flashlight = !!this.torchWas;
     b.v = 0; b.lean = 0;
   }
 
@@ -248,16 +309,26 @@ export class Bikes {
       if (!b.light || n >= 2 || Math.hypot(b.x - cam.x, b.z - cam.z) > 160) continue;
       const fx = Math.sin(b.yaw), fz = -Math.cos(b.yaw);
       const lr = Math.sin(b.lean) * 14.8 * VS, ox = b.x + fx * 11 * VS + Math.cos(b.yaw) * lr, oz = b.z + fz * 11 * VS + Math.sin(b.yaw) * lr;
-      let oy = b.y + Math.cos(b.lean) * 14.8 * VS, dy = -.045;
+      const base = b.sy + Math.cos(b.lean) * 14.8 * VS;
+      // Everything about the beam is eased from frame to frame, never jumped: driving through a field the crops ahead come and go as
+      // they are cut, and a beam that followed every one of them would flicker.
+      const now = this.g.time, ldt = Math.min(.1, Math.max(0, now - (b.lampT ?? now)));
+      b.lampT = now;
       // In among standing crops the lamp is down at the height of the leaves, and all it would show is a wall of them a few yards
       // off. So there it is taken up over the tops of the crops just ahead and angled down onto them, lighting the field the way it
       // should look: the tops of the rows running away into the dark.
       let crop = 0;
-      for (const a of [1, 2.5, 4, 6]) {
+      for (const a of [2, 3.5, 5, 7, 9]) {
         const cx = Math.floor(ox + fx * a), cz = Math.floor(oz + fz * a);
         for (let y = Math.floor(b.y); y < b.y + 5; y++) if (FLAGS[W.get(cx, y, cz)] & F_LEAF) crop = Math.max(crop, y + 1);
       }
-      if (crop > oy - .6) { oy = crop + .35; dy = -(oy - b.y) / 34; }
+      // Held up for a while after the last crop is seen, so a gap in the rows does not drop it and lift it again.
+      if (crop > base - .6) { b.cropTop = Math.max(crop + .35, (b.cropHold > 0 && b.cropTop) || 0); b.cropHold = 1.2; }
+      else b.cropHold = (b.cropHold || 0) - ldt;
+      const liftTo = b.cropHold > 0 && b.cropTop ? Math.max(0, b.cropTop - base) : 0;
+      if (b.cropHold <= 0) b.cropTop = 0;
+      b.lift = (b.lift || 0) + (liftTo - (b.lift || 0)) * Math.min(1, ldt * 3);
+      const oy = base + b.lift, dy = -.045 + (-(oy - b.sy) / 34 + .045) * Math.min(1, b.lift / .4);
       const k = Math.hypot(1, dy), ux = fx / k, uy = dy / k, uz = fz / k, far = 130;
       // Where the beam stops: at the first wall it meets. Not at the crops it shines through, and not where it comes down across open
       // ground, which it goes on lighting all the way out: there, whatever stands up in its path straight ahead is where it ends.
@@ -272,9 +343,10 @@ export class Bikes {
         }
         return { dist: far, ground: false };
       };
-      let hit = reach(ux, uy, uz);
-      if (hit.ground) hit = reach(fx, 0, fz);
-      const len = Math.max(.5, hit.dist + .3);
+      const hit = reach(ux, uy, uz), flat = reach(fx, 0, fz);
+      const lenTo = Math.max(.5, (hit.ground ? flat.dist : Math.min(hit.dist, flat.dist)) + .3);
+      b.len = b.len === undefined ? lenTo : b.len + (lenTo - b.len) * Math.min(1, ldt * (lenTo < b.len ? 5 : 2));
+      const len = b.len;
       // Pushed in at the front: everything already there moves down one, and whatever falls off the end goes.
       const S = r.spotPos.length / 4;
       r.spotPos.copyWithin(4, 0, (S - 1) * 4); r.spotDir.copyWithin(4, 0, (S - 1) * 4); r.spotCol.copyWithin(3, 0, (S - 1) * 3);
@@ -317,6 +389,7 @@ export class Bikes {
     for (const o of this.list) if (o !== b) {
       const gy = this.ground(o.x, o.z, o.y + .5);
       if (gy < o.y) { o.vy -= 26 * dt; o.y = Math.max(gy, o.y + o.vy * dt); if (o.y === gy) o.vy = 0; } else if (gy > o.y + .01 && gy - o.y < 1.2) o.y = gy;
+      o.sy = o.y;
     }
     if (!b) return;
     const g = this.g, P = g.player, W = g.world;
@@ -387,6 +460,7 @@ export class Bikes {
       const gy = Math.max(this.ground(rx2, rz2, b.y + 1.2), this.ground(fx2, fz2, b.y + 1.2), this.ground(b.x, b.z, b.y + 1.2));
       if (gy >= b.y) { b.y = gy; b.vy = 0; } else { b.vy -= 26 * dt; b.y = Math.max(gy, b.y + b.vy * dt); if (b.y === gy) b.vy = 0; }
     }
+    b.sy = b.y < b.sy ? b.y : b.sy + (b.y - b.sy) * Math.min(1, dt * (7 + Math.abs(b.v) * .35));
     b.spin += b.v * dt / (WR * VS);
     // Crops go down under it: anything soft and leafy that is not up a tree, the whole plant, anywhere under its length and width.
     // Cut a little ahead of the front wheel, more the faster it goes, so they burst as it hits them and not a moment after.
@@ -433,7 +507,7 @@ export class Bikes {
   // You go where the seat goes, and sit at the height of it.
   seat(b) {
     const P = this.g.player, side = Math.sin(b.lean) * 2.1;   // leaning with it: your head goes over as far as the bike does
-    P.x = b.x + Math.sin(b.yaw) * SEAT * VS + Math.cos(b.yaw) * side; P.z = b.z - Math.cos(b.yaw) * SEAT * VS + Math.sin(b.yaw) * side; P.y = b.y;
+    P.x = b.x + Math.sin(b.yaw) * SEAT * VS + Math.cos(b.yaw) * side; P.z = b.z - Math.cos(b.yaw) * SEAT * VS + Math.sin(b.yaw) * side; P.y = b.sy;
     P.vx = P.vy = P.vz = 0; P.onGround = true; P.eyeSmooth = SIT_EYE;
   }
 
@@ -455,7 +529,7 @@ export class Bikes {
       const cl = Math.cos(b.lean), sl = Math.sin(b.lean);
       const at = (x, y, z) => {
         const lx = x * cl + (y - .5) * sl, ly = -x * sl + (y - .5) * cl;
-        return [b.x + (rx * lx + fx * z) * VS, b.y + .015 + ly * VS, b.z + (rz * lx + fz * z) * VS];
+        return [b.x + (rx * lx + fx * z) * VS, b.sy + .015 + ly * VS, b.z + (rz * lx + fz * z) * VS];
       };
       const vox = (x, y, z, col, metal, glow = 0) => { const p = at(x, y, z); add(p[0], p[1], p[2], VS * 1.001, col[0], col[1], col[2], metal, glow); };
       for (const [x, y, z, r, g, bl, metal, glow] of MODEL) {

@@ -55,9 +55,9 @@ const ROW_STYLES = [
   { wall: M.BRICK_R2, trim: M.BRICK_B, p: 3, w: 1, esc: true },
 ];
 
-const ROLE_SIGN = { general: M.AWN_G, arms: M.AWN_R, medic: M.AWN_B, junk: M.CANVAS, food: M.CONT_O, builder: M.PLANK };
+const ROLE_SIGN = { general: M.AWN_G, arms: M.AWN_R, medic: M.AWN_B, junk: M.CANVAS, food: M.CONT_O, builder: M.PLANK, mechanic: M.PAINT_Y };
 // Nobody built these from the same plan. Each trade tends towards what suits it, and what they could get hold of.
-const STALL_STYLES = { general: ['awning', 'kiosk', 'tarp', 'awning'], arms: ['container', 'kiosk', 'container'], medic: ['awning', 'kiosk'], junk: ['tarp', 'container', 'tarp'], food: ['cart', 'awning', 'cart', 'kiosk'], builder: ['yard', 'tarp', 'yard'] };
+const STALL_STYLES = { general: ['awning', 'kiosk', 'tarp', 'awning'], arms: ['container', 'kiosk', 'container'], medic: ['awning', 'kiosk'], junk: ['tarp', 'container', 'tarp'], food: ['cart', 'awning', 'cart', 'kiosk'], builder: ['yard', 'tarp', 'yard'], mechanic: ['garage'] };
 const WARM = 0, FIRE = 1, COOL = 2;
 
 export function planCamp(def, id, r, ground) {
@@ -283,7 +283,9 @@ export function planCamp(def, id, r, ground) {
     }
     // The first and best spot on the market is the camp's doctor.
     const doctor = !hasDoctor;
-    const role = doctor ? 'medic' : stalls < def.stalls.length ? def.stalls[stalls] : def.stalls[Math.floor(rng() * def.stalls.length)];
+    // Once every kind of trader the town has is set up, the next spot along goes to its mechanic: one in every town, a little way out
+    // from the middle where there is room to wheel a bike out into the street.
+    const role = doctor ? 'medic' : stalls < def.stalls.length ? def.stalls[stalls] : ((r) => stalls === def.stalls.length ? 'mechanic' : r)(def.stalls[Math.floor(rng() * def.stalls.length)]);
     const style = doctor ? 'clinic' : STALL_STYLES[role][Math.floor(rng() * STALL_STYLES[role].length)];
     add('stall', b.x0, b.z0, b.x1, b.z1, 7, { sign: ROLE_SIGN[role], face: s.face, role, style });
     const cx = (b.x0 + b.x1 + 1) / 2, cz = (b.z0 + b.z1 + 1) / 2;
@@ -863,6 +865,7 @@ function stampPart(p, c, box, put, car, letterAt) {
         cart: { wall: paint, post: M.TENT_W, a: paint, b: M.TENT_W, top: M.ALUM, trim: M.TENT_W },
         yard: { wall: M.PLANK, post: M.LOG, a: M.RUST, b: M.RUST, top: M.PLANK, trim: M.LOG },
         clinic: { wall: M.TENT_W, post: M.ALUM, a: M.TENT_W, b: M.TENT_W, top: M.ALUM, trim: M.AWN_R },
+        garage: { wall: M.ROOF_TIN, post: M.IRON, a: M.ROOF_TIN, b: M.RUST, top: M.STEEL_D, trim: M.PAINT_K },
       }[style];
       // Every one works the same way at the front, however it was built. A counter one block high, the seller right behind it,
       // and a valance hanging down over it: you can see straight in, and you can't climb up and stand on the goods.
@@ -884,7 +887,7 @@ function stampPart(p, c, box, put, car, letterAt) {
         for (let l = 0; l <= lenL; l++) { T(l, -1, YB + 4, l % 2 ? S.a : S.b); T(l, -2, YB + 3, l % 2 ? S.a : S.b); }
       } else if (style !== 'container') {
         // Every stall keeps its customers dry: something run out over the front, whatever it was made of. Patched, not matched.
-        const over = { kiosk: [M.ROOF_TAR, M.RUST], tarp: [tarp, M.CANVAS], yard: [M.RUST, M.STEEL], clinic: [M.TENT_W, M.CANVAS] }[style] || [S.a, S.b];
+        const over = { kiosk: [M.ROOF_TAR, M.RUST], tarp: [tarp, M.CANVAS], yard: [M.RUST, M.STEEL], clinic: [M.TENT_W, M.CANVAS], garage: [M.ROOF_TIN, M.RUST] }[style] || [S.a, S.b];
         for (let l = 0; l <= lenL; l++) { const q = h2(l + x0, z0 + 7) % 5 ? 0 : 1; T(l, -1, YB + 4, over[q]); T(l, -2, YB + 4, over[(l + q) % 2]); }
       } else if (style === 'kiosk') {
         // A proper pitched roof and a board across the front.
@@ -929,6 +932,12 @@ function stampPart(p, c, box, put, car, letterAt) {
         } else if (role === 'builder') {
           const stack = [M.PLANK, M.BLOCK_CONC, M.BRICK_R, M.BLOCK_WOOD][q % 4];
           for (let y = 0; y < 2 + q % 2; y++) T(l, back, YB + y, stack);
+        } else if (role === 'mechanic') {
+          // Tyres stacked up, oil drums, a bench with an engine half out on it, and the tools hung over it.
+          const k = q % 4;
+          if (k === 0) for (let y = 0; y < 3; y++) T(l, back, YB + y, M.TIRE);
+          else if (k === 1) { T(l, back, YB, [M.AWN_R, M.PAINT_C, M.RUST][q % 3]); T(l, back, YB + 1, [M.AWN_R, M.PAINT_C, M.RUST][q % 3]); }
+          else { T(l, back, YB, M.IRON); T(l, back, YB + 1, k === 2 ? M.ALUM : M.STEEL_D); T(l, back, YB + 2, M.PAINT_K); }
         } else if (role === 'medic') {
           T(l, back, YB, M.SHELF);
           T(l, back, YB + 1, l % 2 ? M.TENT_W : M.ALUM);

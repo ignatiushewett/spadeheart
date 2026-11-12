@@ -209,6 +209,7 @@ export class Player {
     const it = ITEMS[id];
     if (!it || !this.count(id)) return false;
     if (it.type === 'tool') { this.toggleFlashlight(); return true; }
+    if (it.type === 'keys') { this.g.bikes.whereIs(); return true; }
     if (it.type === 'armor') {
       this.armor = this.armor === id ? null : id;
       this.g.audio.simple('crate');

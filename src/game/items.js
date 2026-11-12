@@ -42,6 +42,7 @@ export const ITEMS = {
   tactical: { name: 'Plate Carrier', type: 'armor', armor: .45, value: 1200, weight: 10, desc: 'Guard issue with ceramic plates. 45% protection.' },
   // Upgrades
   flashlight: { name: 'Flashlight', type: 'tool', value: 38, weight: .4, desc: 'Press F to switch it on. Batteries are the least of your problems.' },
+  bike_keys: { name: 'Motorbike Keys', type: 'keys', value: 3400, weight: .05, stack: true, desc: 'To a motorbike the mechanic wheeled out and left in the street in front of their garage. Use them to find out where it is. E to get on, F for the headlamp.' },
   backpack: { name: 'Hiking Pack', type: 'pack', carry: 40, value: 200, weight: 1, desc: 'Adds 40 carry capacity while you own it.' },
   // Junk, valuable only to traders
   scrap: { name: 'Scrap Metal', type: 'junk', value: 5, weight: .8, stack: true, desc: 'Scrap merchants pay well.' },
@@ -122,6 +123,7 @@ export const VENDOR_STOCK = {
   medic: [['sleeping_pills', .9, 2, 5], ['bandage', 1, 6, 14], ['medkit', 1, 2, 6], ['antibiotic', 1, 2, 6], ['stim', .8, 1, 4], ['water', 1, 4, 8], ['beans', .7, 2, 6]],
   food: [['beans', 1, 8, 24], ['water', 1, 8, 24], ['whiskey', .7, 2, 6], ['smokes', .6, 2, 8], ['bandage', .4, 2, 5]],
   builder: [['flashlight', .5, 1, 2], ['block_wood', 1, 240, 540], ['block_conc', 1, 180, 420], ['block_steel', 1, 60, 180], ['sledge', .7, 1, 1], ['axe', .7, 1, 1], ['crowbar', 1, 1, 2], ['dynamite', .5, 1, 3]],
+  mechanic: [['bike_keys', 1, 1, 1], ['flashlight', .8, 1, 2], ['scrap', .7, 4, 12], ['parts', .7, 2, 6], ['crowbar', .7, 1, 1], ['sledge', .4, 1, 1]],
   junk: [['flashlight', .7, 1, 2], ['block_wood', 1, 120, 300], ['block_conc', 1, 90, 240], ['block_steel', .8, 24, 72], ['sledge', .6, 1, 1], ['axe', .6, 1, 1], ['dynamite', .5, 1, 3], ['scrap', .7, 4, 12], ['parts', .5, 2, 6], ['backpack', .4, 1, 1]],
 };
 
@@ -192,7 +194,7 @@ export function startingGear(kit, campKey) {
   };
 }
 // Standing needed before a camp's traders will part with their best kit.
-export const TRUST_LOCK = { smg: 5, shotgun: 5, revolver: 5, rifle: 10, hunting: 10, riot: 10, dynamite: 10, grenade: 5, lmg: 25, rocket: 25, ammo_rocket: 25, tactical: 25 };
+export const TRUST_LOCK = { bike_keys: 10, smg: 5, shotgun: 5, revolver: 5, rifle: 10, hunting: 10, riot: 10, dynamite: 10, grenade: 5, lmg: 25, rocket: 25, ammo_rocket: 25, tactical: 25 };
 
 export const RUMORS = [
   'Sound carries between the towers. Fire one shot on Kingsway and half of Midtown comes to see.',
