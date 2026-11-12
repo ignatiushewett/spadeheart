@@ -1806,7 +1806,7 @@ export class NPCs {
     R.tc = t; R.ox = ox; R.oz = oz;
     R.bx = horiz ? t : fixed; R.bz = horiz ? fixed : t;
     R.blowT = 9 + rand() * 4;
-    const tough = 1 + Math.min(.6, g.day * .02), gang = R.bx * 7 + R.bz * 3 + 1;
+    const tough = 1 + Math.min(.9, g.day * .03), gang = R.bx * 7 + R.bz * 3 + 1;
     for (let i = 0; i < R.size; i++) {
       const key = R.size >= 14 && i === 0 ? 'boss' : RAID_CREW[i % RAID_CREW.length];
       const role = RAIDER_ROLES[key];
@@ -2756,7 +2756,7 @@ export class NPCs {
     if (gd !== G.ROAD && gd !== G.WALK && gd !== G.PLAZA && gd !== G.ALLEY) return false;
     if (!w.walk[(x >> 1) + (z >> 1) * w.walkW] || (!bounty && g.horde.inCamp(x, z, 170))) return false;
     const heading = Math.round(rand() * 4) * Math.PI * .5;
-    const crew = this.pickCrew(), tough = 1 + Math.min(.6, g.day * .02);
+    const crew = this.pickCrew(), tough = 1 + Math.min(.9, g.day * .03);
     // About a third have heard you, and are coming to see what you have got.
     const hunting = !bounty && rand() < .35;
     for (let i = 0; i < size; i++) {
@@ -2813,6 +2813,11 @@ export class NPCs {
     } else if (n.aggro) {
       const ux = (P.x - n.x) / (dp || 1), uz = (P.z - n.z) / (dp || 1);
       const want = melee ? 1.8 : role.hold + (n.tick * 3) % 6;
+      // Nobody who has lived this long stands still to be shot. They side-step in short bursts one way and the other, and when they
+      // can see you have your sights on them they jink harder.
+      const f = P.forward(), sighted = n.canSee && dp < 90 && -(ux * f[0] + uz * f[2]) / (Math.hypot(f[0], f[2]) || 1) > .975;
+      if ((n.strafeT = (n.strafeT ?? 0) - dt) <= 0) { n.strafeT = (sighted ? .45 : .8) + rand() * (sighted ? .6 : 1.2); n.strafeDir = rand() < .5 ? -1 : 1; }
+      const jink = melee ? 0 : (sighted ? .95 : .55) * role.speed * (n.strafeDir || 1);
       if (busy) {
         // Guns give ground and keep firing. Blades go and deal with it.
         const zx = (n.zx - n.x) / (n.zd || 1), zz = (n.zz - n.z) / (n.zd || 1);
@@ -2825,8 +2830,9 @@ export class NPCs {
         const side = n.canSee && dp > 8 ? Math.sin(n.flank) * .55 : 0;
         const hx = route ? route[0] : ux - uz * side, hz = route ? route[1] : uz + ux * side, m = Math.hypot(hx, hz) || 1;
         vx = hx / m * role.speed * 1.25; vz = hz / m * role.speed * 1.25;
-      } else if (dp < want - 5 && !melee) { vx = -ux * role.speed * .8; vz = -uz * role.speed * .8; }
-      else { vx = -uz * role.speed * .4 * ((n.tick & 1) * 2 - 1); vz = ux * role.speed * .4 * ((n.tick & 1) * 2 - 1); }
+        if (sighted && !route) { vx += -uz * jink * .7; vz += ux * jink * .7; }
+      } else if (dp < want - 5 && !melee) { vx = -ux * role.speed * .8 - uz * jink * .6; vz = -uz * role.speed * .8 + ux * jink * .6; }
+      else { vx = -uz * jink; vz = ux * jink; }
       if (!busy) n.yaw = Math.atan2(ux, uz);
       if (!busy && n.grenades > 0 && n.canSee && dp > 11 && dp < 34 && (n.nadeT = (n.nadeT ?? 4 + rand() * 6) - dt) <= 0) this.throwGrenade(n, dp);
       if (n.cd <= 0) {
@@ -2873,7 +2879,7 @@ export class NPCs {
   }
 
   // Nobody out here is a soldier. They hit softer than they used to, though they do get harder to shrug off as the weeks go on.
-  raiderHits() { return .68 * (1 + Math.min(.5, this.g.day * .02)); }
+  raiderHits() { return .88 * (1 + Math.min(.5, this.g.day * .02)); }
 
   // One raider round at you. Whether it lands is settled first, by the gun, how far, and what you are doing (running, keeping low),
   // and then the shot is drawn to match: at you if it hit, past you if it did not. A big crew gets in its own way a little.
@@ -3933,8 +3939,8 @@ export class NPCs {
       // A crew in the middle of a job only cares about the one you hit, and that one only so much.
       if (n.raidCamp !== undefined || n.calm) { n.aggro = true; n.calm = false; }
       else if (!n.aggro) this.raiderAlert(n);
-      // Tough enough to last against a camp full of cooks. Not against someone who does this for a living.
-      n.hp -= dmg * (n.raidCamp !== undefined ? 2 : 1.35);
+      // Tough enough to last against a camp full of cooks, and to take a few rounds from you: these are people who live by the gun.
+      n.hp -= dmg * (n.raidCamp !== undefined ? 1.5 : .95);
       if (n.hp <= 0) { n.headless = behead; this.kill(n, true); }
       return;
     }
