@@ -502,7 +502,7 @@ export class Audio2 {
       case 'hurt': { const o = d(.7, .05); this.noiseBurst(o, .22, 'lowpass', 900, 220, 2, .8); this.tone(o, .2, 'sawtooth', 150, 70, .25); break; }
       case 'crate': this.noiseBurst(d(.3, .08), .2, 'bandpass', 500, 900, 2.5, .8, .04); break;
       // Stalks going down under a wheel: a dry swish and the snap of them.
-      case 'thrash': { const o = d(.32, .04); this.noiseBurst(o, .13 + rand() * .06, 'bandpass', 2600 + rand() * 900, 1100, 1.1, .7, .008); this.noiseBurst(o, .03, 'highpass', 3400, 2600, 1, .5); break; }
+      case 'thrash': { const o = d(.75, .05); this.noiseBurst(o, .13 + rand() * .06, 'bandpass', 2600 + rand() * 900, 1100, 1.1, .7, .008); this.noiseBurst(o, .03, 'highpass', 3400, 2600, 1, .5); break; }
       // Driven into a wall: the crack of it going, the thud through the frame, and what is left of it coming down after.
       case 'smash': {
         const o = d(1.1, .25);

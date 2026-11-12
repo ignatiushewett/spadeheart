@@ -165,12 +165,14 @@ vec3 dynLights(vec3 wp, vec3 n){
     if(l>range+3.) continue;
     vec3 v=d/max(l,.001);
     float c=dot(v,uSpotDirs[i].xyz);
-    float cone=smoothstep(.86,.94,c)*.3+smoothstep(.94,.993,c);
+    float cone=uSpots[i].w<0.?smoothstep(.7,.9,c)*.22+smoothstep(.84,.99,c)*.85:smoothstep(.86,.94,c)*.3+smoothstep(.94,.993,c);
     if(cone<=0.) continue;
     // It stops at whatever the beam landed on, instead of lighting up the room behind. A strength given below zero is a lamp
     // that throws a long way (a vehicle's headlamp): it falls off far more slowly than a hand torch.
     float sk=uSpots[i].w;
-    sum+=uSpotCols[i]*abs(sk)*cone*max(dot(n,-v)*.72+.28,0.)/(1.+l*l*(sk<0.?.0016:.014))*smoothstep(range+3.,range,l);
+    // And it does not end at a line out in the open: it thins away into the dark, and is gentler on whatever is right in front of it.
+    float lt=sk<0.?smoothstep(135.,30.,l)*(.35+.65*smoothstep(.5,6.,l)):1.;
+    sum+=uSpotCols[i]*abs(sk)*lt*cone*max(dot(n,-v)*.72+.28,0.)/(1.+l*l*(sk<0.?.0016:.014))*smoothstep(range+3.,range,l);
   }
   return sum;
 }
@@ -268,7 +270,7 @@ void main(){
   // across the ground on the diagonal. Only what is drawn moves; nothing anyone stands on or bumps into does.
   if(aInfo.w>0u){
     float ph=uGrassT*.9-(p.x+p.z)*.075;
-    p.y+=(.5+.5*sin(ph))*.2;
+    p.y+=.05+(.5+.5*sin(ph))*.17;   // never right down: always a little proud of the path or kerb beside it
   }
   vWorld=p;
   vNormal=NORMALS[aPos.w];
@@ -1220,11 +1222,14 @@ out float vGlow;
 out float vMetal;
 void main(){
   float a=iCol.a, c=cos(a), s=sin(a);
-  // A glow below zero marks a part of something built (a vehicle): turned about the vertical only, not tumbling. Its glow is -1 - that,
-  // with how metal it is (0 to 3) in fours on top.
+  // A glow below zero marks a part of something built (a vehicle): turned about the vertical, and leaned over sideways, not tumbling.
+  // Its glow is -1 - that, with how metal it is (0 to 3) in fours on top, and its lean in sixteens on top of that (24 is upright,
+  // each step a fortieth of a radian).
   bool built=iGlow<-.5;
-  float bg=-1.-iGlow, bm=floor((bg+.01)/4.);
-  mat3 R=built?mat3(c,0,-s, 0,1,0, s,0,c):mat3(c,0,-s, 0,1,0, s,0,c)*mat3(1,0,0, 0,c,s, 0,-s,c);
+  float bg=-1.-iGlow, bri=floor((bg+.01)/16.);
+  bg-=bri*16.;
+  float bm=floor((bg+.01)/4.), lean=built?(bri-24.)/40.:0., cl=cos(lean), sl=sin(lean);
+  mat3 R=built?mat3(c,0,-s, 0,1,0, s,0,c)*mat3(cl,-sl,0, sl,cl,0, 0,0,1):mat3(c,0,-s, 0,1,0, s,0,c)*mat3(1,0,0, 0,c,s, 0,-s,c);
   vec3 sc=vec3(iPos.w);
   // Below -1000, a length of limb: its own length and its tilt packed into the rest, turned to its heading by the angle, iPos.w thick.
   if(iGlow<-999.){

@@ -2831,7 +2831,7 @@ class Game {
     cam.z = e[2] + (rand() - .5) * shake;
     cam.yaw = P.yaw + P.kickX;
     cam.pitch = P.pitch + P.kickY;
-    cam.roll = (Math.cos(P.bob) * .004 * P.bobAmt) + (P.alive ? 0 : Math.min(.7, P.deadT * .45)) + (rand() - .5) * shake * .3;
+    cam.roll = (Math.cos(P.bob) * .004 * P.bobAmt) + (P.alive ? 0 : Math.min(.7, P.deadT * .45)) + (rand() - .5) * shake * .3 + (this.bikes.ride ? this.bikes.ride.lean * .6 : 0);
     const base = this.settings.fov * Math.PI / 180 * .72;
     const it = P.weapon ? ITEMS[P.weapon] : null;
     let wantFov = base * (P.sprinting ? 1.07 : 1);

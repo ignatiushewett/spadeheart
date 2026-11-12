@@ -163,6 +163,7 @@ class Bike {
   constructor(x, y, z, yaw) {
     this.x = x; this.y = y; this.z = z; this.yaw = yaw;
     this.v = 0; this.vy = 0; this.spin = 0; this.rev = 0; this.load = 0; this.straight = 0; this.thrashT = 0;
+    this.lean = 0;             // over to the right, in radians: into the turn
     this.light = false;        // the headlamp: switched on and off from the bars, and left however you leave it
   }
 }
@@ -228,7 +229,7 @@ export class Bikes {
     // Jumping off at speed keeps a little of it.
     P.vx = fx * b.v * .3; P.vz = fz * b.v * .3; P.vy = 0;
     P.eyeSmooth = SIT_EYE;
-    b.v = 0;
+    b.v = 0; b.lean = 0;
   }
 
   toggleLight() {
@@ -246,10 +247,34 @@ export class Bikes {
     for (const b of this.list) {
       if (!b.light || n >= 2 || Math.hypot(b.x - cam.x, b.z - cam.z) > 160) continue;
       const fx = Math.sin(b.yaw), fz = -Math.cos(b.yaw);
-      const ox = b.x + fx * 11 * VS, oy = b.y + 14.8 * VS, oz = b.z + fz * 11 * VS;
-      const dy = -.045, k = Math.hypot(1, dy), ux = fx / k, uy = dy / k, uz = fz / k, far = 130;
-      const hit = W.raycast(ox + ux * .3, oy + uy * .3, oz + uz * .3, ux, uy, uz, far, false);
-      const len = hit ? Math.max(.5, hit.dist + .3) : far;
+      const lr = Math.sin(b.lean) * 14.8 * VS, ox = b.x + fx * 11 * VS + Math.cos(b.yaw) * lr, oz = b.z + fz * 11 * VS + Math.sin(b.yaw) * lr;
+      let oy = b.y + Math.cos(b.lean) * 14.8 * VS, dy = -.045;
+      // In among standing crops the lamp is down at the height of the leaves, and all it would show is a wall of them a few yards
+      // off. So there it is taken up over the tops of the crops just ahead and angled down onto them, lighting the field the way it
+      // should look: the tops of the rows running away into the dark.
+      let crop = 0;
+      for (const a of [1, 2.5, 4, 6]) {
+        const cx = Math.floor(ox + fx * a), cz = Math.floor(oz + fz * a);
+        for (let y = Math.floor(b.y); y < b.y + 5; y++) if (FLAGS[W.get(cx, y, cz)] & F_LEAF) crop = Math.max(crop, y + 1);
+      }
+      if (crop > oy - .6) { oy = crop + .35; dy = -(oy - b.y) / 34; }
+      const k = Math.hypot(1, dy), ux = fx / k, uy = dy / k, uz = fz / k, far = 130;
+      // Where the beam stops: at the first wall it meets. Not at the crops it shines through, and not where it comes down across open
+      // ground, which it goes on lighting all the way out: there, whatever stands up in its path straight ahead is where it ends.
+      const reach = (dx, dy2, dz) => {
+        let t = .3;
+        for (let tries = 0; tries < 24; tries++) {
+          const h = W.raycast(ox + dx * t, oy + dy2 * t, oz + dz * t, dx, dy2, dz, far - t, false);
+          if (!h) return { dist: far, ground: false };
+          const d = t + h.dist;
+          if (FLAGS[h.id] & F_LEAF) { t = d + .8; continue; }
+          return { dist: d, ground: h.ny > 0 };
+        }
+        return { dist: far, ground: false };
+      };
+      let hit = reach(ux, uy, uz);
+      if (hit.ground) hit = reach(fx, 0, fz);
+      const len = Math.max(.5, hit.dist + .3);
       // Pushed in at the front: everything already there moves down one, and whatever falls off the end goes.
       const S = r.spotPos.length / 4;
       r.spotPos.copyWithin(4, 0, (S - 1) * 4); r.spotDir.copyWithin(4, 0, (S - 1) * 4); r.spotCol.copyWithin(3, 0, (S - 1) * 3);
@@ -309,6 +334,9 @@ export class Bikes {
     const turn = st * dt * 1.9 * Math.min(1, Math.abs(b.v) / 3) * Math.sign(b.v || 1) * (1 - Math.min(.45, Math.abs(b.v) / MAX * .45));
     b.yaw += turn;
     P.yaw += turn;
+    // Leaned into the turn, more the faster and tighter it is, and back up as it straightens.
+    const leanTo = Math.max(-.42, Math.min(.42, b.v * (turn / Math.max(dt, 1e-3)) * .03));
+    b.lean += (leanTo - b.lean) * Math.min(1, dt * 5);
     const fx = Math.sin(b.yaw), fz = -Math.cos(b.yaw), dir = Math.sign(b.v);
     const nx = b.x + fx * b.v * dt, nz = b.z + fz * b.v * dt;
     // What the leading wheel runs onto: a kerb it rides up, a wall it does not, nor anything low enough to take your head off.
@@ -404,8 +432,8 @@ export class Bikes {
 
   // You go where the seat goes, and sit at the height of it.
   seat(b) {
-    const P = this.g.player;
-    P.x = b.x + Math.sin(b.yaw) * SEAT * VS; P.z = b.z - Math.cos(b.yaw) * SEAT * VS; P.y = b.y;
+    const P = this.g.player, side = Math.sin(b.lean) * 2.1;   // leaning with it: your head goes over as far as the bike does
+    P.x = b.x + Math.sin(b.yaw) * SEAT * VS + Math.cos(b.yaw) * side; P.z = b.z - Math.cos(b.yaw) * SEAT * VS + Math.sin(b.yaw) * side; P.y = b.y;
     P.vx = P.vy = P.vz = 0; P.onGround = true; P.eyeSmooth = SIT_EYE;
   }
 
@@ -420,10 +448,15 @@ export class Bikes {
         if ((this.n + 1) * 9 > c.length) return;
         const k = this.n++ * 9;
         c[k] = wx; c[k + 1] = wy; c[k + 2] = wz; c[k + 3] = size; c[k + 4] = r; c[k + 5] = g; c[k + 6] = bl; c[k + 7] = -b.yaw;
-        c[k + 8] = -1 - glow - 4 * metal;
+        c[k + 8] = -1 - glow - 4 * metal - 16 * (24 + Math.round(b.lean * 40));
       };
       // Every voxel on one grid, the same size, sat a hair off the ground: no two faces ever lie in the same place to fight.
-      const at = (x, y, z) => [b.x + (rx * x + fx * z) * VS, b.y + .015 + (y - .5) * VS, b.z + (rz * x + fz * z) * VS];
+      // Leaned over about the line the tyres touch the ground along, the same way the shader leans each voxel.
+      const cl = Math.cos(b.lean), sl = Math.sin(b.lean);
+      const at = (x, y, z) => {
+        const lx = x * cl + (y - .5) * sl, ly = -x * sl + (y - .5) * cl;
+        return [b.x + (rx * lx + fx * z) * VS, b.y + .015 + ly * VS, b.z + (rz * lx + fz * z) * VS];
+      };
       const vox = (x, y, z, col, metal, glow = 0) => { const p = at(x, y, z); add(p[0], p[1], p[2], VS * 1.001, col[0], col[1], col[2], metal, glow); };
       for (const [x, y, z, r, g, bl, metal, glow] of MODEL) {
         const p = at(x, y, z);
