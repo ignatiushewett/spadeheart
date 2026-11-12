@@ -946,9 +946,9 @@ function stampPart(p, c, box, put, car, letterAt) {
         for (let l = 1; l < lenL - 1; l += 2) T(l, 2, YB + 3, [M.BRICK_R, M.CORN, M.BRICK_P][(l + sd) % 3]);
       }
       T(lenL >> 1, 2, YB + 3, M.LAMP);
-      // A way in for whoever keeps the stall: a narrow doorway at the back of one side, out into the gap next door, with the stock
-      // moved out of the way behind it.
-      { const l = (sd >> 2) % 2 ? 0 : lenL; for (let y = YB; y < YB + 3; y++) { T(l, back, y, 0); T(l ? lenL - 1 : 1, back, y, 0); } }
+      // A way in for whoever keeps the stall: a narrow doorway toward the back of one side, a step in front of the stock, out into the
+      // gap next door.
+      { const l = (sd >> 2) % 2 ? 0 : lenL; for (let y = YB; y < YB + 3; y++) T(l, back - 1, y, 0); }
       break;
     }
     case 'goods': {
