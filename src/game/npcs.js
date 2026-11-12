@@ -3443,7 +3443,9 @@ export class NPCs {
         this.selfDefence(n, dp, hostile);
       }
     }
-    if (campS && !n.flee && !n.beat && (n.kind === 'guard' || n.kind === 'sentry' || n.kind === 'vendor' || n.kind === 'clerk' || n.kind === 'named' || n.kind === 'boss' || n.kind === 'resident') && this.giveGround(n, dt)) return;
+    // Out in the streets too: a patrol, someone walking with you, anyone on the road. Caught in a crowd, nobody stands still in it.
+    if (!n.flee && !n.beat && ((campS && (n.kind === 'guard' || n.kind === 'sentry' || n.kind === 'vendor' || n.kind === 'clerk' || n.kind === 'named' || n.kind === 'boss' || n.kind === 'resident'))
+      || (!campS && (n.kind === 'roamer' || n.kind === 'follower' || n.kind === 'wanderer'))) && this.giveGround(n, dt)) return;
     if (n.kind === 'guard') {
       if (n.beat) { this.walkBeat(n, dt); return; }
       if (n.aim <= 0 && n.baseYaw !== null) n.yaw = this.showcase ? this.lookingAbout(n) : n.baseYaw;
@@ -3468,7 +3470,9 @@ export class NPCs {
   // once it is all round them, or they are badly hurt, they turn and run for it. When it has thinned out they go back to where they were.
   giveGround(n, dt) {
     const g = this.g, H = g.horde, w = g.world;
-    if (!n.giving && n.y > STREET_Y + 1.5) return false;
+    // Up on a wall walk or a tower they hold where they are; on the ground, wherever that is, they move.
+    if (!n.giving && n.y > w.terrainTop(Math.floor(n.x), Math.floor(n.z)) + 1.5) return false;
+    const loose = n.kind === 'resident' || n.kind === 'roamer' || n.kind === 'follower' || n.kind === 'wanderer';
     if ((n.swarmT = (n.swarmT || 0) - dt) <= 0) {
       n.swarmT = .15 + rand() * .1;
       let k = 0, close = 0, sx = 0, sz = 0, ring = 0;
@@ -3489,7 +3493,7 @@ export class NPCs {
       if (k >= 3 || close >= 2 || (close && n.hp < n.maxHp * .5)) {
         if (!n.giving) {
           n.giving = true;
-          if (n.kind !== 'resident') { n.homeX = n.x; n.homeZ = n.z; n.homeYaw = n.baseYaw; }
+          if (!loose) { n.homeX = n.x; n.homeZ = n.z; n.homeYaw = n.baseYaw; }
           this.bark(n, pickOf(['Falling back!', 'Too many, too many!', 'Get back, get back!', 'I need help here!', 'Back up, back up!', "They're all over me!"]), 40);
         }
         n.clearT = 0;
@@ -3501,8 +3505,9 @@ export class NPCs {
       n.clearT = (n.clearT || 0) + dt;
       if (n.clearT < 2.5) { n.state = n.aim > 0 ? 3 : 0; return true; }
       // Clear. Back to it.
-      if (n.homeX === undefined || n.kind === 'resident') {
-        n.giving = false; n.homeX = undefined;
+      if (n.homeX === undefined || loose) {
+        n.giving = false;
+        if (!loose || n.kind === 'resident') n.homeX = undefined;
         if (n.kind === 'resident') { n.path = null; n.pathI = 0; n.arrived = false; }
         return false;
       }

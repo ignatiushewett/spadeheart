@@ -1564,7 +1564,8 @@ export class Horde {
     if (st !== S_IDLE) {
       if (flat2 < 2.9 && Math.abs(tgtY - py[i]) < 2.6 && (H || !this.ignorePlayer)) {
         st = S_ATTACK;
-        moving = .15;
+        // Close enough to reach: it stops walking, rather than shoving on into them and out the other side.
+        moving = flat2 < 1.6 ? 0 : .15;
         this.atk[i] -= dt;
         if (this.atk[i] <= 0) {
           this.atk[i] = 1.15 + rand() * .8;
@@ -1671,11 +1672,13 @@ export class Horde {
       }
     }
 
-    // Bodies stop at arm's length rather than clipping through the camera.
-    if (!H) {
-      const ax = bx - P.x, az = bz - P.z, a2 = ax * ax + az * az;
-      if (a2 < 1.0 && Math.abs(y - P.y) < 2.4 && a2 > .0001) {
-        const m = Math.sqrt(a2), k = (1 - m) / m;
+    // Bodies stop at arm's length, from you (rather than clipping through the camera) and from anyone else they are going for: walking
+    // into a person and out the other side flips the way to them from one frame to the next, and the body spins on the spot.
+    {
+      const T = H && !H.dead ? H : P, reach = H ? .9 : 1;
+      const ax = bx - T.x, az = bz - T.z, a2 = ax * ax + az * az;
+      if (a2 < reach * reach && Math.abs(y - T.y) < 2.4 && a2 > .0001) {
+        const m = Math.sqrt(a2), k = (reach - m) / m;
         const nx = bx + ax * k, nz = bz + az * k;
         if (!w.solid(Math.floor(nx), Math.floor(y + .5), Math.floor(nz))) { bx = nx; bz = nz; px[i] = bx; pz[i] = bz; }
       }
