@@ -34,6 +34,8 @@ const rand = Math.random;
 const nextFrame = () => new Promise((r) => { requestAnimationFrame(r); setTimeout(r, 120); });
 const DAY_SECONDS = 1500;
 const GARVEY_V = 5;        // which build of Carver Yard a save's edits belong to
+const WEST_V = 1;          // which lie of the land west of Weston a save's edits belong to (Mt Page and Fort Westpoint moved south)
+const WEST_AREA = { x0: 0, z0: 1350, x1: 2250, z1: 2850 };
 const INTRO_TIME = 7.5;    // seconds of words on black before the wake-up
 const INTRO_FADE = 1.3;    // the last of that is them fading out, and a beat of nothing
 // What a broken voxel gives back when you tear it down by hand.
@@ -2080,6 +2082,14 @@ class Game {
     // Garvey was rebuilt. Damage inside its wall belongs to buildings that are gone, and nobody should wake up inside a new one.
     const rebuilt = s.garvey !== GARVEY_V, yard = this.layout.camps.find((k) => k.key === 'garvey');
     let edits = rebuilt ? this.world.dropEditsIn(s.edits, yard.x0 + 2, yard.z0 + 2, yard.x1 - 2, yard.z1 - 2) : s.edits;
+    // The mountain and Fort Westpoint moved south. Anything dug or built out there in an older save was in ground that is not where it
+    // was, so it goes, and so does any damage the fort had: it is a new wall.
+    const moved = (s.west || 0) !== WEST_V, A = WEST_AREA;
+    if (moved) {
+      edits = this.world.dropEditsIn(edits, A.x0, A.z0, A.x1, A.z1);
+      const fort = this.layout.camps.find((k) => k.key === 'union'), fs = fort && s.camps && s.camps.state && s.camps.state[fort.id];
+      if (fs) { fs.breaches = []; fs.broken = null; }
+    }
     // The outside face of a standing camp's wall, and its gate towers, are as hard as the wall itself now. Damage to them in an older
     // save is put back, on every side that does not have an open breach the camp is still dealing with.
     for (const c of this.layout.camps) {
@@ -2104,6 +2114,14 @@ class Game {
     this.clearLoadedWorld();
     this.player.reset();
     this.player.fromSave(s.player);
+    if (moved) {
+      // Stood out there: on top of whatever the ground is now, not inside a hillside.
+      const P = this.player, L = this.layout;
+      if (P.x > A.x0 && P.x < A.x1 && P.z > A.z0 && P.z < A.z1) {
+        const i = Math.floor(P.z) * WX + Math.floor(P.x);
+        P.y = Math.max(P.y, (L.height[i] || (STREET_Y + L.terr[i])) + .05);
+      }
+    }
     if (rebuilt) {
       const P = this.player;
       if (P.x > yard.x0 && P.x < yard.x1 && P.z > yard.z0 && P.z < yard.z1) { P.x = yard.spots.plaza.x; P.z = yard.spots.plaza.z; P.y = STREET_Y; }
@@ -2140,7 +2158,7 @@ class Game {
   saveGame() {
     if (this.state !== 'play' && this.state !== 'loading') return;
     const data = {
-      version: 1, garvey: GARVEY_V, player: this.player.toSave(), jobs: this.jobs.toSave(), edits: this.world.exportEdits(), horde: this.horde.exportState(),
+      version: 1, garvey: GARVEY_V, west: WEST_V, player: this.player.toSave(), jobs: this.jobs.toSave(), edits: this.world.exportEdits(), horde: this.horde.exportState(),
       tod: this.tod, day: this.day, difficulty: this.difficulty, stats: this.stats, lightsGone: [...(this.lightsGone || [])], lotHurt: [...(this.lotHurt || new Map())].map(([k, e]) => [k, e.lost, e.base, e.down ? 1 : 0]), camps: this.campSim.toSave(), bikes: this.bikes.toSave(), director: this.director.toSave(), weather: this.weather.toSave(), savedAt: Date.now(),
       permaDead: this.player.loadout === 'survival' && !this.player.alive,
     };

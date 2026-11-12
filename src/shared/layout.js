@@ -114,7 +114,7 @@ const px = (list) => list.map(([a, b]) => [gx(a * PX), b * PX]);
 const COAST = [[0, 905], [50, 935], [100, 975], [150, 990], [200, 1000], [250, 1012], [300, 1030], [350, 1048], [400, 1052], [450, 1062], [500, 1080], [550, 1096],
   [600, 1120], [650, 1150], [680, 1162], [705, 1135], [725, 1110], [770, 1100], [830, 1095], [880, 1062], [950, 1052], [1000, 1050], [1050, 1045], [1075, 1020],
   [1085, 990], [1100, 955], [1130, 925], [1170, 910], [1210, 905], [1254, 900]];
-const MT = { x: 1159, z: 1862 };                       // the summit of Mt. Page
+const MT = { x: 1159, z: 2042 };                       // the summit of Mt. Page
 const LIGHT = { x: 4517, z: 3821 };                    // Severn Rock, and the light on it
 const RIVER = px([[500, 0], [492, 60], [490, 110], [500, 140], [525, 165], [560, 185], [575, 210], [560, 240], [540, 260], [525, 290], [530, 315], [555, 330],
   [590, 345], [600, 370], [585, 395], [575, 420], [565, 440], [580, 460]]);
@@ -380,7 +380,7 @@ export function buildLayout(seed = 1609) {
     bryant: { x0: 1824, x1: 2096, z0: 1240, z1: 1520, keep: [P_LIBRARY], plazaX: 1966, plazaZ: 1380 },   // Lakeshore Market: built into the south of Albion, above the lake
     battery: around(4120, 3400, 135, 86),      // Severn Landing: built into the south side of Severn Bay, up from the marina
     wash: around(2150, 2120, 122, 84),         // Weston Grange, under the ridge on the north side of Weston: the road from the valley runs through town to it
-    union: around(560, 1990, 94, 140),        // Fort Westpoint, off the west road above the truck stop
+    union: around(560, 2140, 94, 140),        // Fort Westpoint, off the west road just above the truck stop, well clear of Albion
     sheep: around(2570, 3720, 150, 104),       // Arnhem Bastion, out among the fields
     tompkins: around(4380, 1400, 86, 128),      // Cannery Collective: the old cannery lots in south Dayton, back from the shore
     morning: around(2900, 560, 138, 92),      // Gibson Redoubt, on the north side at the head of the valley
@@ -403,7 +403,7 @@ export function buildLayout(seed = 1609) {
   // last fields and Severn Bay.
   const farmK = (x, z) => Math.max(sstep(1 - capsule(x, z, 2540, 2480, 2520, 4096) / 520), sstep(1 - capsule(x, z, 2700, 3150, 2900, 3420) / 400), sstep(1 - capsule(x, z, 2080, 2980, 2020, 3820) / 380));
   const trinityK = (x, z) => Math.max(sstep(1 - capsule(x, z, 2570, 950, 4470, 2150) / 430), sstep(1 - capsule(x, z, 2270, 60, 4120, 380) / 300), sstep(1 - capsule(x, z, 3500, 1700, 2820, 2380) / 380));
-  const pageK = (x, z) => sstep(1 - capsule(x, z, 560, 1450, 2040, 2380) / 560);
+  const pageK = (x, z) => sstep(1 - capsule(x, z, 560, 1650, 2040, 2380) / 560);
   const elev0 = (x, z) => {
     let e = 4 + 30 * sstep((2800 - z) / 2500) + 8 * sstep((1800 - x) / 1600);
     e += (fbm2(x * .0028 + 11, z * .0028 + 5, 4) - .45) * 34;
@@ -1086,9 +1086,9 @@ export function buildLayout(seed = 1609) {
   }
   // A ranger's cabin where the forest road gives out, and another at the foot of the mountain trail.
   landmark('Trinity Ranger Station', { x0: 3770, x1: 3790, z0: 1782, z1: 1798 }, S.cedar, [0, 1], { house: true, rise: 4 });
-  landmark('Mt. Page Trailhead', { x0: 886, x1: 904, z0: 2006, z1: 2020 }, S.cedar, [0, 1], { house: true, rise: 4 });
+  landmark('Mt. Page Trailhead', { x0: 886, x1: 904, z0: 2186, z1: 2200 }, S.cedar, [0, 1], { house: true, rise: 4 });
   fillGround({ x0: 3750, x1: 3810, z0: 1778, z1: 1806 }, G.DIRT, (g) => g === G.PARK);
-  fillGround({ x0: 870, x1: 910, z0: 1984, z1: 2004 }, G.DIRT, (g) => g === G.PARK);
+  fillGround({ x0: 870, x1: 910, z0: 2164, z1: 2184 }, G.DIRT, (g) => g === G.PARK);
   // The Strand: a tower every so often down both sides of Ocean Drive, each in its own paved apron, facing the sea or the lagoon.
   {
     const towerSt = [S.glassT, S.glassB, S.beachP, S.beachT, S.whitebrick, S.concrete], tr = makeRng(seed + 404);
@@ -1625,7 +1625,7 @@ export function buildLayout(seed = 1609) {
   ].map(([name, x, z, tier, kind]) => ({ name, x: Math.round(x), z: Math.round(z), tier, kind }));
 
   // The country between the towns, by whatever is nearest.
-  const COUNTRY = [['The Strand', 4760, 3110, 230], ['Mt. Page', MT.x, MT.z, 720], ['the Page escarpment', 900, 1700, 700], ['Trinity Forest', 3420, 1640, 820], ['the North Woods', 3520, 230, 520], ['Gibson Valley', 3200, 720, 520],
+  const COUNTRY = [['The Strand', 4760, 3110, 230], ['Mt. Page', MT.x, MT.z, 720], ['the Page escarpment', 900, 1880, 700], ['Trinity Forest', 3420, 1640, 820], ['the North Woods', 3520, 230, 520], ['Gibson Valley', 3200, 720, 520],
     ['Arnhem Fields', 2410, 3820, 480], ['the Weston farmlands', 2350, 2950, 760], ['Westpoint', 360, 2150, 320], ['the Severn marshes', 4620, 3150, 260], ['the Esperance woods', 800, 3470, 820],
     ['the lake country', 2220, 1700, 300], ['the Weston ridge', 2520, 1980, 320]];
   const lakeAt = (x, z) => {
