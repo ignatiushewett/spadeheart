@@ -713,9 +713,14 @@ export function stampCamp(c, ctx) {
           const h = y - YB;
           if (gate && y >= YB && h <= hc - 2) { P(t, y, row, c.door); continue; }
           if (y < YB) { P(t, y, row, M.CONCRETE_D); continue; }
+          // The top band is set a block out (see below), so on the inside it gives way to the walkway: boards at its foot, open above.
+          if (row === 1 && h >= H - 2) { if (h === H - 2) P(t, y, row, M.PLANK); continue; }
           P(t, y, row, wallVoxel(wall, t, h, row, H));
         }
       }
+      // The top of the wall stands out a block past the face below it, all the way along and over the gates: a coping two blocks wide,
+      // set a block further out than the wall it sits on, which you can see from the road.
+      for (let h = H - 2; h < H; h++) if (YB + h >= oy && YB + h < oy + CS) P(t, YB + h, -1, wallVoxel(wall, t, h, 0, H));
       for (let row = 2; row <= 4; row++) P(t, YB + hc - 1, row, M.PLANK);
       if (t % 8 === 0) for (let y = YB; y < YB + hc - 1; y++) P(t, y, 4, M.WOOD_D);
       const clearOfGate = !c.gates.some((g) => g.side === sideKey && Math.abs(t - g.tc) < 9);
@@ -730,7 +735,7 @@ export function stampCamp(c, ctx) {
           const top = YB + H - 1;
           for (let k = 0; k < 8; k++) {
             const col = u < 1 || u > 7 || k === 0 ? c.flag[1] : (bitmap[k - 1][u - 1] === '#' ? c.flag[1] : c.flag[0]);
-            P(t, top - k, -1, col);
+            P(t, top - k, -2, col);
           }
         }
       }
