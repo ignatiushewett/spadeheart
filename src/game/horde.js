@@ -622,7 +622,8 @@ export class Horde {
     this.sx[i] = Math.sin(a); this.sz[i] = Math.cos(a);
     this.yaw[i] = a;
     this.phase[i] = rand() * 6.283;
-    this.spd[i] = .88 + rand() * .24;
+    // Everyone moves a tenth slower than they used to: chasing, wandering and on the move alike.
+    this.spd[i] = (.88 + rand() * .24) * .9;
     this.atk[i] = 0;
     this.blk[i] = 0;
     this.hp[i] = 53 + (rand() * 38) | 0;

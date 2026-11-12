@@ -1653,13 +1653,34 @@ export function buildLayout(seed = 1609) {
     const nm = (s) => s.name || 'Dead End';
     return { district, cross: hs && vs ? (vd < hd ? `${nm(vs)} & ${nm(hs)}` : `${nm(hs)} & ${nm(vs)}`) : hs || vs ? nm(hs || vs) : '' };
   };
-  // How thick the dead are on the ground, before the streets and the camps have their say.
-  const densityAt = (x, z) => {
+  // How thick the dead are on the ground, before the streets and the camps have their say. It builds as you go in: a few out in the
+  // country, more along the roads in, thin on a town's edge and thickening block by block to the middle, thickest of all in the
+  // busiest districts. The total is the same as it always was; it has only moved toward the middles.
+  const townOut = chamfer((i) => !!townId[i]);
+  const densityOld = (x, z) => {
     const i = cellOf(x, z);
     if (townId[i]) return (DISTRICTS[dist[i] - 1] || { zone: Z.village }).zone.dens;
     if (ground[i] === G.ROCK) return 1;
     return 4 + 8 * (1 - forestAt(x, z)) + (ground[i] === G.FIELD ? 6 : 0);
   };
+  const densityNew = (x, z) => {
+    const i = cellOf(x, z);
+    if (townId[i]) {
+      const base = (DISTRICTS[dist[i] - 1] || { zone: Z.village }).zone.dens;
+      return Math.pow(base, 1.25) / Math.pow(100, .25) * (.4 + .9 * sstep(townEdge[i] / 210));
+    }
+    if (ground[i] === G.ROCK) return .6;
+    const country = (4 + 8 * (1 - forestAt(x, z)) + (ground[i] === G.FIELD ? 6 : 0)) * .6;
+    // Coming up on a town, the road gets busier before the houses start.
+    return country * (1 + 1.6 * sstep(1 - townOut[i] / 255));
+  };
+  let densK = 1;
+  {
+    let a = 0, b = 0;
+    for (let z = 16; z < WZ; z += 32) for (let x = 16; x < WX; x += 32) { a += densityOld(x, z); b += densityNew(x, z); }
+    densK = b > 0 ? a / b : 1;
+  }
+  const densityAt = (x, z) => densityNew(x, z) * densK;
 
   const rows = [], aves = [];
   return {
