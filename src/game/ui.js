@@ -1614,7 +1614,7 @@ export class UI {
       const TAG = { kill: 'Cull', fetch: 'Fetch', hold: 'Relay', bounty: 'Bounty' };
       const out = (job) => Math.max(0, Math.round(Math.max(c.x0 - job.x, job.x - c.x1, c.z0 - job.z, job.z - c.z1)));
       const task = (job) => job.type === 'kill' ? `${job.need} infected` : job.type === 'bounty' ? (job.gang > 1 ? `${job.gang} raiders` : 'one raider') : job.type === 'hold' ? `${job.time} seconds on the relay` : 'one cache';
-      this.board(offers.map((job) => ({ tag: TAG[job.type] || 'Work', state: `${out(job)} m out`, title: job.title, pay: `${SP} ${fmt(job.reward)}${job.bonus ? ` + ${ITEMS[job.bonus].name}` : ''}`,
+      this.board(offers.map((job) => ({ tag: TAG[job.type] || 'Work', state: `${out(job)}m`, title: job.title, pay: `${SP} ${fmt(job.reward)}${job.bonus ? ` + ${ITEMS[job.bonus].name}` : ''}`,
         meta: `${task(job)}, ${job.where}`, off: full, fn: () => this.jobCard(n, job) })));
       this.say(words.join(' '));
     }
@@ -1699,7 +1699,6 @@ export class UI {
       if (plan === 'vanguard') { if (!g.jobs.signOperation(c)) { backTo(); return; } }
       else if (plan === 'night') g.jobs.signNight(c);
       else g.jobs.signPatrol(c);
-      g.dialogue.addStanding(n.camp, 1);
       backTo();
       this.say(plan === 'patrol' ? 'Signed. The corners are marked on your map.' : 'Signed. I will be counting.');
     } }], { label: 'Back', fn: backTo });
@@ -1713,7 +1712,7 @@ export class UI {
     d.className = 'job';
     d.innerHTML = `<b>${job.title}</b><p>${job.desc}</p><span class="pay">${SP} ${job.reward}${job.bonus ? ` + ${ITEMS[job.bonus].name}` : ''}</span>`;
     box.appendChild(d);
-    this.setChoices([{ label: 'I will take it', cls: 'quest', fn: () => { g.jobs.accept(job); g.dialogue.addStanding(n.camp, 1); this.workMenu(); } }], { label: 'Back', fn: () => this.workMenu() });
+    this.setChoices([{ label: 'I will take it', cls: 'quest', fn: () => { g.jobs.accept(job); this.workMenu(); } }], { label: 'Back', fn: () => this.workMenu() });
   }
 
   smallTalk() {

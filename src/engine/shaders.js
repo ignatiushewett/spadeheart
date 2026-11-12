@@ -1968,14 +1968,14 @@ void main(){
     L=dot(col,vec3(.299,.587,.114));
     col=mix(col,vec3(L)*vec3(.9,1.,1.05),blue*.42);
     // The warmth sits in the midtones and the lit faces of things; a white sky stays a hazy white, not yellow.
-    vec3 warm=mix(vec3(1.05,1.02,.88),vec3(1.,1.,.97),smoothstep(.72,.95,L));
+    vec3 warm=mix(vec3(1.035,1.015,.915),vec3(.99,1.,.99),smoothstep(.72,.95,L));
     col*=mix(vec3(.92,1.025,.975),warm,smoothstep(.1,.7,L));
     col=mix(vec3(L),col,.84);
     col=col*.962+vec3(.011,.017,.012);
   }
   // Soft toe and shoulder.
   col=mix(col,col*col*(3.-2.*col),.42);
-  col*=vec3(.985,1.,.965);
+  col*=vec3(.965,.995,1.005);   // a shade on the cool side overall
   // Vignette, hurt pulse, infection tint.
   float vig=smoothstep(.95,.15,r2*1.7);
   col*=mix(.42,1.,vig);

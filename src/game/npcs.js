@@ -4311,13 +4311,20 @@ export class Jobs {
       }
       delete P.dlg.flags[`${job.favour}_done`];
     }
-    if (job.type !== 'defend' && job.type !== 'defended' && job.type !== 'migrate' && job.type !== 'visit' && job.campId >= 0) g.dialogue.addStanding(job.campId, -1);
+    // Saying yes earns nothing; doing it does. Walking away from something you said you would do costs you with them, and a contract
+    // you signed for costs more than an errand you picked off the board.
+    const contract = job.type === 'patrol' || job.type === 'night';
+    if (job.type !== 'defend' && job.type !== 'defended' && job.type !== 'migrate' && job.type !== 'visit' && job.campId >= 0) {
+      g.dialogue.addStanding(job.campId, contract ? -5 : -3);
+      P.rep = Math.max(-100, P.rep - (contract ? 3 : 2));
+    }
     g.ui.toast(`Abandoned: ${job.title}`);
     // Walking out on a contract breaks it. You still get the same bonus for your kills as anyone who helps.
     if (job.type === 'defend') {
       const s = g.campSim.state[job.campId], c = g.layout.camps[job.campId];
       if (s.op && !job.pending) {
-        g.dialogue.addStanding(job.campId, -2);
+        g.dialogue.addStanding(job.campId, -5);
+        P.rep = Math.max(-100, P.rep - 3);
         const back = this.commission(c, s.op);
         back.kills = job.kills || 0;
       }
@@ -4447,7 +4454,9 @@ export class Jobs {
     const g = this.g, i = this.active.indexOf(j);
     if (i >= 0) this.active.splice(i, 1);
     j.status = 'ended';
-    g.dialogue.addStanding(c.id, -1);
+    // A contract broken by not turning up: they had counted on you.
+    g.dialogue.addStanding(c.id, -5);
+    g.player.rep = Math.max(-100, g.player.rep - 3);
     this.contractNote(c, `Contract ended. ${why}${j.earned ? ` The ${SPADE} ${j.earned.toLocaleString('en-US')} you had earned is gone.` : ''}`, 'bad', `${j.type === 'patrol' ? 'Patrol' : 'Night shift'} contract failed`);
     g.audio.simple('beep');
   }
@@ -4742,7 +4751,7 @@ export class Jobs {
   missedQuota(j, c, op, missed, day) {
     const g = this.g, rule = DOCK[c.key] || { why: '' };
     j.misses = (j.misses || 0) + 1;
-    g.dialogue.addStanding(c.id, -1);
+    g.dialogue.addStanding(c.id, -2);
     g.audio.simple('beep');
     if (j.misses >= OP_PAY.strikes) {
       j.plan = 'commission';

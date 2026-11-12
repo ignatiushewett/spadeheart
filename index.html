@@ -391,8 +391,8 @@ body.talking #hud > *:not(#caption) { visibility: hidden; }
 .board { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; margin: 2px 0 12px; max-height: 34vh; overflow-y: auto; }
 .board .card { display: flex; flex-direction: column; gap: 3px; text-align: left; padding: 9px 11px 10px; font: inherit; color: inherit; background: rgba(255,255,255,.035); border: 1px solid rgba(255,255,255,.08); border-left: 3px solid #9fd0ff; cursor: pointer; }
 .board .card:hover { background: rgba(159,208,255,.09); border-color: rgba(159,208,255,.35); border-left-color: #9fd0ff; }
-.board .card .tag { font-family: var(--mono); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--dim); display: flex; justify-content: space-between; gap: 6px; }
-.board .card .tag i { font-style: normal; color: #9fd0ff; }
+.board .card .tag { font-family: Quantico, Bahnschrift, 'Segoe UI', sans-serif; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--dim); display: flex; justify-content: space-between; gap: 6px; }
+.board .card .tag i { font-style: normal; color: #9fd0ff; text-transform: none; letter-spacing: .02em; }
 .board .card b { color: var(--ink); font-size: 15px; font-weight: 600; line-height: 1.25; }
 .board .card .pay { color: var(--amber); font-family: var(--mono); font-size: 13px; }
 .board .card .meta { color: var(--dim); font-size: 12px; line-height: 1.35; }
