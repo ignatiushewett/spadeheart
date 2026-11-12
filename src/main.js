@@ -2254,9 +2254,11 @@ class Game {
     }
     // If the foot of the bed is blocked, anywhere else nearby will do to stand.
     // A spot to stand is floor underfoot and room for a head over it, both: never the middle of a wall.
-    const Y = bed.y ?? STREET_Y, clear = (x, z) => W.solid(Math.floor(x), Y - 1, Math.floor(z)) && !W.solid(Math.floor(x), Y, Math.floor(z)) && !W.solid(Math.floor(x), Y + 1, Math.floor(z)) && !W.solid(Math.floor(x), Y + 2, Math.floor(z));
+    // The whole body has to fit, not just the middle of it: anything less and the push out of the wall goes up, through the roof.
+    const Y = bed.y ?? STREET_Y, col = (x, z) => W.solid(Math.floor(x), Y - 1, Math.floor(z)) && !W.solid(Math.floor(x), Y, Math.floor(z)) && !W.solid(Math.floor(x), Y + 1, Math.floor(z)) && !W.solid(Math.floor(x), Y + 2, Math.floor(z));
+    const clear = (x, z) => col(x - .4, z - .4) && col(x + .4, z - .4) && col(x - .4, z + .4) && col(x + .4, z + .4);
     if (!clear(P.x, P.z)) {
-      search: for (let r = 1.2; r < 9; r += .6) for (let a = 0; a < 16; a++) {
+      search: for (let r = 1; r < 9; r += .5) for (let a = 0; a < 16; a++) {
         const x = bed.x + .5 + Math.cos(a * .3927) * r, z = bed.z + Math.sin(a * .3927) * r;
         if (clear(x, z)) { P.x = x; P.z = z; break search; }
       }
