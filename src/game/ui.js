@@ -1401,7 +1401,7 @@ export class UI {
       // First the job. Then, once you have said you will do it, what you will need to do it with.
       const c = g.layout.camps[n.camp];
       g.jobs.visited();
-      const job = g.jobs.leaderJob(c), side = job.desc.match(/outside the (\w+) gate/)[1];
+      const job = g.jobs.leaderJob(c), side = job.side;
       $('dlg-jobs').innerHTML = '';
       this.say(`Then you can start by being useful. There are always a few of them outside the ${side} gate. Put ${job.need} of them down, then go to the Town Hall and they will pay you. After that, they will have real work for you.`);
       this.setChoices([{ label: 'Understood.', cls: 'primary', fn: () => {

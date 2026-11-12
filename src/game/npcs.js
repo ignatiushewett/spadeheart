@@ -4829,9 +4829,9 @@ export class Jobs {
   // The leader's job: a few of them, just outside the nearest gate, paid at the Town Hall.
   leaderJob(c) {
     const q = c.gates[0], ox = q.side === 'W' ? -1 : q.side === 'E' ? 1 : 0, oz = q.side === 'N' ? -1 : q.side === 'S' ? 1 : 0;
-    const x = Math.floor(q.cx + ox * 50), z = Math.floor(q.cz + oz * 50), need = 15;
-    const job = { id: this.nextId++, type: 'kill', intro: true, title: 'Clear the approach', need, got: 0, reward: 50, bonus: 'bandage',
-      desc: `Put down ${need} infected. Out past the ${{ N: 'north', S: 'south', E: 'east', W: 'west' }[q.side]} gate is the place to find them. Then collect your pay at the Town Hall.`, x, z, y: STREET_Y, campId: c.id, status: 'active', where: 'the gate' };
+    const x = Math.floor(q.cx + ox * 50), z = Math.floor(q.cz + oz * 50), need = 15, side = { N: 'north', S: 'south', E: 'east', W: 'west' }[q.side];
+    const job = { id: this.nextId++, type: 'kill', intro: true, title: 'Clear the approach', need, got: 0, reward: 50, bonus: 'bandage', side,
+      desc: `Put down ${need} infected. Out past the ${side} gate is the place to find them. Then collect your pay at the Town Hall.`, x, z, y: STREET_Y, campId: c.id, status: 'active', where: 'the gate' };
     this.active.push(job);
     return job;
   }

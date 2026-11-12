@@ -281,6 +281,8 @@ export class Player {
       for (const ox of [-R, R]) for (const oz of [-R, R]) for (let y = Math.floor(this.y - .5); y <= Math.floor(this.y + 1.6) && !burning; y++) {
         if (w.get(Math.floor(this.x + ox), y, Math.floor(this.z + oz)) === M.FIRE) burning = true;
       }
+      // And the fires that are not blocks: a burning wreck, or what a collapse or a blast set alight.
+      if (!burning && g.hotAt && g.hotAt(this.x, this.y, this.z)) burning = true;
       if (burning) { this.fireT = (this.fireT || 0) + dt; if (this.fireT >= .5) { this.fireT -= .5; this.damage(5, null, null, 'fire'); } } else this.fireT = .45;
     }
     if (locked) {

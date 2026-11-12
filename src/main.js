@@ -1303,6 +1303,21 @@ class Game {
     }
   }
 
+  // Is anything that is burning, other than a fire block, right up against you here? A burning wreck you are touching (its shell is
+  // the size of a car, four by nine), or a fire on a rubble pile or where a blast went off, once it has caught and until it dies down.
+  hotAt(x, y, z) {
+    const r = .55;
+    if (y < STREET_Y + 3.5) for (const w of this.activeWrecks || []) {
+      const ax = (w[2] === 0 ? 2 : 4.5) + r, az = (w[2] === 0 ? 4.5 : 2) + r;
+      if (Math.abs(x - w[0]) < ax && Math.abs(z - w[1]) < az) return true;
+    }
+    for (const f of this.rubbleFires || []) {
+      if (f.y === undefined || f.t < f.delay + 1.5 || f.t > f.delay + f.life - 4) continue;
+      if (Math.hypot(x - f.x, z - f.z) < r + f.size * .7 && y > f.y - 1.5 && y < f.y + 2) return true;
+    }
+    return false;
+  }
+
   // The small fires a collapse leaves: on top of the pile, a while to catch, a minute or so of burning, and out sooner in rain.
   updateRubbleFires(dt) {
     const F = this.rubbleFires;
