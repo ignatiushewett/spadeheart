@@ -104,7 +104,7 @@ export class FarCity {
         const c = [0, 0, 0];
         for (let k = 0; k < 4; k++) {
           const sx = Math.min(WX - 1, x + 2 + (k & 1) * 8), sz = Math.min(WZ - 1, z + 2 + (k >> 1) * 8), g = ground[sz * WX + sx];
-          const q = g === G.FIELD && mark[sz * WX + sx] === 2 ? srgb(M.CORN, .8) : GC[g] || grass;
+          const fm = g === G.FIELD ? mark[sz * WX + sx] : 0, q = fm === 2 ? srgb(M.CORN, .8) : fm === 1 || fm === 3 || fm === 5 ? srgb(M.LEAF2, .75) : fm === 6 ? srgb(M.GRASS_DRY, 1) : GC[g] || grass;
           c[0] += q[0] / 4; c[1] += q[1] / 4; c[2] += q[2] / 4;
         }
         return c;
@@ -173,7 +173,7 @@ export class FarCity {
     }
 
     // Camps read from afar as a wall ring with their tallest buildings poking over it.
-    const WALL_COL = { cabs: M.TAXI, containers: M.CONT_R, palisade: M.LOG, hesco: M.SANDBAG, sheet: M.STEEL, scrap: M.PAINT_P, white: M.CAR_W, brick: M.BRICK_R, stone: M.GRANITE };
+    const WALL_COL = { cabs: M.TAXI, containers: M.CONT_R, palisade: M.LOG, hesco: M.SANDBAG, sheet: M.STEEL, scrap: M.RUST, white: M.CAR_W, brick: M.BRICK_R, stone: M.GRANITE };
     for (const c of L.camps) {
       const col = srgb(WALL_COL[c.wall] || M.CONCRETE, 1);
       const top = STREET_Y + c.H;

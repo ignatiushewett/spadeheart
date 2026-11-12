@@ -110,13 +110,13 @@ export function makeGenerator(L) {
       }
       return;
     }
-    if (g === G.FIELD && flags > 1 && flags < 6) {
+    if (g === G.FIELD && flags >= 1 && flags < 6) {
       // What was in the ground when everyone stopped coming out to it.
       const y = top + 1;
       // Corn in tall rows, cotton gone to boll and never picked, low peanut rows, and somebody's tomatoes.
-      const tall = flags === 2 ? ((x + (z >> 6)) % 3 === 0 ? 0 : 2 + (h2(x, z) & 1)) : flags === 3 ? ((z & 1) && h2(x, z) % 4 ? 2 : 0) : flags === 4 ? (x % 3 === 0 ? 1 : 0) : (x % 4 === 0 && h2(x, z) % 3 ? 1 : 0);
+      const tall = flags === 1 ? (x % 3 && h2(x, z) % 5 ? 1 : 0) : flags === 2 ? ((x + (z >> 6)) % 3 === 0 ? 0 : 2 + (h2(x, z) & 1)) : flags === 3 ? ((z & 1) && h2(x, z) % 4 ? 2 : 0) : flags === 4 ? (x % 3 === 0 ? 1 : 0) : (x % 4 === 0 && h2(x, z) % 3 ? 1 : 0);
       for (let k = 0; k < tall; k++) {
-        const id = flags === 2 ? M.CORN : flags === 3 ? (k === tall - 1 && h2(x + k, z) % 3 ? M.COTTON : M.LEAF3) : flags === 4 ? M.PEANUT : M.TOMATO;
+        const id = flags === 1 ? M.LEAF2 : flags === 2 ? M.CORN : flags === 3 ? (k === tall - 1 && h2(x + k, z) % 3 ? M.COTTON : M.LEAF3) : flags === 4 ? M.PEANUT : M.TOMATO;
         if (y + k >= y0 && y + k <= y1) { d[lx | ((y + k - oy) << 5) | (lz << 10)] = id; any = true; }
       }
       return;

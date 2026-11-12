@@ -44,7 +44,7 @@ const SETTINGS_KEY = 'acez.settings.v2';
 const OLD_SETTINGS_KEY = 'acez.settings.v1';
 const DB_NAME = 'acez';
 const MENU_SHOT = { angle: .62, dist: 185, height: 88, turn: .46, pitch: -.14, fov: 1.05, flight: 125, startHeight: 30, startOff: 44, startPitch: -.1 };
-const SAVE_KEY = 'slot12';  // bumped whenever the map changes: old voxel edits no longer line up
+const SAVE_KEY = 'slot13';  // bumped whenever the map changes: old voxel edits no longer line up
 export const SLOTS = 3;
 // Slot 1 keeps the plain key, so a save from before there were slots simply becomes the first character.
 const slotKey = (n) => (n === 1 ? SAVE_KEY : `${SAVE_KEY}.${n}`);   // 'sandbox' gives its own key too
@@ -329,7 +329,7 @@ class Game {
         rgb = [s0[0] + (gr[0] - s0[0]) * Math.max(0, k), s0[1] + (gr[1] - s0[1]) * Math.max(0, k), s0[2] + (gr[2] - s0[2]) * Math.max(0, k)];
       }
       else if (g === G.DIRT) rgb = col(hash(wx >> 1, wz >> 1) < .4 ? M.PATH : M.DIRT);
-      else if (g === G.FIELD) { const m = L.mark[i], dot = hash(wx >> 1, wz >> 1); rgb = col(m === 2 ? (dot < .6 ? M.CORN : M.LEAF3) : m === 3 ? (dot < .35 ? M.COTTON : M.LEAF3) : m === 4 ? (dot < .5 ? M.PEANUT : M.SOIL) : m === 5 ? (wx % 8 < 2 ? M.LEAF2 : M.SOIL) : m === 6 ? M.GRASS_DRY : M.SOIL); rgb = [rgb[0] * .88, rgb[1] * .88, rgb[2] * .88]; }
+      else if (g === G.FIELD) { const m = L.mark[i], dot = hash(wx >> 1, wz >> 1); rgb = col(m === 1 ? (wx % 6 < 4 ? M.LEAF2 : M.SOIL) : m === 2 ? (dot < .6 ? M.CORN : M.LEAF3) : m === 3 ? (dot < .35 ? M.COTTON : M.LEAF3) : m === 4 ? (dot < .5 ? M.PEANUT : M.SOIL) : m === 5 ? (wx % 8 < 2 ? M.LEAF2 : M.SOIL) : m === 6 ? M.GRASS_DRY : M.SOIL); rgb = [rgb[0] * .88, rgb[1] * .88, rgb[2] * .88]; }
       else if (g === G.ALLEY) rgb = col(M.ALLEYWAY);
       else if (g === G.PROM) rgb = col((wx + wz) % 4 === 0 ? M.WOOD_D : M.WOOD);
       else if (g === G.CAMP) rgb = col(M.GRAVEL);
@@ -479,11 +479,15 @@ class Game {
       const fx = Math.max(0, (wx - X0) / GS), fz = Math.max(0, (wz - Z0) / GS), ix = Math.min(GW - 2, fx | 0), iz = Math.min(GD - 2, fz | 0), ux = Math.min(1, fx - ix), uz = Math.min(1, fz - iz), k = ix + iz * GW;
       return (A[k] * (1 - ux) + A[k + 1] * ux) * (1 - uz) + (A[k + GW] * (1 - ux) + A[k + GW + 1] * ux) * uz;
     };
-    // The highways west, carrying straight on from where they leave the world.
+    // The highways west, and the two roads north out of Albion, carrying straight on from where they leave the world.
     const chaikin = (pts) => { for (let n = 0; n < 2; n++) { const o = [pts[0]]; for (let i = 0; i + 1 < pts.length; i++) { const [ax, az] = pts[i], [bx, bz] = pts[i + 1]; o.push([ax * .75 + bx * .25, az * .75 + bz * .25], [ax * .25 + bx * .75, az * .25 + bz * .75]); } o.push(pts[pts.length - 1]); pts = o; } return pts; };
-    const roads = [chaikin([[40, 2278], [0, 2290], [-196, 2350], [-480, 2412], [-760, 2400], [-1060, 2452], [-1440, 2472]]), chaikin([[40, 3559], [0, 3560], [-300, 3570], [-620, 3560], [-900, 3604], [-1180, 3622], [-1440, 3648]])];
+    const roads = [chaikin([[40, 2278], [0, 2290], [-196, 2350], [-480, 2412], [-760, 2400], [-1060, 2452], [-1440, 2472]]), chaikin([[40, 3559], [0, 3560], [-300, 3570], [-620, 3560], [-900, 3604], [-1180, 3622], [-1440, 3648]]),
+      chaikin([[333, 40], [334, 0], [350, -180], [318, -380], [262, -560], [250, -800]]), chaikin([[2379, 40], [2378, 0], [2360, -160], [2410, -360], [2470, -560], [2500, -800]])];
+    const roadBox = roads.map((pts) => { let a = Infinity, b = -Infinity, c = Infinity, d = -Infinity; for (const [px2, pz2] of pts) { a = Math.min(a, px2); b = Math.max(b, px2); c = Math.min(c, pz2); d = Math.max(d, pz2); } return [a - 12, b + 12, c - 12, d + 12]; });
     const roadAt = (wx, wz) => {
-      for (const pts of roads) {
+      for (let r = 0; r < roads.length; r++) {
+        const pts = roads[r], bb = roadBox[r];
+        if (wx < bb[0] || wx > bb[1] || wz < bb[2] || wz > bb[3]) continue;
         let run = 0;
         for (let k = 0; k + 1 < pts.length; k++) {
           const [ax, az] = pts[k], [bx, bz] = pts[k + 1], dx = bx - ax, dz = bz - az, len = Math.hypot(dx, dz);
@@ -507,7 +511,7 @@ class Game {
         rgb = [WATER.deep[0] + (WATER.shallow[0] - WATER.deep[0]) * shore, WATER.deep[1] + (WATER.shallow[1] - WATER.deep[1]) * shore, WATER.deep[2] + (WATER.shallow[2] - WATER.deep[2]) * shore];
         land = false;
       } else {
-        const crop = wz > WZ ? L.cropAt(wx, wz) : 0, t = at(E, wx, wz), road = wx < 40 && ((wz > 2200 && wz < 2560) || (wz > 3500 && wz < 3720)) ? roadAt(wx, wz) : 0;
+        const crop = wz > WZ ? L.cropAt(wx, wz) : 0, t = at(E, wx, wz), road = roadAt(wx, wz);
         const steep = Math.abs(at(E, wx + 2, wz) - at(E, wx - 2, wz)) + Math.abs(at(E, wx, wz + 2) - at(E, wx, wz - 2));
         let park = false;
         const sandK = wx > 1800 ? (this.seaAt(wx + 14 + mapNoise(wz * .02, 3) * 12, wz) || this.seaAt(wx - 22, wz) ? 1 : this.seaAt(wx + 34, wz) ? .45 : 0) : 0;
@@ -518,7 +522,7 @@ class Game {
         else if (crop === -1) rgb = col(hash(wx >> 1, wz >> 1) < .4 ? M.PATH : M.DIRT);
         else if (crop > 0) {
           const dot = hash(wx >> 1, wz >> 1);
-          rgb = col(crop === 2 ? (dot < .6 ? M.CORN : M.LEAF3) : crop === 3 ? (dot < .35 ? M.COTTON : M.LEAF3) : crop === 4 ? (dot < .5 ? M.PEANUT : M.SOIL) : crop === 5 ? (wx % 8 < 2 ? M.LEAF2 : M.SOIL) : crop === 6 ? M.GRASS_DRY : M.SOIL);
+          rgb = col(crop === 1 ? (wx % 6 < 4 ? M.LEAF2 : M.SOIL) : crop === 2 ? (dot < .6 ? M.CORN : M.LEAF3) : crop === 3 ? (dot < .35 ? M.COTTON : M.LEAF3) : crop === 4 ? (dot < .5 ? M.PEANUT : M.SOIL) : crop === 5 ? (wx % 8 < 2 ? M.LEAF2 : M.SOIL) : crop === 6 ? M.GRASS_DRY : M.SOIL);
           rgb = [rgb[0] * .88, rgb[1] * .88, rgb[2] * .88];
         } else if ((t >= 12 && steep > 7) || t > 128 + mapNoise(wx * .02, wz * .02) * 30) { const r0 = col(M.SCHIST), gr = this.groundColour(wx, wz, t, 0, col, hash); rgb = [r0[0] * .62 + gr[0] * .3, r0[1] * .62 + gr[1] * .3, r0[2] * .62 + gr[2] * .3]; }
         else { rgb = this.groundColour(wx, wz, t, at(F, wx, wz), col, hash); park = true; }
@@ -555,7 +559,7 @@ class Game {
     for (let wz = Math.floor(Z0 / 6) * 6; wz < Z1; wz += 6) for (let wx = Math.floor(X0 / 6) * 6; wx < X1; wx += 6) {
       if (inWorld(wx, wz) && inWorld(wx + 4, wz + 4)) continue;
       const t = at(E, wx, wz), steep = Math.abs(at(E, wx + 2, wz) - at(E, wx - 2, wz)) + Math.abs(at(E, wx, wz + 2) - at(E, wx, wz - 2));
-      if ((t >= 12 && steep > 7) || (wx < 0 && ((wz > 2200 && wz < 2560) || (wz > 3500 && wz < 3720)) && roadAt(wx, wz))) continue;
+      if ((t >= 12 && steep > 7) || (!inWorld(wx, wz) && roadAt(wx, wz))) continue;
       const f = at(F, wx, wz), j = r2(wx, wz);
       if (j < L.forestAt(wx, wz) * .8) tree(wx + Math.floor(j * 40) % 4, wz + Math.floor(j * 70) % 4, Math.floor(j * 9999), f);
       const tk = L.trinityAt(wx, wz);

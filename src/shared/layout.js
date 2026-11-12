@@ -87,6 +87,9 @@ const Z = {
   houses: { blk: [104, 66], drop: 0.3, f: [1, 2], st: [S.clapW, S.clapB, S.clapY, S.clapG, S.cottage, S.cedar], lot: [21, 29], house: [3, 5], dens: 60 },
   beach: { blk: [100, 62], drop: 0.26, f: [1, 2], st: [S.beachP, S.beachT, S.clapW, S.clapY, S.clapB], lot: [20, 27], house: [3, 4], dens: 50 },
   estate: { blk: [190, 140], drop: 0.38, f: [2, 3], st: [S.manor, S.manor, S.manorB, S.cottage, S.clapW], lot: [56, 88], house: [11, 17], dens: 35 },
+  farmtown: { blk: [130, 90], rural: true, f: [1, 2], st: [S.clapW, S.clapY, S.brick, S.cedar, S.clapG, S.brick2], lot: [22, 36], tall: 0, parking: .14, garden: .12, fields: .1, alley: .1, dens: 45 },
+  farmhouse: { blk: [240, 170], rural: true, f: [1, 2], st: [S.clapW, S.clapW, S.clapY, S.cedar, S.cottage, S.clapG, S.barn], lot: [40, 64], house: [7, 13], garden: .14, fields: .55, dens: 22 },
+  grainyard: { blk: [180, 130], rural: true, f: [1, 3], st: [S.barn, S.barn, S.warehouse, S.silo], lot: [40, 70], parking: .18, fields: .2, alley: .2, dens: 24 },
   village: { blk: [100, 70], drop: 0.3, f: [1, 2], st: [S.clapW, S.cedar, S.cottage, S.clapY, S.brick], lot: [20, 28], house: [3, 5], dens: 38 },
 };
 
@@ -116,7 +119,7 @@ const RIVER = px([[500, 0], [492, 60], [490, 110], [500, 140], [525, 165], [560,
   [590, 345], [600, 370], [585, 395], [575, 420], [565, 440], [580, 460]]);
 const BARRIER = px([[1095, 830], [1115, 900], [1140, 1000], [1160, 1070], [1150, 1092], [1128, 1080], [1110, 1005], [1090, 925], [1076, 860]]);
 const SPIT = px([[1078, 1100], [1100, 1105], [1112, 1150], [1102, 1200], [1088, 1254], [1062, 1254], [1068, 1200], [1074, 1150]]);
-const GIBSON_ROAD = [[2400, 1045], [2520, 1045], [2610, 960], [2660, 830], [3500, 760], [3720, 760], [3810, 790], [3880, 866], [4059, 900], [4110, 935], [4220, 935]];
+const GIBSON_ROAD = [[2400, 1045], [2520, 1045], [2610, 960], [2660, 830], [2900, 792], [3010, 760], [3500, 760], [3720, 760], [3810, 790], [3880, 866], [4059, 900], [4110, 935], [4220, 935]];
 const STREET_POOL = ['Linden', 'Carrow', 'Page', 'Founders', 'Marlowe', 'Garrison', 'Exchange', 'Meridian', 'Tanner', 'Quay', 'Mill', 'Ferry', 'Chapel', 'Union', 'Market',
   'Bridge', 'Hawthorn', 'Laurel', 'Cedar', 'Magnolia', 'Dogwood', 'Pecan', 'Willow', 'Sycamore', 'Pine', 'Juniper', 'Palmetto', 'Live Oak', 'Peachtree', 'Cypress',
   'Harbor', 'Bay', 'Ocean', 'Gull', 'Heron', 'Pelican', 'Dune', 'Coral', 'Orchard', 'Ridge', 'Summit', 'Highland', 'Abbey', 'Stone', 'Belmont', 'Court', 'Bell', 'Vine',
@@ -148,7 +151,9 @@ const ridged = (x, z, f, ang, str, o) => {
 const TOWN_DEFS = [
   {
     key: 'albion', name: 'Albion', joins: [[false, 310], [false, 1045], [true, 2386], [true, 441]], lift: (x, z) => 6 + 26 * sstep((1700 - z) / 1400),
-    poly: px([[95, 58], [300, 50], [470, 62], [520, 85], [640, 95], [648, 300], [645, 480], [600, 485], [565, 470], [520, 430], [450, 405], [380, 395], [300, 420], [260, 470],
+    // The north side steps in through the middle: the old town reaches up at the west corner and the mills by the river at the east, and
+    // between them the woods come down to the edge of Market Row.
+    poly: px([[95, 58], [200, 52], [262, 58], [280, 126], [330, 136], [395, 132], [412, 98], [470, 66], [520, 85], [640, 95], [648, 300], [645, 480], [600, 485], [565, 470], [520, 430], [450, 405], [380, 395], [300, 420], [260, 470],
       [200, 520], [140, 510], [110, 470], [80, 380], [75, 200]]),
     districts: [
       ['Exchange District', 1180, 840, 'core', 0, 124, 76, 18, 12, { oa: 0, ob: 38, wide: [0], square: { ia: 0, ir: -1 }, numbered: true }],
@@ -164,7 +169,7 @@ const TOWN_DEFS = [
     ],
   },
   {
-    key: 'severn', name: 'Severn Bay', joins: [[true, 4320], [false, 3200], [false, 2905], [false, 3250]], lift: () => 1,
+    key: 'severn', name: 'Severn Bay', joins: [[true, 4320], [false, 3200], [false, 2905]], lift: () => 1,
     poly: px([[760, 840], [860, 820], [960, 815], [1060, 830], [1092, 858], [1066, 892], [1056, 960], [1054, 1050], [1040, 1080], [990, 1095], [950, 1110], [900, 1105],
       [860, 1070], [790, 1050], [755, 980], [750, 900]]),
     districts: [
@@ -176,12 +181,13 @@ const TOWN_DEFS = [
   },
   {
     key: 'esperance', name: 'Esperance', joins: [[true, 760], [false, 3544]], lift: (x) => 8 + 36 * sstep((1520 - x) / 620),
-    poly: px([[150, 840], [250, 815], [340, 840], [430, 880], [455, 960], [440, 1050], [380, 1095], [290, 1110], [200, 1090], [140, 1040], [115, 960], [125, 890]]),
+    // Sat low on its hill, so the southern road runs through the lower middle of town rather than along the bottom of it.
+    poly: px([[150, 840], [250, 815], [340, 840], [430, 880], [455, 960], [440, 1050], [380, 1095], [290, 1110], [200, 1090], [140, 1040], [115, 960], [125, 890]]).map(([x, z]) => [x, z + 170]),
     districts: [
-      ['Esperance Center', 950, 3300, 'shops', 0, 92, 68, 14, 12, { parks: [['Esperance Common', 0, -1, 1, 1]] }], ['Laurel Park', 1180, 3130, 'houses', .25, 104, 64, 12, 10, {}],
-      ['Belmont', 720, 3460, 'houses', -.3, 104, 64, 12, 10, {}], ['Chapel Hill', 960, 3560, 'finest', .1, 96, 64, 12, 10, {}],
-      ['Esperance Heights', 680, 2930, 'estate', .4, 170, 120, 12, 10, {}], ['Highland', 470, 3220, 'estate', -.45, 170, 120, 12, 10, {}],
-      ['Ridgeview', 1300, 2900, 'estate', -.2, 170, 120, 12, 10, {}], ['Southview', 1250, 3480, 'estate', .15, 170, 120, 12, 10, {}],
+      ['Esperance Center', 950, 3470, 'shops', 0, 92, 68, 14, 12, { parks: [['Esperance Common', 0, -1, 1, 1]] }], ['Laurel Park', 1180, 3300, 'houses', .25, 104, 64, 12, 10, {}],
+      ['Belmont', 720, 3630, 'houses', -.3, 104, 64, 12, 10, {}], ['Chapel Hill', 960, 3730, 'finest', .1, 96, 64, 12, 10, {}],
+      ['Esperance Heights', 680, 3100, 'estate', .4, 170, 120, 12, 10, {}], ['Highland', 470, 3390, 'estate', -.45, 170, 120, 12, 10, {}],
+      ['Ridgeview', 1300, 3070, 'estate', -.2, 170, 120, 12, 10, {}], ['Southview', 1250, 3650, 'estate', .15, 170, 120, 12, 10, {}],
     ],
   },
   {
@@ -189,18 +195,18 @@ const TOWN_DEFS = [
     poly: px([[940, 60], [985, 70], [998, 200], [1012, 250], [1040, 320], [1052, 400], [1065, 470], [1085, 540], [1100, 600], [1060, 630], [1010, 600], [975, 520], [950, 440],
       [935, 350], [925, 250], [925, 140]]),
     districts: [
-      ['Dayton Works', 4240, 350, 'works', -.15, 140, 100, 14, 12, {}], ['Harborside', 4350, 900, 'mainst', -.2, 90, 64, 12, 10, {}],
-      ['Dayton Center', 4450, 1230, 'commercial', -.2, 96, 66, 16, 12, { parks: [['Cooper Square', 0, 0, 1, 1]] }], ['Millside', 4250, 640, 'houses', -.2, 110, 64, 12, 10, {}],
-      ['Sunset Shores', 4520, 1560, 'bungalow', -.22, 104, 60, 12, 10, {}], ['Palm Grove', 4600, 1880, 'bungalow', -.25, 110, 62, 12, 10, {}],
+      ['Dayton Works', 4240, 520, 'works', -.15, 140, 100, 14, 12, {}], ['Harborside', 4350, 1070, 'mainst', -.2, 90, 64, 12, 10, {}],
+      ['Dayton Center', 4450, 1400, 'commercial', -.2, 96, 66, 16, 12, { parks: [['Cooper Square', 0, 0, 1, 1]] }], ['Millside', 4250, 810, 'houses', -.2, 110, 64, 12, 10, {}],
+      ['Sunset Shores', 4520, 1730, 'bungalow', -.22, 104, 60, 12, 10, {}], ['Palm Grove', 4600, 2050, 'bungalow', -.25, 110, 62, 12, 10, {}],
     ],
   },
   {
     key: 'weston', name: 'Weston', joins: [[true, 2330]], lift: () => 3,
     poly: px([[515, 700], [600, 688], [680, 708], [695, 780], [665, 835], [590, 845], [525, 815], [505, 755]]),
     districts: [
-      ['Weston', 2330, 2500, 'mainst', 0, 96, 70, 14, 12, { oa: 0, parks: [['Weston Green', 0, -1, 1, 1]] }], ['North Weston', 2170, 2340, 'village', .15, 100, 66, 12, 10, {}],
-      ['South Weston', 2320, 2680, 'village', -.1, 100, 66, 12, 10, {}], ['Weston Yards', 2510, 2470, 'works', 0, 130, 100, 14, 12, {}],
-      ['Pond Side', 2080, 2550, 'village', .3, 100, 66, 12, 10, {}],
+      ['Weston', 2330, 2500, 'farmtown', 0, 96, 70, 14, 12, { oa: 0, parks: [['Weston Green', 0, -1, 1, 1]] }], ['North Weston', 2170, 2340, 'farmhouse', .15, 100, 66, 12, 10, {}],
+      ['South Weston', 2320, 2680, 'farmhouse', -.1, 100, 66, 12, 10, {}], ['Weston Yards', 2510, 2470, 'grainyard', 0, 130, 100, 14, 12, {}],
+      ['Pond Side', 2080, 2550, 'farmhouse', .3, 100, 66, 12, 10, {}],
     ],
   },
   {
@@ -392,7 +398,9 @@ export function buildLayout(seed = 1609) {
   // The land rises to the north. Mt. Page is a sandstone plateau cut through with gorges, its peak standing out of it, and from its
   // lower slopes a ridge runs east to Trinity Forest: high, broken forest country from the coast road up past Gibson Valley to the northern
   // edge. Weston's farmland lies flat from that ridge to the southern edge, and the coast is a low plain.
-  const farmK = (x, z) => sstep(1 - capsule(x, z, 2540, 2480, 2580, 4096) / 560);
+  // The farmland: a long run south from Weston, spreading west toward Carver Yard and a little way east, with open country between the
+  // last fields and Severn Bay.
+  const farmK = (x, z) => Math.max(sstep(1 - capsule(x, z, 2540, 2480, 2520, 4096) / 520), sstep(1 - capsule(x, z, 2700, 3150, 2900, 3420) / 400), sstep(1 - capsule(x, z, 2080, 2980, 2020, 3820) / 380));
   const trinityK = (x, z) => Math.max(sstep(1 - capsule(x, z, 2570, 950, 4470, 2150) / 430), sstep(1 - capsule(x, z, 2270, 60, 4120, 380) / 300), sstep(1 - capsule(x, z, 3500, 1700, 2820, 2380) / 380));
   const pageK = (x, z) => sstep(1 - capsule(x, z, 560, 1450, 2040, 2380) / 560);
   const elev0 = (x, z) => {
@@ -497,6 +505,7 @@ export function buildLayout(seed = 1609) {
   const dist = new Uint8Array(N), dist2 = new Uint8Array(N), dEdge = new Uint8Array(N);
   const roads = new Uint8Array(N);    // how many streets cross a cell: lane lines stop at the junctions
   const townCars = [];
+  const nearMain = new Uint8Array(N);
   const DISTRICTS = [];
   const leaves = [];
   // Settlements built into a town take whole blocks of it: the streets go round them, not through them.
@@ -531,7 +540,7 @@ export function buildLayout(seed = 1609) {
       }
       if (!canV && !canH && !forced) { leaf(); return; }
       const vert = forced ? forced.fv : canV && (!canH || (w / A) * (.75 + rr() * .5) > d / B);
-      const sw = forced || depth < 2 ? 18 : depth < 4 ? 14 : zone.house ? 10 : 12;
+      const sw = zone.rural ? (forced || depth < 2 ? 14 : 10) : forced || depth < 2 ? 18 : depth < 4 ? 14 : zone.house ? 10 : 12;
       const lo = vert ? x0 : z0, ext = vert ? w : d, tgt = vert ? A : B;
       const k = Math.max(2, Math.round(ext / tgt)), m = Math.max(1, Math.min(k - 1, Math.round(k * (.3 + rr() * .4))));
       let p = forced ? forced.fp : Math.round(lo + ext * m / k + (rr() - .5) * 12);
@@ -542,7 +551,7 @@ export function buildLayout(seed = 1609) {
         if (p > a0 - pad && p < a1 + pad) p = p - a0 < a1 - p ? a0 - pad : a1 + pad;
       }
       if (p - lo < 34 || lo + ext - p < 34) { leaf(); return; }
-      t.segs.push({ v: vert, p, a0: vert ? z0 : x0, a1: vert ? z1 : x1, w: sw, e0: vert ? wN : wW, e1: vert ? wS : wE, depth });
+      t.segs.push({ v: vert, p, a0: vert ? z0 : x0, a1: vert ? z1 : x1, w: sw, e0: vert ? wN : wW, e1: vert ? wS : wE, depth, forced: !!forced });
       if (vert) { split(x0, z0, p, z1, depth + 1, wN, wS, wW, sw); split(p, z0, x1, z1, depth + 1, wN, wS, sw, wE); }
       else { split(x0, z0, x1, p, depth + 1, wN, sw, wW, wE); split(x0, p, x1, z1, depth + 1, sw, wS, wW, wE); }
     };
@@ -577,7 +586,7 @@ export function buildLayout(seed = 1609) {
     }
     // Out where the houses are, a big block gets a cul-de-sac into the middle of it, with a turning circle at the end.
     for (const L of mine) {
-      if (!L.inTown || !L.zone.house) continue;
+      if (!L.inTown || !L.zone.house || L.zone.rural) continue;
       const iw = L.ix1 - L.ix0, ih = L.iz1 - L.iz0;
       if (Math.max(iw, ih) < 84 || Math.min(iw, ih) < 56 || rr() > .65) continue;
       const vert = iw < ih ? false : true;
@@ -601,6 +610,17 @@ export function buildLayout(seed = 1609) {
       for (let k = 0, last = -1e6; k < SL; k++) { if (inT[k]) last = k; fwd[k] = k - last; }
       for (let k = SL - 1, last = 1e6; k >= 0; k--) { if (inT[k]) last = k; back[k] = last - k; }
       const ext0 = 12 + Math.floor(r2(s.p * 3 + ti, 17) * 64), ext1 = 12 + Math.floor(r2(s.p * 5 + ti, 29) * 64);
+      let br = null;
+      if (s.forced) {
+        const wet = (k) => { const x = s.v ? s.p : s.a0 + k, z = s.v ? s.a0 + k : s.p; return inside(x, z) && !land[z * WX + x]; };
+        for (let k = 0; k < SL;) {
+          if (!wet(k)) { k++; continue; }
+          let e = k;
+          while (e < SL && wet(e)) e++;
+          if (k > 0 && e < SL && e - k <= 260 && inT[k - 1] && inT[e]) { br = br || new Uint8Array(SL); for (let q = Math.max(0, k - 28); q < Math.min(SL, e + 28); q++) br[q] = 1; }
+          k = e;
+        }
+      }
       for (let a = s.a0; a <= s.a1; a++) for (let c = s.p - hw - 4; c <= s.p + hw + 4; c++) {
         const k = a - s.a0;
         if (!inT[k] && fwd[k] > ext1 && back[k] > ext0) continue;
@@ -613,11 +633,17 @@ export function buildLayout(seed = 1609) {
           if (v > mask[i]) mask[i] = v;
           continue;
         }
-        if (!deckOK && dw[i] < 24) continue;
+        const dk = deckOK || (br && br[k]);
+        if (!dk && dw[i] < 24) continue;
         const v = Math.abs(c - s.p) <= hw ? 3 : 2;
         if (v > mask[i]) mask[i] = v;
         if (v === 3 && roads[i] < 255) roads[i]++;
-        if (deckOK) deck[i] = 1;
+        if (dk) deck[i] = 1;
+      }
+      // Beside a main street the waterfront drive gives way to it: no second road squeezed in between it and the water.
+      if (s.forced) for (let a = s.a0; a <= s.a1; a++) for (let c = s.p - hw - 26; c <= s.p + hw + 26; c++) {
+        const x = s.v ? c : a, z = s.v ? a : c;
+        if (inside(x, z)) nearMain[z * WX + x] = 1;
       }
     }
     // A waterfront drive along every shore in town, coast, lake or river: a promenade by the water, the drive behind it, and the streets
@@ -625,14 +651,14 @@ export function buildLayout(seed = 1609) {
     for (let z = t.z0; z <= t.z1; z++) for (let x = t.x0, i = z * WX + x; x <= t.x1; x++, i++) {
       if (townId[i] !== ti + 1 || !land[i]) continue;
       const e = dw[i];
-      if (e < 9 || e > 27 || campDist(x, z) < 12) continue;
+      if (e < 9 || e > 27 || nearMain[i] || campDist(x, z) < 12) continue;
       const v = e >= 12 && e <= 22 ? 3 : 2;
       if (v > mask[i]) mask[i] = v;
       if (v === 3) { if (roads[i] < 255) roads[i]++; if (e === 17 && (x + z) % 9 < 5) mark[i] = 2; }
     }
     // Lane lines and crossings, where a street meets the one it runs into; and the cars left along the kerbs.
     for (const s of t.segs) {
-      const hw = s.w >> 1;
+      const hw = s.w >> 1, lane = !zoneNear(s.v ? s.p : (s.a0 + s.a1) >> 1, s.v ? (s.a0 + s.a1) >> 1 : s.p).rural || s.w >= 14;
       for (let a = s.a0; a <= s.a1; a++) {
         const near0 = a - s.a0 <= s.a1 - a, e = near0 ? s.e0 : s.e1, din = near0 ? a - s.a0 - (e >> 1) : s.a1 - a - (e >> 1);
         for (let c = s.p - hw; c <= s.p + hw; c++) {
@@ -641,14 +667,14 @@ export function buildLayout(seed = 1609) {
           const i = z * WX + x;
           if (townId[i] !== ti + 1 || roads[i] !== 1) continue;
           let mk = 0;
-          if (e && din >= 2 && din <= 5) mk = c & 1 ? 0 : 3;
-          else if (c === s.p && s.w >= 14 && a % 9 < 5) mk = s.w >= 18 ? 1 : 2;
+          if (lane && e && din >= 2 && din <= 5) mk = c & 1 ? 0 : 3;
+          else if (lane && c === s.p && s.w >= 14 && a % 9 < 5) mk = s.w >= 18 ? 1 : 2;
           if (mk) mark[i] = mk;
         }
       }
       const lanes = s.w >= 18 ? [-hw + 3, -3, 3, hw - 3] : [-hw + 3, hw - 3];
       for (let a = s.a0 + (s.e0 >> 1) + 12; a < s.a1 - (s.e1 >> 1) - 26; a += 20) for (const ln of lanes) {
-        if (r2(ti * 7 + s.p * 3 + ln, a) < .2 * busy) townCars.push(s.v ? s.p + ln - 2 : a, s.v ? a : s.p + ln - 2, s.v ? 0 : 1, r2(a, s.p + ln));
+        if (r2(ti * 7 + s.p * 3 + ln, a) < (lane ? .2 : .07) * busy) townCars.push(s.v ? s.p + ln - 2 : a, s.v ? a : s.p + ln - 2, s.v ? 0 : 1, r2(a, s.p + ln));
       }
     }
   });
@@ -670,7 +696,7 @@ export function buildLayout(seed = 1609) {
     return { x0: cx - hw, x1: cx + hw, z0: cz - hh, z1: cz + hh };
   };
   // Parks: a whole block each, kept as grass. Meridian Square: a block in the middle of Albion, paved over.
-  const PARK_DEFS = [['Founders Green', 900, 820], ['Northgate Gardens', 760, 330], ['Pagefoot Park', 1120, 1200], ['Esperance Common', 950, 3240], ['Cooper Square', 4450, 1230],
+  const PARK_DEFS = [['Founders Green', 900, 820], ['Northgate Gardens', 760, 330], ['Pagefoot Park', 1120, 1200], ['Esperance Common', 950, 3410], ['Cooper Square', 4450, 1230],
     ['Carousel Park', 4070, 2800], ['Weston Green', 2330, 2450], ['Bayfront Park', 4350, 3400]];
   const SQL = leafFor(1180, 840, 50);
   const parkLeaves = PARK_DEFS.map(([pn, x, z]) => { const L = leafFor(x, z); L.park = pn; return L; });
@@ -721,13 +747,16 @@ export function buildLayout(seed = 1609) {
     southern: stampLine([[0, 3560], [300, 3550], [392, 3544], [1480, 3544], [1920, 3540], [2190, 3530], [2443, 3460], [3500, 3300], [3590, 3215], [3640, 3200], [3740, 3200]], HW, { wind: true }),
     west: stampLine([[441, 1660], [441, 1760], [408, 1850], [408, 1960], [400, 2200], [392, 2286], [425, 2548], [653, 2711], [760, 2770], [760, 2900]], HW, { wind: true }),
     westpoint: stampLine([[400, 2215], [300, 2215], [196, 2230], [0, 2290]], HW, { wind: true }),
+    // Two roads out of Albion to the north, off the edge of the map: the old turnpike off the ring road, and the river road on the east bank.
+    turnpike: stampLine([[327, 196], [322, 120], [334, 0]], HW, { smooth: 1 }),
+    riverRoad: stampLine([[2390, 310], [2392, 170], [2378, 0]], HW, { smooth: 1 }),
     ring: stampLine([[620, 190], [327, 196], [245, 457], [261, 817], [376, 1078], [425, 1372], [441, 1660]], 14),
     page: stampLine([[408, 1800], [653, 1830], [880, 1990]], 10, { line: false, wind: true }),
     arnhem: stampLine([[2190, 3530], [2180, 3700], [2200, 3900], [2500, 3920], [3820, 3890]], 10, { line: false, wind: true }),
   };
   const OCEAN_DRIVE = stampLine(px([[1086, 845], [1102, 915], [1125, 1000], [1144, 1065]]), 14, { walk: true, bridge: false });
   // Two causeways out across the lagoon to the Strand: from the mainland's last street, over the water, to Ocean Drive.
-  for (const cz of [2905, 3250]) {
+  for (const cz of [2905, 3200]) {
     let x = coastX[cz] - 60;
     while (x < WX - 1 && land[cz * WX + x] === 1) x++;
     while (x < WX - 1 && land[cz * WX + x] !== 1) x++;
@@ -764,8 +793,29 @@ export function buildLayout(seed = 1609) {
     const k = Math.max(farmK(x, z) * 1.7, sstep(1 - Math.hypot((x - 3290) / 260, (z - 700) / 170)));
     return k + (fbm2(x * .006, z * .006 + 3, 2) - .5) * .9 > .55;
   };
-  const PLW = Math.ceil((WX + 30) / 92) + 1, plotMemo = new Int8Array(PLW * (Math.ceil(WZ / 66) + 1)).fill(-1);
-  const plotIn = (px2, pz) => { const k = px2 + pz * PLW; let v = plotMemo[k]; if (v < 0) { v = plotMemo[k] = fieldAt(px2 * 92 - 30 + 46, pz * 66 + 33) ? 1 : 0; } return v === 1; };
+  // The fields are laid out in sections a quarter-mile or so across, with a track round each; a section is one big field, or split into
+  // two, three or four, so the country is a patchwork of every size rather than a chequerboard. Whether a field is ploughed is down to its
+  // own middle, so the farmland's edge goes field by field. Returns 0 off the fields, -1 on a track, 1-6 for a crop, 7 for pasture.
+  const SW = 276, SD = 198, SECW = Math.ceil((WX + 30) / SW) + 1, SECD = Math.ceil((WZ + 800) / SD) + 1;
+  const fieldMemo = new Int8Array(SECW * SECD * 16).fill(-1);
+  const CROPS = [1, 1, 2, 2, 2, 3, 4, 6, 6, 7, 7, 5, 1, 6];
+  const fieldCell = (x, z) => {
+    const fx = x + 30, sx = Math.floor(fx / SW), sz = Math.floor(z / SD), lx = fx - sx * SW, lz = z - sz * SD;
+    const a = r2(sx * 7 + 1, sz * 11 + 5), b = r2(sx * 3 + 9, sz * 5 + 2), c = r2(sx * 13 + 4, sz * 17 + 8), t = Math.floor(a * 6);
+    const v0 = t === 1 || t === 3 ? (.3 + b * .4) * SW : t === 4 ? (.26 + b * .12) * SW : 0, v1 = t === 4 ? (.6 + c * .12) * SW : 0;
+    const h0 = t === 2 || t === 3 || t === 5 ? (.3 + c * .4) * SD : 0;
+    const ix = v0 && lx >= v0 ? (v1 && lx >= v1 ? 2 : 1) : 0, iz = h0 && lz >= h0 ? 1 : 0;
+    const key = ((sz * SECW + sx) * 4 + ix) * 4 + iz;
+    let on = sx >= 0 && sz >= 0 && sx < SECW && sz < SECD ? fieldMemo[key] : -1;
+    if (on < 0) {
+      const xa = ix === 0 ? 0 : ix === 1 ? v0 : v1, xb = ix === 0 ? (v0 || SW) : ix === 1 ? (v1 || SW) : SW, za = iz ? h0 : 0, zb = iz || !h0 ? SD : h0;
+      on = fieldAt(sx * SW - 30 + (xa + xb) / 2, sz * SD + (za + zb) / 2) ? 1 : 0;
+      if (sx >= 0 && sz >= 0 && sx < SECW && sz < SECD) fieldMemo[key] = on;
+    }
+    if (!on) return 0;
+    if (lx < 3 || lz < 3 || (v0 && Math.abs(lx - v0) < 1.5) || (v1 && Math.abs(lx - v1) < 1.5) || (h0 && Math.abs(lz - h0) < 1.5)) return -1;
+    return CROPS[Math.floor(r2(key * 7 + 3, key * 13 + 1) * CROPS.length)];
+  };
   for (let z = 0, i = 0; z < WZ; z++) for (let x = 0; x < WX; x++, i++) {
     const m = mask[i];
     if (!land[i]) {
@@ -779,20 +829,19 @@ export function buildLayout(seed = 1609) {
     const d = dw[i];
     if (townId[i] && land[i] !== 3) {
       // A town meets its water with a boardwalk; everything else is a lot until something claims it.
-      ground[i] = d < 7 ? G.PROM : m === 2 || d < 10 ? G.WALK : G.LOT;
+      const rural = dist[i] && DISTRICTS[dist[i] - 1].zone.rural;
+      ground[i] = d < 7 ? G.PROM : m === 2 || d < 10 ? (rural ? G.DIRT : G.WALK) : G.LOT;
       continue;
     }
     if (m === 2) { ground[i] = G.WALK; continue; }
     if (m === 1) { ground[i] = G.DIRT; continue; }
     if (x > coastX[z] - 180 && d < 24 + noise2(x * .02, z * .02) * 14) { ground[i] = G.SAND; continue; }
     if (x > coastX[z] && land[i] === 1 && (z > 3560 || d < 22 + noise2(x * .03, z * .03) * 10)) { ground[i] = G.SAND; continue; }
-    if (land[i] !== 3 && d > 14 && plotIn(Math.floor((x + 30) / 92), Math.floor(z / 66))) {
-      // Plots with a track round each: corn, cotton, peanuts, somebody's tomatoes, cut hay, and pasture left as grass. A plot is all
-      // field or none of it: whether it is ploughed is down to the middle of it.
-      const fx = x + 30, px2 = Math.floor(fx / 92), pz = Math.floor(z / 66);
-      if (fx % 92 < 3 || z % 66 < 3) { ground[i] = G.DIRT; continue; }
-      const crop = Math.floor(r2(px2 * 7 + 3, pz * 13 + 1) * 6);
-      if (crop !== 3) { ground[i] = G.FIELD; mark[i] = crop + 1; continue; }
+    if (land[i] !== 3 && d > 14) {
+      // Beans, corn, cotton, peanuts, somebody's tomatoes, cut hay, and pasture left as grass.
+      const fc = fieldCell(x, z);
+      if (fc < 0) { ground[i] = G.DIRT; continue; }
+      if (fc > 0 && fc < 7) { ground[i] = G.FIELD; mark[i] = fc; continue; }
     }
     ground[i] = G.PARK;
   }
@@ -1038,7 +1087,8 @@ export function buildLayout(seed = 1609) {
     if (count < 40) { turn(zone.house ? G.PARK : G.ALLEY); continue; }
     // Every so often somebody's cleared lot has been turned over for vegetables, or was only ever somewhere to leave the car.
     if (zone.garden && thin >= 8 && r() < zone.garden) { turn(G.PARK); continue; }
-    if (zone.parking && thin >= 18 && r() < zone.parking) { turn(G.PLAZA, 4); parking.push(L); continue; }
+    if (zone.parking && thin >= 18 && r() < zone.parking) { turn(G.PLAZA, zone.rural ? 0 : 4); if (!zone.rural) parking.push(L); else turn(G.DIRT); continue; }
+    if (zone.fields && thin >= 24 && r() < zone.fields) { const crop = [2, 3, 4, 6, 6][Math.floor(r() * 5)]; turn(G.FIELD, crop); continue; }
     let style = r.pick(zone.st);
     const [fa, fb] = zone.f;
     let floors = Math.round(fa + (fb - fa) * Math.pow(r(), 1.6));
@@ -1057,6 +1107,8 @@ export function buildLayout(seed = 1609) {
     } else if (zone.stepped && floors >= 7 && r() < zone.stepped) tiers = [0, top(floors - 2), 4, top(floors)];
     const fx0 = L.ax + inset, fx1 = L.bx - inset, fz0 = L.az + inset, fz1 = L.bz - inset;
     if (fx1 - fx0 < 8 || fz1 - fz0 < 8) { turn(zone.house ? G.PARK : G.ALLEY); continue; }
+    // A silo is a round-shouldered tin can, not a building with windows: a small one at the back of its lot.
+    if (style === S.silo) { const cx = (fx0 + fx1) >> 1, cz = (fz0 + fz1) >> 1; tiers = [0, top(r.int(4, 6))]; addBuilding({ name: '', style, tiers, x0: cx - 5, x1: cx + 5, z0: cz - 5, z1: cz + 5, seed: r() * 4294967296 >>> 0, blank: true }); for (let z = L.az; z <= L.bz; z++) for (let x = L.ax, i = z * WX + x; x <= L.bx; x++, i++) if (label[i] === L.lbl && ground[i] === G.LOT) { if (Math.abs(x - cx) <= 5 && Math.abs(z - cz) <= 5) lot[i] = buildings.length; else { ground[i] = G.DIRT; mark[i] = 0; } } continue; }
     const b = buildings[addBuilding({ style, tiers, x0: fx0, x1: fx1, z0: fz0, z1: fz1, seed: r() * 4294967296 >>> 0 }) - 1];
     if (zone.house) { b.house = true; b.rise = Math.min(6, 3 + Math.floor((Math.min(fx1 - fx0, fz1 - fz0)) / 6)); }
     if (zone.fronts) {
@@ -1067,7 +1119,7 @@ export function buildLayout(seed = 1609) {
     for (let z = L.az; z <= L.bz; z++) for (let x = L.ax, i = z * WX + x; x <= L.bx; x++, i++) {
       if (label[i] !== L.lbl || ground[i] !== G.LOT) continue;
       if (x >= fx0 && x <= fx1 && z >= fz0 && z <= fz1) lot[i] = b.id;
-      else { ground[i] = zone.house ? G.PARK : G.PLAZA; mark[i] = 0; }
+      else { ground[i] = zone.house ? G.PARK : zone.rural ? G.DIRT : G.PLAZA; mark[i] = 0; }
     }
   }
   // Any unclaimed lot ground (slivers, tiny blocks) becomes pavement.
@@ -1448,7 +1500,7 @@ export function buildLayout(seed = 1609) {
   tick('structs');
   // --- Names ------------------------------------------------------------------------------------
   // Places worth a name on the map. tier 0 shows at any zoom, tier 1 only when you are looking closely.
-  const townLabel = { albion: [1127, 800], severn: [4320, 3233], esperance: [880, 3299], dayton: [4419, 915], weston: [2313, 2531], westpoint: [300, 2185], gibson: [3290, 600] };
+  const townLabel = { albion: [1127, 800], severn: [4320, 3233], esperance: [880, 3440], dayton: [4419, 915], weston: [2313, 2531], westpoint: [300, 2185], gibson: [3290, 600] };
   const places = [
     ...TOWNS.map((t) => [t.name, ...townLabel[t.key], 0, ['albion', 'severn', 'esperance', 'dayton', 'weston'].includes(t.key) ? 'town' : 'area']),
     ...DISTRICTS.filter((d) => d.town.ds.length > 1 && d.n !== d.town.name).map((d) => [d.n, d.x, d.z, 1, 'area']),
@@ -1466,7 +1518,7 @@ export function buildLayout(seed = 1609) {
 
   // The country between the towns, by whatever is nearest.
   const COUNTRY = [['The Strand', 4760, 3110, 230], ['Mt. Page', MT.x, MT.z, 720], ['the Page escarpment', 900, 1700, 700], ['Trinity Forest', 3420, 1640, 820], ['the North Woods', 3520, 230, 520], ['Gibson Valley', 3200, 720, 520],
-    ['Arnhem Fields', 2410, 3820, 480], ['the Weston farmlands', 2350, 2950, 760], ['Westpoint', 360, 2150, 320], ['the Severn marshes', 4620, 3150, 260], ['the Esperance woods', 800, 3300, 820],
+    ['Arnhem Fields', 2410, 3820, 480], ['the Weston farmlands', 2350, 2950, 760], ['Westpoint', 360, 2150, 320], ['the Severn marshes', 4620, 3150, 260], ['the Esperance woods', 800, 3470, 820],
     ['the lake country', 2220, 1700, 300], ['the Weston ridge', 2520, 1980, 320]];
   const lakeAt = (x, z) => {
     for (const [name, lx, lz, rx, rz] of LAKES) if (((x - lx) / (rx * 1.6)) ** 2 + ((z - lz) / (rz * 1.6)) ** 2 < 1) return name;
@@ -1511,7 +1563,7 @@ export function buildLayout(seed = 1609) {
   const rows = [], aves = [];
   return {
     ground, lot, edge, height, mark, terr, buildings, camps, rows, aves, structs, chunkTop, piers, places, fireSpots,
-    props: propArr, binStart, binData, broadway: [], describe, areaOf, densityAt, forestAt, gx, townAt: (x, z) => townId[cellOf(x, z)] > 0, elevAt: elev0, trinityAt: trinityK, cropAt: (x, z) => { const fx = x + 30; if (!fieldAt(Math.floor(fx / 92) * 92 - 30 + 46, Math.floor(z / 66) * 66 + 33)) return 0; if (((fx % 92) + 92) % 92 < 3 || ((z % 66) + 66) % 66 < 3) return -1; const c = Math.floor(r2(Math.floor(fx / 92) * 7 + 3, Math.floor(z / 66) * 13 + 1) * 6); return c === 3 ? 0 : c + 1; }, coastAt: (z) => coastX[Math.max(0, Math.min(WZ - 1, z | 0))], mountain: MT,
+    props: propArr, binStart, binData, broadway: [], describe, areaOf, densityAt, forestAt, gx, townAt: (x, z) => townId[cellOf(x, z)] > 0, elevAt: elev0, trinityAt: trinityK, cropAt: (x, z) => { const c = fieldCell(x, z); return c === 7 ? 0 : c; }, coastAt: (z) => coastX[Math.max(0, Math.min(WZ - 1, z | 0))], mountain: MT,
     towns: TOWNS.map((t) => ({ key: t.key, name: t.name, x0: t.x0, x1: t.x1, z0: t.z0, z1: t.z1 })),
     pleasurePier: PLEASURE, timings: TM,
     spawn: { x: camps[0].cx, z: camps[0].cz, y: STREET_Y + 1 },
