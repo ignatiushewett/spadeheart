@@ -1886,7 +1886,7 @@ export class NPCs {
       // Only a few at a time, though. The rest have a job to do.
       let onYou = 0;
       for (const m of this.raiders) if (m !== n && m.onPlayer && !m.dead) onYou++;
-      n.onPlayer = P.alive && onYou < 3 && dp < (n.aggro ? 46 : 26) && dp * (n.aggro ? .8 : 1.7) < (n.foeOpen ? fd : fd + 20) && w.los(n.x, n.y + 2.3, n.z, P.x, P.y + 1.8, P.z);
+      n.onPlayer = P.alive && (n.provoked ? onYou < 6 : onYou < 3) && dp < (n.aggro ? 46 : 26) && dp * (n.provoked ? .35 : n.aggro ? .8 : 1.7) < (n.foeOpen ? fd : fd + 20) && w.los(n.x, n.y + 2.3, n.z, P.x, P.y + 1.8, P.z);
       if (n.onPlayer && !n.seenP) { n.seenP = true; if (rand() < .4) g.ui.floatSay(n, pickOf(n.raider.say), 2.2); }
       if (!n.onPlayer) n.seenP = false;
     }
@@ -2839,7 +2839,7 @@ export class NPCs {
       n.zd = 99;
       if (bi >= 0 && w.los(n.x, n.y + 2.3, n.z, H.px[bi], H.py[bi] + 1.7, H.pz[bi])) { n.zd = Math.sqrt(bd); n.zx = H.px[bi]; n.zz = H.pz[bi]; }
     }
-    const pressed = n.zd < 9, busy = n.zd < 24;
+    const pressed = n.zd < (n.provoked ? 3.5 : 9), busy = n.zd < (n.provoked ? 7 : 24);
     n.busy = busy;
     // Some of them only signed up for the easy part.
     if (role.breaks && !n.broken && n.hp < n.maxHp * .4) { n.broken = true; g.ui.floatSay(n, pickOf(RAIDER_BREAK), 2.2); }
@@ -2876,7 +2876,7 @@ export class NPCs {
       if (!busy && n.grenades > 0 && n.canSee && dp > 11 && dp < 34 && (n.nadeT = (n.nadeT ?? 4 + rand() * 6) - dt) <= 0) this.throwGrenade(n, dp);
       if (n.cd <= 0) {
         // You only get their attention when the dead leave them a moment for it. Mostly they don't.
-        const dealt = (pressed || (busy && rand() < .5)) && this.selfDefence(n, dp, false);
+        const dealt = (pressed || (busy && rand() < (n.provoked ? .25 : .5))) && this.selfDefence(n, dp, false);
         if (dealt) n.cd = melee ? .9 + rand() * .5 : n.gun.rate * (n.gun.rate < .4 ? 2.2 + rand() : 1.6 + rand());
         else if (pressed) n.cd = .2;
         else if (melee) {
@@ -3985,6 +3985,8 @@ export class NPCs {
     const g = this.g, P = g.player;
     // Raiders are fair game, and nobody is keeping score.
     if (n.kind === 'raider') {
+      // Shot at, they have a score to settle: the whole crew turns on you, and the dead come second unless they are right on top of them.
+      if (!n.provoked) for (const m of this.list) if (m.kind === 'raider' && !m.dead && m.gang === n.gang) m.provoked = true;
       // A crew in the middle of a job only cares about the one you hit, and that one only so much.
       if (n.raidCamp !== undefined || n.calm) { n.aggro = true; n.calm = false; }
       else if (!n.aggro) this.raiderAlert(n);

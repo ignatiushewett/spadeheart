@@ -847,8 +847,9 @@ export class UI {
 
   drawCompass() {
     const c = $('compass'), x = c.getContext('2d'), P = this.g.player;
-    const W = c.width, H = c.height;
-    x.clearRect(0, 0, W, H);
+    // The strip itself is the top 52; how far things are is written underneath it, under each mark.
+    const W = c.width, H = 52, LY = 70;
+    x.clearRect(0, 0, W, c.height);
     const yaw = P.yaw;
     x.textAlign = 'center';
     x.textBaseline = 'middle';
@@ -887,12 +888,11 @@ export class UI {
       x.fillRect(px - 6, 5, 12, 12);
       x.strokeStyle = 'rgba(8,14,20,.9)'; x.lineWidth = 2; x.strokeRect(px - 6, 5, 12, 12);
       const label = j.type === 'patrol' && j.posts ? `${j.posts[j.next].name}, ${dist}m` : `${dist}m`;
-      x.textAlign = 'left';
+      x.font = '600 21px Quantico, Bahnschrift, Segoe UI, sans-serif';
       x.lineWidth = 4; x.strokeStyle = 'rgba(10,8,6,.8)';
-      x.strokeText(label, px + 12, 12);
+      x.strokeText(label, px, LY);
       x.fillStyle = '#a8dcff';
-      x.fillText(label, px + 12, 12);
-      x.textAlign = 'center';
+      x.fillText(label, px, LY);
     }
     // Holes in the wall of any camp you know of, nearby: a red diamond, and how far.
     const g = this.g;
@@ -915,12 +915,11 @@ export class UI {
         x.lineWidth = 2;
         x.strokeRect(-7, -7, 14, 14);
         x.restore();
-        x.textAlign = 'left';
+        x.font = '600 21px Quantico, Bahnschrift, Segoe UI, sans-serif';
         x.lineWidth = 4; x.strokeStyle = 'rgba(10,8,6,.8)';
-        x.strokeText(`${dist}m`, px + 13, 12);
+        x.strokeText(`${dist}m`, px, LY);
         x.fillStyle = `rgba(255,150,130,${a})`;
-        x.fillText(`${dist}m`, px + 13, 12);
-        x.textAlign = 'center';
+        x.fillText(`${dist}m`, px, LY);
       }
     }
     x.fillStyle = '#e8b04a';

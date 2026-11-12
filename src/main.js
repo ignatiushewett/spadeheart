@@ -1548,6 +1548,8 @@ class Game {
   // what is left cannot carry what is above: the whole thing comes down. A crowd chewing its way in after you can do it, given time.
   structureLost(x, y, z, id) {
     // A tree is only leaves and a trunk. Take some of it away and see what is still holding on to anything.
+    // Cut through the trunk and the tree comes down: everything of it above the cut, the trunk and its crown together.
+    if (id === M.TRUNK && !this.lotFalling) (this.fellQ || (this.fellQ = [])).push([x, y, z]);
     if (id === M.TRUNK || (FLAGS[id] & F_LEAF)) {
       const q = this.treeQ || (this.treeQ = new Map());
       const key = (x >> 2) + (z >> 2) * 4096 + (y >> 2) * 4096 * 4096;
@@ -1574,6 +1576,45 @@ class Game {
     // of a building taken apart from above (by hand, or by a charge on an upper floor) brings the rest of it down the same way.
     e.lost += upper ? .3 : 1;
     (this.lotDirty || (this.lotDirty = new Set())).add(lot);
+  }
+
+  // A tree whose trunk has been cut. Above the cut: the rest of the trunk, and the crown round it (leaves joined to that trunk, and to
+  // each other, no further out than a crown reaches), not the next tree's. All of that comes down at once and lies where it falls.
+  fellTrees() {
+    const Q = this.fellQ;
+    if (!Q || !Q.length) return;
+    const W = this.world, TREE = new Set([M.LEAF, M.LEAF2, M.LEAF3]);
+    while (Q.length) {
+      const [x, y, z] = Q.shift();
+      const list = [], seen = new Set(), key = (a, b, c) => a + c * WX + b * WX * WZ;
+      let top = y;
+      while (W.get(x, top + 1, z) === M.TRUNK) top++;
+      if (top === y) continue;   // cut at the very top: nothing above it to fall
+      const stack = [];
+      let crown = 0;
+      for (let yy = y + 1; yy <= top; yy++) { seen.add(key(x, yy, z)); list.push(x, yy, z, M.TRUNK); stack.push(x, yy, z); }
+      while (stack.length && list.length < 4 * 900) {
+        const c = stack.pop(), b = stack.pop(), a = stack.pop();
+        for (const [dx, dy, dz] of [[1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1], [0, 1, 0], [0, -1, 0]]) {
+          const nx = a + dx, ny = b + dy, nz = c + dz;
+          if (ny <= y - 1 || Math.abs(nx - x) > 6 || Math.abs(nz - z) > 6) continue;
+          const k = key(nx, ny, nz);
+          if (seen.has(k)) continue;
+          seen.add(k);
+          const id = W.get(nx, ny, nz);
+          // Its own crown is all one kind of leaf: a neighbour's of another kind, touching it, stays on that tree.
+          if (!TREE.has(id) || (crown && id !== crown)) continue;
+          crown = crown || id;
+          list.push(nx, ny, nz, id);
+          stack.push(nx, ny, nz);
+        }
+      }
+      this.lotFalling = true;
+      const out = [];
+      for (let k = 0; k < list.length; k += 4) if (W.set(list[k], list[k + 1], list[k + 2], 0)) out.push(list[k], list[k + 1], list[k + 2], list[k + 3]);
+      this.lotFalling = false;
+      if (out.length) this.onCollapse(out);
+    }
   }
 
   // Leaves that were held by what has gone: each is tried on its own, so a clump hanging by a corner comes down with the rest.
@@ -2848,6 +2889,7 @@ class Game {
     this.guard('dogs', () => this.dogs.update(dt));
     this.guard('buildings', () => {
       if ((this.structT = (this.structT || 0) - dt) <= 0) { this.structT = .5; this.checkStructures(); }
+      this.fellTrees();
       this.checkTrees();
       const lc = this.lightChecks;
       if (lc && lc.length) for (let i = lc.length - 1; i >= 0; i--) if ((lc[i].t -= dt) <= 0) { const q = lc.splice(i, 1)[0]; this.checkLightsGone(q.cols); }

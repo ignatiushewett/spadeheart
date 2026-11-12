@@ -424,12 +424,21 @@ export function makeGenerator(L) {
     if (kind === 3 && seed % 3 === 0) p(len - 2, 2, 1, seed % 2 ? M.CRATE : M.CRATE_AMMO);
   }
 
+  // A tree grows round what is there, not through it: nothing of it on a building's lot, and nothing put where something already is.
+  const grow = (x, y, z, id) => {
+    if (x < 0 || z < 0 || x >= WX || z >= WZ) return;
+    const i = z * WX + x;
+    if (lot[i] && ground[i] === G.LOT) return;
+    const lx = x - ox, ly = y - oy, lz = z - oz;
+    if (lx < 0 || ly < 0 || lz < 0 || lx >= CS || ly >= CS || lz >= CS || d[lx | (ly << 5) | (lz << 10)]) return;
+    put(x, y, z, id);
+  };
   function tree(x, z, seed, size) {
     const base = STREET_Y - 1 + terr[Math.max(0, z * WX + x)] + 1;
     if (size && seed % 5 < 2) {
       // A pine: a tall bare trunk and a cone of dark needles.
       const tall = 9 + size * 2 + seed % 4;
-      for (let y = 0; y < tall - 2; y++) put(x, base + y, z, M.TRUNK);
+      for (let y = 0; y < tall - 2; y++) grow(x, base + y, z, M.TRUNK);
       // Tiers that step in and out a little as they go up, but never wider than the one below: no flat cap sat on a narrower neck,
       // just a cone that comes to a point, with a single sprig standing off the top.
       let prev = 3;
@@ -437,14 +446,14 @@ export function makeGenerator(L) {
         const r = prev = Math.min(prev, Math.round((tall - y) * .42 + ((y & 1) ? .6 : 0)));
         for (let dz = -r; dz <= r; dz++) for (let dx = -r; dx <= r; dx++) {
           if (dx * dx + dz * dz > r * r + 1 || (!dx && !dz && y < tall - 2)) continue;
-          put(x + dx, base + y, z + dz, M.LEAF);
+          grow(x + dx, base + y, z + dz, M.LEAF);
         }
       }
-      put(x, base + tall + 1, z, M.LEAF);
+      grow(x, base + tall + 1, z, M.LEAF);
       return;
     }
     const trunkH = 3 + size + seed % 3;
-    for (let y = 0; y < trunkH; y++) put(x, base + y, z, M.TRUNK);
+    for (let y = 0; y < trunkH; y++) grow(x, base + y, z, M.TRUNK);
     const r = 2 + size;
     const leaf = seed % 7 === 0 ? M.LEAF3 : seed % 2 ? M.LEAF : M.LEAF2;
     const cy = base + trunkH + r - 2;
@@ -452,7 +461,7 @@ export function makeGenerator(L) {
       const dist = dx * dx + dy * dy * 1.4 + dz * dz;
       if (dist > r * r + 1) continue;
       if (dist > (r - 1) * (r - 1) && r3(x + dx, cy + dy, z + dz) < .22) continue;
-      put(x + dx, cy + dy, z + dz, leaf);
+      grow(x + dx, cy + dy, z + dz, leaf);
     }
   }
 

@@ -96,6 +96,13 @@ em.over { font-style: normal; color: #ff9a4a; }
 .settings-panel { width: min(700px, 94vw); height: min(560px, 90vh); }
 .s-tabs { display: flex; gap: 2px; padding: 0 14px; border-bottom: 1px solid var(--line); overflow-x: auto; overflow-y: hidden; scrollbar-width: none; flex: none; }
 .s-tabs::-webkit-scrollbar { display: none; }
+/* Every list that scrolls (a trader's counter, your pack, the job board): a slim bar in the game's own colours, not the browser's. */
+* { scrollbar-width: thin; scrollbar-color: rgba(232,176,74,.5) rgba(255,255,255,.035); }
+::-webkit-scrollbar { width: 7px; height: 7px; }
+::-webkit-scrollbar-track { background: rgba(255,255,255,.035); }
+::-webkit-scrollbar-thumb { background: rgba(232,176,74,.45); }
+::-webkit-scrollbar-thumb:hover { background: rgba(232,176,74,.8); }
+::-webkit-scrollbar-button, ::-webkit-scrollbar-corner { display: none; background: transparent; }
 .s-page .row input[type=checkbox] { justify-self: start; width: 16px; height: 16px; accent-color: var(--amber); }
 .s-tab { padding: 10px 14px 9px; color: var(--dim); border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; font-size: 14px; }
 .s-tab:hover { color: var(--ink); }
@@ -156,7 +163,7 @@ select { background: #1c1b18; color: var(--ink); border: 1px solid var(--line); 
 #hotbar div i { position: absolute; top: 1px; left: 3px; font-size: 9px; font-style: normal; font-family: var(--mono); opacity: .55; }
 #hotbar div.on { opacity: 1; background: rgba(0,0,0,.6); border-bottom-color: var(--amber); }
 #topbar { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); text-align: center; text-shadow: 0 1px 2px #000; }
-#compass { width: 420px; height: 26px; display: block; }
+#compass { width: 420px; height: 43px; display: block; }
 #loc { font-size: 15px; font-weight: 600; }
 /* A settlement's name reads a little differently from a district's: in the amber, spaced out. */
 #loc .settlement { color: var(--amber); letter-spacing: .05em; }
@@ -451,7 +458,7 @@ body.talking #hud > *:not(#caption) { visibility: hidden; }
   <div id="hitmark"></div>
   <div id="dmg"></div>
   <div id="status"></div>
-  <div id="topbar"><canvas id="compass" width="840" height="52"></canvas><div id="gate-note"></div><div id="mag-bar"></div><div id="siren-bar"></div></div>
+  <div id="topbar"><canvas id="compass" width="840" height="86"></canvas><div id="gate-note"></div><div id="mag-bar"></div><div id="siren-bar"></div></div>
   <div id="mapbox"><canvas id="minimap" width="392" height="392"></canvas><div id="loc"></div></div>
   <div id="vitals">
     <div class="vit-row"><div id="hp-num">100</div><div id="armor-tag"></div></div>

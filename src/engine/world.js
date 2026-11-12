@@ -566,11 +566,18 @@ export class World {
       list.push(x, y, z);
       if (list.length > LIMIT * 3) return;
       const lotHere = lot[z * WX + x];
+      // Leaves hold nothing up. Whatever is built can't lean on a tree's canopy, and a canopy is only held by its own trunk, or by
+      // something it is resting its weight on from above (a crop on its soil). So: nothing steps from the solid world into leaves
+      // except a trunk, and from leaves nothing steps sideways or up into anything but leaves and trunk.
+      const here = this.getRaw(x, y, z), hereLeaf = !!(FLAGS[here] & F_LEAF), hereTrunk = here === M.TRUNK;
       // Pushing "down" last explores it first, so grounded structures exit quickly.
       const push = (nx, ny, nz) => {
         if (ny < 0 || nx < 0 || nz < 0 || nx >= WX || nz >= WZ) return;
         const id = this.getRaw(nx, ny, nz);
         if (!id) return;
+        const leaf = FLAGS[id] & F_LEAF;
+        if (leaf && !hereLeaf && !hereTrunk) return;
+        if (hereLeaf && !leaf && id !== M.TRUNK && ny >= y) return;
         // Party walls do not hold a neighbour up: each building stands or falls alone.
         const lotThere = lot[nz * WX + nx];
         if (lotHere && lotThere && lotHere !== lotThere) return;
