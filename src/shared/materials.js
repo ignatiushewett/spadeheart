@@ -29,7 +29,7 @@ function m(name, hex, hp, flags = 0) {
 // Terrain
 m('BEDROCK', 0x2a2a2e, 255); m('STONE', 0x6a6c70, 14); m('SCHIST', 0x77797c, 14); m('DIRT', 0x5b4631, 4);
 m('GRASS', 0x4a5a34, 4); m('GRASS2', 0x505f38, 4); m('GRASS_DRY', 0x6a6640, 4); m('SAND', 0xa8976f, 3);
-m('GRAVEL', 0x726e66, 5); m('PATH', 0x9a927e, 5);
+m('GRAVEL', 0x726e66, 5); m('PATH', 0x8c7152, 4);
 // Street
 m('ASPHALT', 0x34353a, 10); m('ASPHALT2', 0x3c3d41, 10); m('WALK', 0x8c8b86, 9); m('WALK2', 0x7f7e79, 9);
 m('CURB', 0xa3a29c, 12); m('LINE_Y', 0xc9a227, 10); m('LINE_W', 0xc8c8c0, 10); m('ALLEYWAY', 0x55534f, 8);

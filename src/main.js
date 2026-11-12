@@ -328,7 +328,7 @@ class Game {
         const k = Math.min(.75, (at2(-8, 0) + at2(-14, 0) + at2(0, -10) + at2(0, 10)) * .19 + (hash(wx >> 1, wz >> 1) - .5) * .15);
         rgb = [s0[0] + (gr[0] - s0[0]) * Math.max(0, k), s0[1] + (gr[1] - s0[1]) * Math.max(0, k), s0[2] + (gr[2] - s0[2]) * Math.max(0, k)];
       }
-      else if (g === G.DIRT) rgb = col(hash(wx >> 1, wz >> 1) < .4 ? M.PATH : M.DIRT);
+      else if (g === G.DIRT) rgb = col(M.PATH);
       else if (g === G.FIELD) { const m = L.mark[i], dot = hash(wx >> 1, wz >> 1); rgb = col(m === 1 ? (wx % 6 < 4 ? M.LEAF2 : M.SOIL) : m === 2 ? (dot < .6 ? M.CORN : M.LEAF3) : m === 3 ? (dot < .35 ? M.COTTON : M.LEAF3) : m === 4 ? (dot < .5 ? M.PEANUT : M.SOIL) : m === 5 ? (wx % 8 < 2 ? M.LEAF2 : M.SOIL) : m === 6 ? M.GRASS_DRY : M.SOIL); rgb = [rgb[0] * .88, rgb[1] * .88, rgb[2] * .88]; }
       else if (g === G.ALLEY) rgb = col(M.ALLEYWAY);
       else if (g === G.PROM) rgb = col((wx + wz) % 4 === 0 ? M.WOOD_D : M.WOOD);
@@ -518,8 +518,8 @@ class Game {
         if (sandK) { const s0 = col(M.SAND), gr = this.groundColour(wx, wz, t, 0, col, hash), k = 1 - sandK; rgb = [s0[0] + (gr[0] - s0[0]) * k, s0[1] + (gr[1] - s0[1]) * k, s0[2] + (gr[2] - s0[2]) * k]; }
         else if (road === 1) rgb = col(M.ASPHALT);
         else if (road === 2) rgb = col(M.LINE_Y);
-        else if (road === 3) rgb = col(hash(wx >> 1, wz >> 1) < .4 ? M.PATH : M.DIRT);
-        else if (crop === -1) rgb = col(hash(wx >> 1, wz >> 1) < .4 ? M.PATH : M.DIRT);
+        else if (road === 3) rgb = col(M.PATH);
+        else if (crop === -1) rgb = col(M.PATH);
         else if (crop > 0) {
           const dot = hash(wx >> 1, wz >> 1);
           rgb = col(crop === 1 ? (wx % 6 < 4 ? M.LEAF2 : M.SOIL) : crop === 2 ? (dot < .6 ? M.CORN : M.LEAF3) : crop === 3 ? (dot < .35 ? M.COTTON : M.LEAF3) : crop === 4 ? (dot < .5 ? M.PEANUT : M.SOIL) : crop === 5 ? (wx % 8 < 2 ? M.LEAF2 : M.SOIL) : crop === 6 ? M.GRASS_DRY : M.SOIL);

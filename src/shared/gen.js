@@ -67,7 +67,8 @@ export function makeGenerator(L) {
       case G.CAMP: surface = M.GRAVEL; break;
       case G.ROCK: surface = mark[i] ? M.SNOW : M.SCHIST; under = M.SCHIST; deep = M.SCHIST; break;
       case G.SAND: surface = M.SAND; under = M.SAND; break;
-      case G.DIRT: surface = noise2(x * .21, z * .21) < .42 ? M.PATH : M.DIRT; under = M.DIRT; break;
+      // Trodden earth: one light brown, the same all the way along.
+      case G.DIRT: surface = M.PATH; under = M.DIRT; break;
       case G.FIELD: surface = mark[i] === 6 ? M.GRASS_DRY : M.SOIL; under = M.DIRT; break;
       case G.PARK: {
         if (top < WATER_Y) { surface = M.DIRT; under = M.DIRT; break; }

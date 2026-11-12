@@ -98,7 +98,7 @@ export class FarCity {
       const at = (x, z) => { const i = Math.min(WZ - 1, z) * WX + Math.min(WX - 1, x); return ground[i] === G.WATER ? -4 : terr[i]; };
       const grass = srgb(M.GRASS, 1), wood = srgb(M.LEAF, .8), rock = srgb(M.SCHIST, 1), snow = srgb(M.SNOW, 1), field = srgb(M.GRASS_DRY, 1);
       const GC = { [G.ROAD]: srgb(M.ASPHALT, 1), [G.WALK]: srgb(M.WALK, 1), [G.LOT]: srgb(M.WALK2, 1), [G.PLAZA]: srgb(M.WALK2, 1), [G.ALLEY]: srgb(M.ALLEYWAY, 1), [G.CAMP]: srgb(M.GRAVEL, 1),
-        [G.SAND]: srgb(M.SAND, 1), [G.DIRT]: srgb(M.DIRT, 1), [G.FIELD]: srgb(M.SOIL, 1), [G.PROM]: srgb(M.WOOD, 1), [G.PARK]: grass, [G.ROCK]: rock, [G.WATER]: grass };
+        [G.SAND]: srgb(M.SAND, 1), [G.DIRT]: srgb(M.PATH, 1), [G.FIELD]: srgb(M.SOIL, 1), [G.PROM]: srgb(M.WOOD, 1), [G.PARK]: grass, [G.ROCK]: rock, [G.WATER]: grass };
       // The colour of a patch of ground from afar: what covers most of it, blended.
       const patch = (x, z) => {
         const c = [0, 0, 0];
@@ -251,7 +251,7 @@ export function buildCityMap(L) {
   const groundCol = {
     [G.WATER]: [20, 42, 54], [G.ROAD]: [50, 50, 52], [G.WALK]: [100, 98, 92], [G.LOT]: [72, 72, 70], [G.PARK]: [66, 76, 50],
     [G.PLAZA]: [120, 116, 108], [G.ALLEY]: [70, 68, 64], [G.PROM]: [108, 88, 62], [G.CAMP]: [94, 90, 78], [G.ROCK]: [110, 110, 112],
-    [G.SAND]: [150, 138, 104], [G.FIELD]: [104, 92, 56], [G.DIRT]: [96, 82, 62],
+    [G.SAND]: [150, 138, 104], [G.FIELD]: [104, 92, 56], [G.DIRT]: [126, 102, 74],
   };
   for (let z = 0; z < h; z++) for (let x = 0; x < w; x++) {
     const i = (z << 1) * WX + (x << 1);
