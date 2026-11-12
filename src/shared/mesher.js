@@ -144,8 +144,10 @@ export function makeMesher(L) {
               const c0 = s(-1, 0), c1 = s(1, 0), c2 = s(0, -1), c3 = s(0, 1);
               const ao = (e1, e2, cn) => (e1 && e2) ? 0 : 3 - (e1 + e2 + cn);
               const a0 = ao(c0, c2, s(-1, -1)), a1 = ao(c1, c2, s(1, -1)), a2 = ao(c1, c3, s(1, 1)), a3 = ao(c0, c3, s(-1, 1));
-              // Sky term: fraction of nearby columns that are open above this face.
-              const wy = oy + sy;
+              // Sky term: fraction of nearby columns that are open above this face. The side of grass beside a path is lit as its top
+              // is: the strip of it that shows when the wind lifts it is above the ground beside it, not down in it.
+              const lip = !lod && ny === 0 && WAVE[id];
+              const wy = oy + sy + (lip ? 1 : 0);
               let open = 0;
               if (wy >= topAt(ox, oz, sx, sz)) open += 2;
               if (wy >= topAt(ox, oz, sx - 4, sz)) open++;
@@ -154,7 +156,7 @@ export function makeMesher(L) {
               if (wy >= topAt(ox, oz, sx, sz + 4)) open++;
               if (wy >= topAt(ox, oz, sx - 2, sz - 2)) open++;
               if (wy >= topAt(ox, oz, sx + 2, sz + 2)) open++;
-              v = id | ((a0 | (a1 << 2) | (a2 << 4) | (a3 << 6)) << 8) | (open << 16);
+              v = id | ((lip ? 255 : a0 | (a1 << 2) | (a2 << 4) | (a3 << 6)) << 8) | (open << 16);
               any = true;
             }
           }

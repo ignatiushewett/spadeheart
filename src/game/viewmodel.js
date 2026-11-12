@@ -139,7 +139,7 @@ const FLASH = [
 // Fingerless work gloves and a canvas jacket. The hands are their own mesh, drawn with whatever is being held: the same weapon models
 // are used for things in flight, and a thrown grenade should not take your fingers with it.
 // Light to dark, the same spread as the people in the camps. Tuned against this shader, which lifts mid-tones a long way.
-const SKIN_TONES = [[0xbd9a84, 0x9b7c68], [0xa5826c, 0x866955], [0x876549, 0x6c503a], [0x5f4432, 0x4b3527], [0x412e22, 0x332418]];
+export const SKIN_TONES = [[0xbd9a84, 0x9b7c68], [0xa5826c, 0x866955], [0x876549, 0x6c503a], [0x5f4432, 0x4b3527], [0x412e22, 0x332418]];
 let SKIN = SKIN_TONES[1][0], SKIN_D = SKIN_TONES[1][1];
 export const SKIN_TONE_COUNT = SKIN_TONES.length;
 const GLOVE = 0x1f1a15, GLOVE_L = 0x2e271f, SLEEVE = 0x38362f, SLEEVE_D = 0x24221d;

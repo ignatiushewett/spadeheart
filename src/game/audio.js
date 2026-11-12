@@ -97,6 +97,66 @@ export class Audio2 {
     this.renderBank();
   }
 
+  // A motorbike's engine: a ragged sawtooth at the firing rate with a square an octave down, a throb at a quarter of it, and a bit of
+  // mechanical rattle, driven hard through a low-pass that opens up with the throttle. It runs while someone is on the bike and is
+  // told every frame how hard; told nothing, it dies away on its own.
+  engineStart(x, y, z) {
+    if (!this.ctx) return;
+    if (this.eng) this.engineStop(true);
+    const ctx = this.ctx;
+    const o1 = ctx.createOscillator(), o2 = ctx.createOscillator(), throb = ctx.createOscillator();
+    o1.type = 'sawtooth'; o2.type = 'square'; throb.type = 'square';
+    const am = ctx.createGain(), depth = ctx.createGain();
+    am.gain.value = .6; depth.gain.value = .4;
+    throb.connect(depth); depth.connect(am.gain);
+    const o2g = ctx.createGain(); o2g.gain.value = .45;
+    o1.connect(am); o2.connect(o2g); o2g.connect(am);
+    const rattle = ctx.createBufferSource(); rattle.buffer = this.noiseBuf; rattle.loop = true;
+    const rf = ctx.createBiquadFilter(); rf.type = 'bandpass'; rf.frequency.value = 2200; rf.Q.value = 1.2;
+    const rg = ctx.createGain(); rg.gain.value = .12;
+    rattle.connect(rf); rf.connect(rg); rg.connect(am);
+    const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.Q.value = 2.5; f.frequency.value = 500;
+    const shape = ctx.createWaveShaper();
+    const curve = new Float32Array(256);
+    for (let i = 0; i < 256; i++) curve[i] = Math.tanh((i / 127.5 - 1) * 2.4);
+    shape.curve = curve;
+    const lvl = ctx.createGain(); lvl.gain.value = 0;
+    const s = this.spatial(x, y, z, 18);
+    const out = this.out(1, s.pan, .12);
+    am.connect(shape); shape.connect(f); f.connect(lvl); lvl.connect(out);
+    for (const o of [o1, o2, throb]) o.frequency.value = 30;
+    o1.start(); o2.start(); throb.start(); rattle.start();
+    this.eng = { o1, o2, throb, f, lvl, out, rattle };
+    // Kicked over: a cough, then it catches.
+    this.noiseBurst(this.out(s.gain * .5, s.pan), .35, 'lowpass', 300, 120, 1, .5, .01);
+  }
+
+  engineSet(rev, load, x, y, z) {
+    const e = this.eng;
+    if (!e) return;
+    const t = this.ctx.currentTime, s = this.spatial(x, y, z, 26);
+    const fr = 34 + rev * 150;
+    e.o1.frequency.setTargetAtTime(fr, t, .04);
+    e.o2.frequency.setTargetAtTime(fr * .502, t, .04);
+    e.throb.frequency.setTargetAtTime(fr * .25, t, .04);
+    e.f.frequency.setTargetAtTime(380 + rev * 1500 + load * 900, t, .06);
+    e.out.gain.setTargetAtTime(s.gain, t, .05);
+    e.lvl.gain.cancelScheduledValues(t);
+    e.lvl.gain.setTargetAtTime(.3 + rev * .18 + load * .15, t, .05);
+    e.lvl.gain.setTargetAtTime(0, t + .3, .15);   // if nobody says anything more, it goes quiet
+  }
+
+  engineStop(now = false) {
+    const e = this.eng;
+    if (!e) return;
+    this.eng = null;
+    const t = this.ctx.currentTime;
+    e.lvl.gain.cancelScheduledValues(t);
+    e.lvl.gain.setTargetAtTime(0, t, now ? .02 : .12);
+    e.o1.frequency.setTargetAtTime(28, t, .25);
+    setTimeout(() => { for (const n of [e.o1, e.o2, e.throb, e.rattle]) { try { n.stop(); } catch (_) { /* already stopped */ } } e.out.disconnect(); }, 900);
+  }
+
   setVolume(v, music = this.musicShare ?? 1) {
     this.volume = v;
     this.musicShare = music;
@@ -441,6 +501,17 @@ export class Audio2 {
       case 'thump': { const o = d(.9, .04); this.tone(o, .16, 'sine', 110, 46, .9); this.noiseBurst(o, .09, 'lowpass', 700, 120, 1.4, .9); break; }
       case 'hurt': { const o = d(.7, .05); this.noiseBurst(o, .22, 'lowpass', 900, 220, 2, .8); this.tone(o, .2, 'sawtooth', 150, 70, .25); break; }
       case 'crate': this.noiseBurst(d(.3, .08), .2, 'bandpass', 500, 900, 2.5, .8, .04); break;
+      // Stalks going down under a wheel: a dry swish and the snap of them.
+      case 'thrash': { const o = d(.32, .04); this.noiseBurst(o, .13 + rand() * .06, 'bandpass', 2600 + rand() * 900, 1100, 1.1, .7, .008); this.noiseBurst(o, .03, 'highpass', 3400, 2600, 1, .5); break; }
+      // Driven into a wall: the crack of it going, the thud through the frame, and what is left of it coming down after.
+      case 'smash': {
+        const o = d(1.1, .25);
+        this.noiseBurst(o, .38, 'lowpass', 1100, 140, 1.4, 1, .002);
+        this.tone(o, .3, 'sine', 80, 34, .9);
+        this.noiseBurst(o, .06, 'bandpass', 2200, 900, 1.5, .7);
+        for (let i = 0; i < 5; i++) later(90 + rand() * 600, () => this.noiseBurst(d(.45, .2), .14, 'bandpass', 600 + rand() * 900, 250, 1.6, .5));
+        break;
+      }
       case 'place': this.tone(d(.3, .06), .08, 'square', 140, 90, .4); break;
       case 'beep': this.tone(d(.3, .12), .08, 'square', 1250, 1250, .24); break;
       case 'gate': { const o = d(.4, .3); this.noiseBurst(o, .7, 'lowpass', 340, 120, 2, .7, .08); this.tone(o, .5, 'sawtooth', 64, 52, .18); break; }

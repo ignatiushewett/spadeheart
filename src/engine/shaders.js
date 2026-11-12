@@ -167,8 +167,10 @@ vec3 dynLights(vec3 wp, vec3 n){
     float c=dot(v,uSpotDirs[i].xyz);
     float cone=smoothstep(.86,.94,c)*.3+smoothstep(.94,.993,c);
     if(cone<=0.) continue;
-    // It stops at whatever the beam landed on, instead of lighting up the room behind.
-    sum+=uSpotCols[i]*uSpots[i].w*cone*max(dot(n,-v)*.72+.28,0.)/(1.+l*l*.014)*smoothstep(range+3.,range,l);
+    // It stops at whatever the beam landed on, instead of lighting up the room behind. A strength given below zero is a lamp
+    // that throws a long way (a vehicle's headlamp): it falls off far more slowly than a hand torch.
+    float sk=uSpots[i].w;
+    sum+=uSpotCols[i]*abs(sk)*cone*max(dot(n,-v)*.72+.28,0.)/(1.+l*l*(sk<0.?.0016:.014))*smoothstep(range+3.,range,l);
   }
   return sum;
 }
@@ -190,7 +192,7 @@ vec3 wetGlare(vec3 wp, vec3 n, vec3 v, float glint){
     if(l>uSpotDirs[i].w+3.) continue;
     vec3 L=d/max(l,.001);
     float c=-dot(L,uSpotDirs[i].xyz);
-    sum+=uSpotCols[i]*uSpots[i].w*pow(max(dot(n,normalize(L+v)),0.),36.)*smoothstep(.86,.97,c)*.45;
+    sum+=uSpotCols[i]*abs(uSpots[i].w)*pow(max(dot(n,normalize(L+v)),0.),36.)*smoothstep(.86,.97,c)*.45;
   }
   if(uSpotPos.w>0.){
     vec3 d=wp-uSpotPos.xyz;
@@ -262,11 +264,11 @@ void main(){
     p.z+=(cos(t*.7+p.z*.29+p.y*.23+p.x*.11)*.65+sin(t*1.6+p.x*.47)*.35)*.13*k;
     p.y+=sin(t*1.05+p.x*.4+p.z*.4)*.035*k;
   }
-  // Grass in the wind: the top edge of each grass block lifted up to a third of a block and let down again, in long waves running
+  // Grass in the wind: the top edge of each grass block lifted up to a fifth of a block and let down again, in long waves running
   // across the ground on the diagonal. Only what is drawn moves; nothing anyone stands on or bumps into does.
   if(aInfo.w>0u){
     float ph=uGrassT*.9-(p.x+p.z)*.075;
-    p.y+=(.5+.5*sin(ph))*.333;
+    p.y+=(.5+.5*sin(ph))*.2;
   }
   vWorld=p;
   vNormal=NORMALS[aPos.w];
@@ -1215,13 +1217,24 @@ out vec3 vWorld;
 out vec3 vNormal;
 out vec3 vCol;
 out float vGlow;
+out float vMetal;
 void main(){
   float a=iCol.a, c=cos(a), s=sin(a);
-  // A glow below zero marks a part of something built (a vehicle): turned about the vertical only, not tumbling. Its glow is -1 - that.
+  // A glow below zero marks a part of something built (a vehicle): turned about the vertical only, not tumbling. Its glow is -1 - that,
+  // with how metal it is (0 to 3) in fours on top.
   bool built=iGlow<-.5;
+  float bg=-1.-iGlow, bm=floor((bg+.01)/4.);
   mat3 R=built?mat3(c,0,-s, 0,1,0, s,0,c):mat3(c,0,-s, 0,1,0, s,0,c)*mat3(1,0,0, 0,c,s, 0,-s,c);
-  vec3 p=R*(aPos*iPos.w)+iPos.xyz;
-  vWorld=p; vNormal=R*aNormal; vCol=iCol.rgb; vGlow=built?-1.-iGlow:iGlow;
+  vec3 sc=vec3(iPos.w);
+  // Below -1000, a length of limb: its own length and its tilt packed into the rest, turned to its heading by the angle, iPos.w thick.
+  if(iGlow<-999.){
+    float q=-1000.-iGlow, lc=floor(q/10.), pt=(q-lc*10.)/3.-1.6, cp=cos(pt), sp=sin(pt);
+    R=mat3(c,0,-s, 0,1,0, s,0,c)*mat3(1,0,0, 0,cp,-sp, 0,sp,cp);
+    sc.z=lc/100.;
+    bg=0.; bm=0.;
+  }
+  vec3 p=R*(aPos*sc)+iPos.xyz;
+  vWorld=p; vNormal=R*aNormal; vCol=iCol.rgb; vGlow=built?bg-bm*4.:iGlow; vMetal=built?bm:0.;
   gl_Position=uViewProj*vec4(p,1.);
 }`;
 
@@ -1230,11 +1243,24 @@ in vec3 vWorld;
 in vec3 vNormal;
 in vec3 vCol;
 in float vGlow;
+in float vMetal;
 layout(location=0) out vec4 outCol;
 void main(){
   vec3 col=pow(vCol,vec3(2.2));
   float dist=length(vWorld-uCam);
-  vec3 c=shade(col,vWorld,normalize(vNormal),1.,.9,dist)+col*vGlow;
+  vec3 N=normalize(vNormal);
+  vec3 c=shade(col,vWorld,N,1.,.9,dist)+col*vGlow;
+  // Metal: less of its own colour, more of the sky and the ground caught in it, tinted by it, and a hard glint of the sun.
+  if(vMetal>.5){
+    float k=vMetal/3.;
+    vec3 V=normalize(uCam-vWorld), Rf=reflect(-V,N);
+    vec3 env=Rf.y>0.?mix(uHorizon,uSkyCol,clamp(Rf.y*1.6,0.,1.)):uGroundCol*.5;
+    float fres=pow(1.-max(dot(N,V),0.),3.);
+    float sh=sampleShadow(vWorld,N,dist);
+    float sp=pow(max(dot(Rf,uSunDir),0.),24.+40.*k)*sh;
+    vec3 tint=mix(vec3(1.),col*1.6,.55);
+    c=c*(1.-.45*k)+env*tint*(.25+.55*k)*(.6+.4*fres)+uSunCol*tint*sp*(.5+1.6*k);
+  }
   outCol=vec4(applyFog(c,vWorld),1.);
 }`;
 
@@ -1682,7 +1708,8 @@ vec3 lightAtDrop(vec3 p){
     vec3 d=p-uSpots[i].xyz;
     float l=length(d);
     if(l>uSpotDirs[i].w) continue;
-    L+=uSpotCols[i]*uSpots[i].w*smoothstep(.9,.985,dot(d/max(l,.001),uSpotDirs[i].xyz))/(1.+l*l*.012)*1.2;
+    float sk=uSpots[i].w;
+    L+=uSpotCols[i]*abs(sk)*smoothstep(.9,.985,dot(d/max(l,.001),uSpotDirs[i].xyz))/(1.+l*l*(sk<0.?.0016:.012))*1.2;
   }
   return L;
 }

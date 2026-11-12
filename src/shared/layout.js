@@ -118,7 +118,6 @@ const LIGHT = { x: 4517, z: 3821 };                    // Severn Rock, and the l
 const RIVER = px([[500, 0], [492, 60], [490, 110], [500, 140], [525, 165], [560, 185], [575, 210], [560, 240], [540, 260], [525, 290], [530, 315], [555, 330],
   [590, 345], [600, 370], [585, 395], [575, 420], [565, 440], [580, 460]]);
 const BARRIER = px([[1095, 830], [1115, 900], [1140, 1000], [1160, 1070], [1150, 1092], [1128, 1080], [1110, 1005], [1090, 925], [1076, 860]]);
-const SPIT = px([[1078, 1100], [1100, 1105], [1112, 1150], [1102, 1200], [1088, 1254], [1062, 1254], [1068, 1200], [1074, 1150]]);
 const GIBSON_ROAD = [[2400, 1045], [2520, 1045], [2610, 960], [2660, 830], [2900, 792], [3010, 760], [3500, 760], [3720, 760], [3810, 790], [3880, 866], [4059, 900], [4110, 935], [4220, 935]];
 const STREET_POOL = ['Linden', 'Carrow', 'Page', 'Founders', 'Marlowe', 'Garrison', 'Exchange', 'Meridian', 'Tanner', 'Quay', 'Mill', 'Ferry', 'Chapel', 'Union', 'Market',
   'Bridge', 'Hawthorn', 'Laurel', 'Cedar', 'Magnolia', 'Dogwood', 'Pecan', 'Willow', 'Sycamore', 'Pine', 'Juniper', 'Palmetto', 'Live Oak', 'Peachtree', 'Cypress',
@@ -257,9 +256,8 @@ export function buildLayout(seed = 1609) {
       if (inPoly(pts, x + ox, z + oz)) land[z * WX + x] = val;
     }
   };
-  // The barrier beach in front of Severn Bay, and the long spit across the mouth of the bay.
+  // The barrier beach in front of Severn Bay. Past its end, the mouth of the bay is open water out to the light.
   fillPoly(BARRIER, 1, 10);
-  fillPoly(SPIT, 1, 10);
   // Marsh islands, all through the lagoon behind the barrier.
   for (let z = Math.round(830 * PX); z < Math.round(1078 * PX); z++) for (let x = coastX[z] + 22; x < gx(1120 * PX); x++) {
     const i = z * WX + x;

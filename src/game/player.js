@@ -976,6 +976,8 @@ export class Player {
     const hit = g.world.raycast(o[0], o[1], o[2], f[0], f[1], f[2], 4.6);
     this.highlight = hit && hit.dist < 4.6 ? hit : null;
     this.interact = null;
+    // On a bike there is only getting off. Said once you have slowed down; E does it at any speed.
+    if (g.bikes && g.bikes.ride) { if (Math.abs(g.bikes.ride.v) < 2) this.interact = { kind: 'bikeoff', label: 'Get off the motorbike' }; return; }
     const n = g.npcs.lookAt(o, f, 4.2, hit ? hit.dist : 4.2) || g.npcs.acrossCounter(o, f);
     // Facing the hole, the hole wins over a guard who happens to be standing in front of it. Look away to talk to them.
     const br = g.campSim.breachNear(this.x, this.y, this.z);
@@ -988,6 +990,8 @@ export class Player {
     if (n && n.kind !== 'raider' && !open) { this.interact = { kind: 'npc', npc: n, label: n.promptLabel() }; return; }
     const dog = !open && g.dogs ? g.dogs.lookAt(o, f, Math.min(3.4, hit ? hit.dist : 3.4)) : null;
     if (dog) { this.interact = { kind: 'dog', dog, label: `Pet ${dog.name}` }; return; }
+    const bike = !open && g.bikes ? g.bikes.lookAt(o, f, Math.min(3.8, hit ? hit.dist + .8 : 3.8)) : null;
+    if (bike) { this.interact = { kind: 'bike', bike, label: 'Ride the motorbike' }; return; }
     if (atHole) {
       const done = Math.round(Math.min(1, br.progress) * 100);
       this.interact = { kind: 'breach', breach: br, label: br.busy ? 'Breach: cannot repair while they are coming through' : done > 0 ? `Hold to repair the breach: ${done}%` : 'Hold to repair the breach' };
