@@ -1815,6 +1815,8 @@ export class NPCs {
         const out = 18 + rand() * 18, side = (rand() - .5) * 34;
         x = Math.floor(R.bx + ox * out + (horiz ? side : 0)); z = Math.floor(R.bz + oz * out + (horiz ? 0 : side));
         ok = x > 2 && z > 2 && x < WX - 2 && z < WZ - 2 && !!w.walk[(x >> 1) + (z >> 1) * w.walkW] && !H.campAt(x, z, 4);
+        // Not stood inside a wreck, a bus or a wall.
+        if (ok) { const y = w.terrainTop(x, z); ok = !w.solid(x, y, z) && !w.solid(x, y + 1, z) && !w.solid(x, y + 2, z); }
       }
       if (!ok) { x = R.bx + ox * 8; z = R.bz + oz * 8; }
       const m = new NPC('raider', x + .5, w.terrainTop(x, z), z + .5, { weapon: pickOf(role.weapons), variant: wardrobeRow(['raider']), hp: role.hp * 1.5 * tough * (.9 + rand() * .2), name: pickOf(RAIDER_NAMES), title: role.boss ? 'Raider boss' : 'Raider' });
@@ -2757,17 +2759,25 @@ export class NPCs {
     if (!w.walk[(x >> 1) + (z >> 1) * w.walkW] || (!bounty && g.horde.inCamp(x, z, 170))) return false;
     const heading = Math.round(rand() * 4) * Math.PI * .5;
     const crew = this.pickCrew(), tough = 1 + Math.min(.9, g.day * .03);
+    // Out on a street full of the dead nobody lasts. A crew holes up indoors, on the ground floor of a building near here, and comes out
+    // when there is something worth coming out for. Failing that they are on the street, but never stood inside a wreck or a wall.
+    const den = this.hideout(x, z, size);
+    const clear = (px, pz) => { const y = w.terrainTop(Math.floor(px), Math.floor(pz)); return !w.solid(Math.floor(px), y, Math.floor(pz)) && !w.solid(Math.floor(px), y + 1, Math.floor(pz)) && !w.solid(Math.floor(px), y + 2, Math.floor(pz)) ? y : null; };
     // About a third have heard you, and are coming to see what you have got.
     const hunting = !bounty && rand() < .35;
     for (let i = 0; i < size; i++) {
       const key = crew.boss && i === 0 && size >= 3 ? 'boss' : crew.roles[i % crew.roles.length];
       const role = RAIDER_ROLES[key];
-      const nx = x + (rand() - .5) * (6 + size), nz = z + (rand() - .5) * (6 + size);
-      const m = new NPC('raider', nx, w.terrainTop(nx, nz), nz, { weapon: pickOf(role.weapons), variant: wardrobeRow(['raider']), hp: role.hp * tough * (.9 + rand() * .2), name: pickOf(RAIDER_NAMES), title: role.boss ? 'Raider boss' : 'Raider' });
+      let nx = x + .5, nz = z + .5, ny = null;
+      if (den) { const c = den.cells[(i * 7 + Math.floor(rand() * 3)) % den.cells.length]; nx = c[0] + .5; nz = c[2] + .5; ny = c[1]; }
+      else for (let t = 0; t < 12 && ny === null; t++) { nx = x + .5 + (rand() - .5) * (6 + size); nz = z + .5 + (rand() - .5) * (6 + size); ny = clear(nx, nz); }
+      if (ny === null) continue;
+      const m = new NPC('raider', nx, ny, nz, { weapon: pickOf(role.weapons), variant: wardrobeRow(['raider']), hp: role.hp * tough * (.9 + rand() * .2), name: pickOf(RAIDER_NAMES), title: role.boss ? 'Raider boss' : 'Raider' });
       m.dx = Math.sin(heading); m.dz = Math.cos(heading);
       m.gang = x * 7 + z;
       m.bounty = bounty;
-      m.homeX = x; m.homeZ = z;
+      m.homeX = den ? den.cx : x; m.homeZ = den ? den.cz : z;
+      m.den = den ? den.box : null;
       m.raider = role;
       m.maxHp = m.hp;
       m.flank = (i * 2.4 + rand()) % 6.283;
@@ -2776,7 +2786,36 @@ export class NPCs {
       m.crew = size;
       this.list.push(m);
     }
-    return true;
+    return den ? { cx: den.cx, cz: den.cz } : true;
+  }
+
+  // A building near (x, z) a crew can hole up in: one still standing, not a camp's, with enough clear floor on its ground floor for them
+  // all (room to stand, something underfoot, nothing over their heads for three blocks). The nearest that will do, or nothing.
+  hideout(x, z, size) {
+    const g = this.g, L = g.layout, W = g.world, seen = new Set();
+    let best = null, bd = 1e9;
+    for (let dz = -40; dz <= 40; dz += 3) for (let dx = -40; dx <= 40; dx += 3) {
+      const px = x + dx, pz = z + dz;
+      if (px < 0 || pz < 0 || px >= WX || pz >= WZ) continue;
+      const lot = L.lot[pz * WX + px];
+      if (!lot || seen.has(lot)) continue;
+      seen.add(lot);
+      const b = L.buildings[lot - 1];
+      if (!b || b.gone || b.x1 - b.x0 < 4 || b.z1 - b.z0 < 4 || g.horde.inCamp((b.x0 + b.x1) / 2, (b.z0 + b.z1) / 2, 30)) continue;
+      const d = Math.hypot((b.x0 + b.x1) / 2 - x, (b.z0 + b.z1) / 2 - z);
+      if (d >= bd) continue;
+      const y = STREET_Y + (b.lift || 0), cells = [];
+      if (!W.isLoaded(b.x0, y, b.z0) || !W.isLoaded(b.x1, y, b.z1)) continue;
+      for (let cz = b.z0 + 1; cz < b.z1 && cells.length < 40; cz += 2) for (let cx = b.x0 + 1; cx < b.x1 && cells.length < 40; cx += 2) {
+        if (L.lot[cz * WX + cx] !== lot) continue;
+        if (W.get(cx, y, cz) || W.get(cx, y + 1, cz) || W.get(cx, y + 2, cz) || !W.solid(cx, y - 1, cz)) continue;
+        cells.push([cx, y, cz]);
+      }
+      if (cells.length < Math.max(3, size)) continue;
+      bd = d;
+      best = { cells, cx: (b.x0 + b.x1 + 1) / 2, cz: (b.z0 + b.z1 + 1) / 2, box: { x0: b.x0 + 1, x1: b.x1, z0: b.z0 + 1, z1: b.z1 } };
+    }
+    return best;
   }
 
   updateRaider(n, dt, dp) {
@@ -2857,12 +2896,15 @@ export class NPCs {
       if (n.moveT <= 0) {
         n.moveT = 3 + rand() * 7;
         if (rand() < .3) { const a = Math.round(rand() * 4) * Math.PI * .5; n.dx = Math.sin(a); n.dz = Math.cos(a); }
-        // A bounty's gang keeps to its patch, and nobody here goes near a wall full of rifles.
-        const away = n.bounty ? Math.hypot(n.x - n.homeX, n.z - n.homeZ) > 26 : H.inCamp(n.x, n.z, 150);
+        // Holed up, they keep to their building and mostly keep still. A bounty's gang keeps to its patch, and nobody here goes near a
+        // wall full of rifles.
+        const D = n.den;
+        if (D && rand() < .6) { n.dx = 0; n.dz = 0; }
+        const away = D ? n.x < D.x0 || n.x > D.x1 || n.z < D.z0 || n.z > D.z1 : n.bounty ? Math.hypot(n.x - n.homeX, n.z - n.homeZ) > 26 : H.inCamp(n.x, n.z, 150);
         if (away) { const m = Math.hypot(n.homeX - n.x, n.homeZ - n.z) || 1; n.dx = (n.homeX - n.x) / m; n.dz = (n.homeZ - n.z) / m; }
-        else if (n.hunting) { const route = H.flowAt(n.x, n.z); if (route) { n.dx = route[0]; n.dz = route[1]; } }
+        else if (n.hunting && !D) { const route = H.flowAt(n.x, n.z); if (route) { n.dx = route[0]; n.dz = route[1]; } }
       }
-      const pace = n.hunting ? 1 : .75;
+      const pace = n.den ? .35 : n.hunting ? 1 : .75;
       vx = n.dx * role.speed * pace; vz = n.dz * role.speed * pace;
       if (pressed) {
         const zx = (n.zx - n.x) / (n.zd || 1), zz = (n.zz - n.z) / (n.zd || 1);
@@ -4984,7 +5026,9 @@ export class Jobs {
       if (j.type === 'bounty' && !j.spawned && d < 200) {
         for (let t = 0; t < 40 && !j.spawned; t++) {
           const a = rand() * 6.283, r = t * .6;
-          j.spawned = g.npcs.addGang(Math.floor(j.x + Math.cos(a) * r), Math.floor(j.z + Math.sin(a) * r), j.left, j.id);
+          const got = g.npcs.addGang(Math.floor(j.x + Math.cos(a) * r), Math.floor(j.z + Math.sin(a) * r), j.left, j.id);
+          // Holed up in a building: the marker goes to their door, not the street they were last seen on.
+          if (got) { j.spawned = true; if (got.cx !== undefined) { j.x = got.cx; j.z = got.cz; } }
         }
       }
       if (j.type === 'hold' && d < 16) {
