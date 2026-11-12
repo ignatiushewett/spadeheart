@@ -3524,11 +3524,13 @@ export class NPCs {
       n.state = n.aim > 0 ? 3 : .7;
       return true;
     }
-    // Away from the weight of them. When they are everywhere, any gap will do, and the camp is behind you.
-    const c = g.layout.camps[n.camp];
+    // Away from the weight of them. When they are everywhere, any gap will do, and the camp is behind you; out in the streets, whoever
+    // they are with is (you, for anyone walking with you), or failing that just a way out, any way.
+    const c = n.camp >= 0 ? g.layout.camps[n.camp] : null, P = g.player;
     let ax = -n.swarmX, az = -n.swarmZ;
     const am = Math.hypot(ax, az);
-    const tx = (c.x0 + c.x1) / 2 - n.x, tz = (c.z0 + c.z1) / 2 - n.z, tm = Math.hypot(tx, tz) || 1;
+    const sx = c ? (c.x0 + c.x1) / 2 : n.kind === 'follower' ? P.x : n.x + (n.escX ?? (n.escX = rand() - .5)) * 10, sz = c ? (c.z0 + c.z1) / 2 : n.kind === 'follower' ? P.z : n.z + (n.escZ ?? (n.escZ = rand() - .5)) * 10;
+    const tx = sx - n.x, tz = sz - n.z, tm = Math.hypot(tx, tz) || 1;
     if (am < .8) { ax = tx / tm; az = tz / tm; } else { ax = ax / am + tx / tm * .35; az = az / am + tz / tm * .35; }
     const m = Math.hypot(ax, az) || 1;
     ax /= m; az /= m;
