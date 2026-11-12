@@ -7,6 +7,7 @@ import { alarmPostCells, flagCells } from '../shared/camps.js';
 import { LORE } from './camplore.js';
 import { CAMP_START } from './items.js';
 import { refugeCandidates, sideOf } from './director.js';
+import { NIGHT_RADIUS } from './npcs.js';
 
 const rand = Math.random;
 const M_ALUM = M.ALUM;
@@ -714,13 +715,15 @@ export class CampSim {
   // One of the dead went down close to a wall. If an operation is on and it was you that put it down, that kill counts for you, whether the
   // crowd is at the wall right now or you went out looking for it. The camp pays for it if it holds.
   noteKill(x, z, byPlayer) {
-    const H = this.g.horde, c = H.inCamp(x, z, 100);
+    const H = this.g.horde;
+    // A night shift counts further out than an operation does.
+    if (byPlayer) { const cn = H.inCamp(x, z, NIGHT_RADIUS); if (cn && this.state[cn.id].status === 'holding') this.g.jobs.nightKill(cn); }
+    const c = H.inCamp(x, z, 100);
     if (!c) return;
     const s = this.state[c.id], r = s.rec, count = this.ledger(s);
     count.kills++;
     if (byPlayer) count.yours++;
     if (r) r.kills++;
-    if (byPlayer && s.status === 'holding') this.g.jobs.nightKill(c);
     if (!s.op || s.status !== 'holding') return;
     if (!r) s.op.kills++;
     if (!byPlayer) return;

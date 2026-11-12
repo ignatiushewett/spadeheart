@@ -597,6 +597,14 @@ export class Horde {
     }
   }
 
+  // How many of the dead are in the population grid round a camp, out to this far past its wall.
+  popNear(c, R) {
+    const W = this.popW;
+    let s = 0;
+    for (let cz = Math.max(0, (c.z0 - R) >> 6); cz <= Math.min(this.popD - 1, (c.z1 + R) >> 6); cz++) for (let cx = Math.max(0, (c.x0 - R) >> 6); cx <= Math.min(W - 1, (c.x1 + R) >> 6); cx++) s += this.pop[cx + cz * W];
+    return s;
+  }
+
   inCamp(x, z, margin = 0) {
     for (const c of this.L.camps) {
       if (x > c.x0 - margin && x < c.x1 + margin && z > c.z0 - margin && z < c.z1 + margin) return c;

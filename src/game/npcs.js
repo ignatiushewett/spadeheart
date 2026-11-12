@@ -40,6 +40,8 @@ export const OP_PAY = {
   nightLen: 1 / 3,             // until five in the morning
   strikes: 3,                  // missed quotas before a contract is torn up
 };
+// How far from a camp's wall a kill still counts toward a night shift: out past where the guards on the wall do most of their work.
+export const NIGHT_RADIUS = 150;
 // What each place does about a missed quota: how much of the contract's earnings it still pays, and how it puts that to you. Nobody here is a charity,
 // and the ones doing badly can afford it least: the lower a camp has sunk, the less of even this it pays.
 const DOCK = {
@@ -4412,9 +4414,13 @@ export class Jobs {
   nightOf(campId) { return this.active.find((a) => a.type === 'night' && a.campId === campId); }
 
   // A hard night's work, but less than a day's quota on an operation. More people in the city means more to shoot at, and more expected.
-  nightQuota() {
-    const g = this.g, k = Math.sqrt(Math.max(.5, g.horde.settings.horde || 1));
-    return Math.round((35 + g.day * 1.5) * k / 5) * 5;
+  // The night's quota goes by how many of the dead are actually about: a farm camp out in thin country asks for fewer than a town
+  // camp with a city's worth of them in the streets round it, where the guards cannot get them all first.
+  nightQuota(c) {
+    const g = this.g, k = Math.sqrt(Math.max(.5, g.horde.settings.horde || 1)), base = (35 + g.day * 1.5) * k;
+    if (!c) return Math.round(base / 5) * 5;
+    const f = Math.max(.4, Math.min(1.3, Math.sqrt(g.horde.popNear(c, NIGHT_RADIUS) / 700)));
+    return Math.max(10, Math.round(base * f / 5) * 5);
   }
 
   onShift(j, now = this.g.campSim.now()) {
@@ -4579,7 +4585,7 @@ export class Jobs {
   // Three nights in a row near the wall, nine till five, with a quota for each. The first is always the next night to come. Nothing is paid until
   // the third is done, and then only over the table at the town hall, so it is worth exactly as much as the camp's chances of still being there.
   signNight(c) {
-    const g = this.g, quota = this.nightQuota();
+    const g = this.g, quota = this.nightQuota(c);
     const j = {
       id: this.nextId++, type: 'night', campId: c.id, title: `Night shift contract: ${c.name}`,
       desc: `${quota} infected near the walls of ${c.name} every night from nine till five, ${OP_PAY.nights} nights in a row, for ${SPADE} ${OP_PAY.shift} a shift, ${SPADE} ${OP_PAY.shiftOp} during an operation. Collect it all at the Town Hall after the last one. Miss a night and the contract ends with nothing paid. Nothing if the settlement falls.`,
@@ -4977,7 +4983,7 @@ export class Jobs {
       if (j.type === 'clearing') {
         j.type = 'night';
         j.title = `Night shift contract: ${c.name}`;
-        j.quota = this.nightQuota();
+        j.quota = this.nightQuota(c);
         j.k = Math.floor(this.g.day + this.g.tod - OP_PAY.nightStart) + 1;
         j.shiftKills = 0; j.streak = 0; j.earned = 0;
         j.desc = `${j.quota} infected near the walls of ${c.name} every night from nine till five, ${OP_PAY.nights} nights in a row, for ${SPADE} ${OP_PAY.shift} a shift, ${SPADE} ${OP_PAY.shiftOp} during an operation. Collect it all at the Town Hall after the last one. Miss a night and the contract ends with nothing paid. Nothing if the settlement falls.`;

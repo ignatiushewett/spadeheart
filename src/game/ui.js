@@ -1611,7 +1611,7 @@ export class UI {
         title: 'Night shift contract',
         job: `Kill infected near the walls every night for ${OP_PAY.nights} nights.`,
         pay: rate,
-        terms: [['Nightly quota', `${g.jobs.nightQuota()} kills`], ['Hours', `${clockOf(OP_PAY.nightStart)} to ${clockOf((OP_PAY.nightStart + OP_PAY.nightLen + .0001) % 1)}`], ['Starts', 'The next night'], collect],
+        terms: [['Nightly quota', `${g.jobs.nightQuota(c)} kills`], ['Hours', `${clockOf(OP_PAY.nightStart)} to ${clockOf((OP_PAY.nightStart + OP_PAY.nightLen + .0001) % 1)}`], ['Starts', 'The next night'], collect],
         perks: [['Doctor', 'One free treatment a day'], ['Traders', 'One free supply package a day']],
         risks: [['Miss a quota', 'Contract ends, nothing paid']],
       };
