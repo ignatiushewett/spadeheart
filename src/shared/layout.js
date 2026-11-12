@@ -505,6 +505,7 @@ export function buildLayout(seed = 1609) {
   const dist = new Uint8Array(N), dist2 = new Uint8Array(N), dEdge = new Uint8Array(N);
   const roads = new Uint8Array(N);    // how many streets cross a cell: lane lines stop at the junctions
   const townCars = [];
+  const hwy = new Uint8Array(N);     // what the highways laid down: 3 the carriageway, 1-2 its verges
   const nearMain = new Uint8Array(N);
   const DISTRICTS = [];
   const leaves = [];
@@ -630,7 +631,9 @@ export function buildLayout(seed = 1609) {
         if (townId[i] !== ti + 1) {
           if (townId[i] || !land[i] || dw[i] < 24 || campDist(x, z) < 16) continue;
           const v = Math.abs(c - s.p) <= hw ? 3 : Math.abs(c - s.p) <= hw + 3 ? 1 : 0;
-          if (v > mask[i]) mask[i] = v;
+          const side = fwd[k] < back[k] ? 1 : 0, st = (s.stub || (s.stub = [{ cells: [], cent: [], side: 0 }, { cells: [], cent: [], side: 1 }]))[side];
+          if (v > mask[i]) { st.cells.push(i, mask[i], a); mask[i] = v; }
+          if (c === s.p) st.cent.push(i, a);
           continue;
         }
         const dk = deckOK || (br && br[k]);
@@ -729,6 +732,7 @@ export function buildLayout(seed = 1609) {
     eachNear(path, hs, (i, d, along) => {
       const v = d <= hw ? 3 : walk || townId[i] ? 2 : 1;
       if (v > mask[i]) mask[i] = v;
+      if (v > hwy[i]) hwy[i] = v;
       if (bridge) deck[i] = 1;
       if (line && d < .75 && (along % 11) < 6) lineMarks.push(i);
     });
@@ -764,6 +768,32 @@ export function buildLayout(seed = 1609) {
     while (e < WX - 1 && mask[cz * WX + e] !== 3) e++;
     highways['cause' + cz] = stampLine([[coastX[cz] - 70, cz], [e + 4, cz]], 14, { walk: true, smooth: 0 });
   }
+  // A street that runs on out of town stops short where a highway comes in: the highway is the way out, and a stub of street beside it or
+  // across it only looks like a mistake.
+  // Where it meets the highway it stops there; where it only runs alongside, it goes altogether.
+  const hwyWithin = (i, r) => {
+    const x = i % WX, z = (i / WX) | 0;
+    for (let dz = -r; dz <= r; dz += 2) for (let dx = -r; dx <= r; dx += 2) { const xx = x + dx, zz = z + dz; if (inside(xx, zz) && hwy[zz * WX + xx] === 3) return true; }
+    return false;
+  };
+  for (const t of TOWNS) for (const s of t.segs || []) for (const st of s.stub || []) {
+    if (!st.cent.length) continue;
+    // From the town outward.
+    const cent = [];
+    for (let q = 0; q < st.cent.length; q += 2) cent.push([st.cent[q], st.cent[q + 1]]);
+    cent.sort((p, q) => (st.side ? p[1] - q[1] : q[1] - p[1]));
+    let meet = null, near = false;
+    for (const [i, a] of cent) {
+      if (hwyWithin(i, 4)) { meet = a; break; }
+      if (!near && hwyWithin(i, 24)) near = true;
+    }
+    if (meet === null && !near) continue;
+    for (let q = 0; q < st.cells.length; q += 3) {
+      const i = st.cells[q], a = st.cells[q + 2];
+      if (meet !== null && (st.side ? a <= meet : a >= meet)) continue;
+      mask[i] = Math.max(st.cells[q + 1], hwy[i]);
+    }
+  }
   // The tunnel under the ridge between Albion and Weston: the road keeps its level and the hill goes over the top.
   eachNear(TUN, 8, (i, d, along) => {
     if (d > 7.5) return;
@@ -789,6 +819,14 @@ export function buildLayout(seed = 1609) {
 
   tick('streets');
   // --- Ground classes -----------------------------------------------------------------------------
+  // The edges of some towns are country already: farmhouses on big lots, paddocks and barns, the way Weston builds, inside the town's
+  // own bounds. Gibson Valley is all of it; Esperance all round; Dayton and Severn Bay on the side that faces inland.
+  const townEdge = chamfer((i) => !townId[i]);
+  const OUTSKIRTS = { gibson: [255, () => true], esperance: [120, () => true], dayton: [110, (x) => x < 4330], severn: [120, (x) => x < 3760] };
+  const outskirt = (i, x, z) => {
+    const t = townId[i] && TOWNS[townId[i] - 1], o = t && OUTSKIRTS[t.key];
+    return !!o && o[1](x, z) && townEdge[i] < o[0] * (.65 + .7 * noise2(x * .008 + 11, z * .008));
+  };
   const fieldAt = (x, z) => {
     const k = Math.max(farmK(x, z) * 1.7, sstep(1 - Math.hypot((x - 3290) / 260, (z - 700) / 170)));
     return k + (fbm2(x * .006, z * .006 + 3, 2) - .5) * .9 > .55;
@@ -809,7 +847,10 @@ export function buildLayout(seed = 1609) {
     let on = sx >= 0 && sz >= 0 && sx < SECW && sz < SECD ? fieldMemo[key] : -1;
     if (on < 0) {
       const xa = ix === 0 ? 0 : ix === 1 ? v0 : v1, xb = ix === 0 ? (v0 || SW) : ix === 1 ? (v1 || SW) : SW, za = iz ? h0 : 0, zb = iz || !h0 ? SD : h0;
-      on = fieldAt(sx * SW - 30 + (xa + xb) / 2, sz * SD + (za + zb) / 2) ? 1 : 0;
+      const wx0 = sx * SW - 30 + xa, wx1 = sx * SW - 30 + xb, wz0 = sz * SD + za, wz1 = sz * SD + zb;
+      on = fieldAt((wx0 + wx1) / 2, (wz0 + wz1) / 2) ? 1 : 0;
+      // Nobody ploughs right up to a settlement's wall: a field that would is left as grass.
+      for (const k in campRects) { const r = campRects[k]; if (wx1 > r.x0 - 40 && wx0 < r.x1 + 40 && wz1 > r.z0 - 40 && wz0 < r.z1 + 40) on = 0; }
       if (sx >= 0 && sz >= 0 && sx < SECW && sz < SECD) fieldMemo[key] = on;
     }
     if (!on) return 0;
@@ -829,7 +870,7 @@ export function buildLayout(seed = 1609) {
     const d = dw[i];
     if (townId[i] && land[i] !== 3) {
       // A town meets its water with a boardwalk; everything else is a lot until something claims it.
-      const rural = dist[i] && DISTRICTS[dist[i] - 1].zone.rural;
+      const rural = (dist[i] && DISTRICTS[dist[i] - 1].zone.rural) || outskirt(i, x, z);
       ground[i] = d < 7 ? G.PROM : m === 2 || d < 10 ? (rural ? G.DIRT : G.WALK) : G.LOT;
       continue;
     }
@@ -928,6 +969,7 @@ export function buildLayout(seed = 1609) {
   const zoneOf = (x, z, seedv = 0) => {
     const i = z * WX + x, d = DISTRICTS[dist[i] - 1];
     if (!d) return Z.village;
+    if (outskirt(i, x, z)) return Z.farmhouse;
     const e = dEdge[i];
     if (e < 70 && dist2[i] && r2(x * 3 + seedv, z * 5) < .45 * (1 - e / 70)) return DISTRICTS[dist2[i] - 1].zone;
     return d.zone;
