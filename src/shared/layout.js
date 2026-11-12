@@ -968,12 +968,16 @@ export function buildLayout(seed = 1609) {
   for (const c of camps) {
     const NW = c.navW, ND = c.navD, nav = c.nav, n = NW * ND;
     const cellOf2 = (x, z) => Math.max(0, Math.min(NW - 1, Math.floor((x - c.x0) / 2))) + Math.max(0, Math.min(ND - 1, Math.floor((z - c.z0) / 2))) * NW;
-    const paint = (x, z) => {
-      for (let dz = -1; dz <= 2; dz++) for (let dx = -1; dx <= 2; dx++) {
+    // Five wide, centred on a block, and on the same blocks as the market's own middle line, so a path down an avenue runs dead
+    // centre between the stall fronts.
+    const ax0 = c.spots.plaza ? Math.floor(c.spots.plaza.x) : c.cx, az0 = c.spots.plaza ? Math.floor(c.spots.plaza.z) : c.cz;
+    const paintAt = (x, z) => {
+      for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) {
         const i = (z + dz) * WX + x + dx;
         if (ground[i] === G.CAMP || ground[i] === G.PARK) { ground[i] = G.DIRT; mark[i] = 0; }
       }
     };
+    const paint = (x, z) => paintAt(x + ((ax0 - x) & 1), z + ((az0 - z) & 1));
     const route = (ax, az, bx, bz) => {
       const s = cellOf2(ax, az), t = cellOf2(bx, bz);
       const cost = new Int32Array(n * 4).fill(1 << 30), prev = new Int32Array(n * 4).fill(-1), buckets = [];
@@ -1006,8 +1010,8 @@ export function buildLayout(seed = 1609) {
     const { plaza, market, hq, field } = c.spots;
     for (const g of c.gates) {
       const inX = g.horiz ? 0 : g.side === 'W' ? 1 : -1, inZ = g.horiz ? (g.side === 'N' ? 1 : -1) : 0;
-      // Out through the gate and across the apron to the road.
-      for (let k = -10; k <= 6; k++) paint(g.cx - 1 + inX * k, g.cz - 1 + inZ * k);
+      // From just inside the gate: nothing is trodden out past it.
+      for (let k = 2; k <= 6; k++) paintAt((g.horiz ? g.tc : g.cx) + inX * k, (g.horiz ? g.cz : g.tc) + inZ * k);
       const sx = g.cx + inX * 6, sz = g.cz + inZ * 6;
       if (market) route(sx, sz, market.x, market.z); else if (plaza) route(sx, sz, plaza.x, plaza.z);
     }
