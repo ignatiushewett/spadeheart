@@ -2805,12 +2805,28 @@ export class NPCs {
       const d = Math.hypot((b.x0 + b.x1) / 2 - x, (b.z0 + b.z1) / 2 - z);
       if (d >= bd) continue;
       const y = STREET_Y + (b.lift || 0), cells = [];
-      if (!W.isLoaded(b.x0, y, b.z0) || !W.isLoaded(b.x1, y, b.z1)) continue;
-      for (let cz = b.z0 + 1; cz < b.z1 && cells.length < 40; cz += 2) for (let cx = b.x0 + 1; cx < b.x1 && cells.length < 40; cx += 2) {
-        if (L.lot[cz * WX + cx] !== lot) continue;
-        if (W.get(cx, y, cz) || W.get(cx, y + 1, cz) || W.get(cx, y + 2, cz) || !W.solid(cx, y - 1, cz)) continue;
-        cells.push([cx, y, cz]);
+      if (b.x1 - b.x0 > 64 || b.z1 - b.z0 > 64 || !W.isLoaded(b.x0, y, b.z0) || !W.isLoaded(b.x1, y, b.z1)) continue;
+      // Only somewhere with a way in: a doorway (or a broken-out window, or a hole) at street level that opens onto the street, and the
+      // floor inside that can be walked to from it. A silo, a sealed tank or a bricked-up shell is no hideout.
+      const mine = (cx, cz) => cx >= 0 && cz >= 0 && cx < WX && cz < WZ && L.lot[cz * WX + cx] === lot;
+      const open = (cx, cz) => !W.get(cx, y, cz) && !W.get(cx, y + 1, cz);
+      const reach = new Set(), q = [];
+      for (let cz = b.z0; cz <= b.z1; cz++) for (let cx = b.x0; cx <= b.x1; cx++) {
+        if (!mine(cx, cz) || !open(cx, cz)) continue;
+        const edge = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([ex, ez]) => !mine(cx + ex, cz + ez) && open(cx + ex, cz + ez) && W.solid(cx + ex, y - 1, cz + ez));
+        if (edge) { reach.add(cx + cz * WX); q.push(cx, cz); }
       }
+      while (q.length) {
+        const cz = q.pop(), cx = q.pop();
+        if (!W.get(cx, y + 2, cz) && W.solid(cx, y - 1, cz) && cells.length < 60) cells.push([cx, y, cz]);
+        for (const [ex, ez] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const nx = cx + ex, nz = cz + ez, k = nx + nz * WX;
+          if (reach.has(k) || !mine(nx, nz) || !open(nx, nz) || !W.solid(nx, y - 1, nz)) continue;
+          reach.add(k); q.push(nx, nz);
+        }
+      }
+      // Not stood in the doorway itself: the ones further in, if there are enough.
+      if (cells.length > size * 3) cells.splice(0, Math.floor(cells.length / 3));
       if (cells.length < Math.max(3, size)) continue;
       bd = d;
       best = { cells, cx: (b.x0 + b.x1 + 1) / 2, cz: (b.z0 + b.z1 + 1) / 2, box: { x0: b.x0 + 1, x1: b.x1, z0: b.z0 + 1, z1: b.z1 } };
@@ -2952,9 +2968,9 @@ export class NPCs {
     const g = this.g;
     n.aggro = true;
     g.ui.floatSay(n, pickOf(n.raider.say), 2.6);
-    for (const m of this.raiders) {
-      if (m.gang !== n.gang || m.aggro) continue;
-      m.aggro = true;
+    for (const m of this.list) {
+      if (m.kind !== 'raider' || m.dead || m.gang !== n.gang || (m.aggro && !m.calm)) continue;
+      m.aggro = true; m.calm = false;
       // A beat to react: nobody has their finger on the trigger the moment someone yells.
       m.cd = Math.max(m.cd, .5 + rand() * 1.1);
     }
@@ -3987,9 +4003,8 @@ export class NPCs {
     if (n.kind === 'raider') {
       // Shot at, they have a score to settle: the whole crew turns on you, and the dead come second unless they are right on top of them.
       if (!n.provoked) for (const m of this.list) if (m.kind === 'raider' && !m.dead && m.gang === n.gang) m.provoked = true;
-      // A crew in the middle of a job only cares about the one you hit, and that one only so much.
-      if (n.raidCamp !== undefined || n.calm) { n.aggro = true; n.calm = false; }
-      else if (!n.aggro) this.raiderAlert(n);
+      // One of them knows about you, so all of them do: the crew turns as one, whatever it was in the middle of.
+      if (!n.aggro || n.calm) { n.calm = false; this.raiderAlert(n); }
       // Tough enough to last against a camp full of cooks, and to take a few rounds from you: these are people who live by the gun.
       n.hp -= dmg * (n.raidCamp !== undefined ? 1.5 : .95);
       if (n.hp <= 0) { n.headless = behead; this.kill(n, true); }

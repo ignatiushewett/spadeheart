@@ -1070,17 +1070,22 @@ export function buildLayout(seed = 1609) {
     const x = 200 + Math.floor(farmRng() * (WX - 700)), z = 300 + Math.floor(farmRng() * (WZ - 400));
     if (!fieldAt(x, z) || farms.some((f) => Math.hypot(f.x - x, f.z - z) < 170)) continue;
     let ok = true;
-    for (let dz = -30; dz <= 30 && ok; dz += 6) for (let dx = -36; dx <= 36 && ok; dx += 6) {
+    for (let dz = -36; dz <= 36 && ok; dz += 6) for (let dx = -36; dx <= 36 && ok; dx += 6) {
       const j = (z + dz) * WX + x + dx, g = ground[j];
       if (g !== G.FIELD && g !== G.PARK && g !== G.DIRT || campMask[j] || townId[j] || campDist(x + dx, z + dz) < 60) ok = false;
     }
     if (!ok) continue;
     farms.push({ x, z });
-    fillGround({ x0: x - 34, x1: x + 34, z0: z - 28, z1: z + 28 }, G.DIRT);
+    // Every farm is laid out its own way round: the yard turned a quarter, a half or three quarters, and sometimes mirrored, so no two
+    // read as the same stamp from the air.
+    const turn = Math.floor(farmRng() * 4), flip = farmRng() < .5 ? -1 : 1;
+    const at = (dx, dz) => { dx *= flip; return turn === 0 ? [dx, dz] : turn === 1 ? [-dz, dx] : turn === 2 ? [-dx, -dz] : [dz, -dx]; };
+    const box = (ax, az, bx, bz) => { const [p, q] = at(ax, az), [r, s] = at(bx, bz); return { x0: x + Math.min(p, r), x1: x + Math.max(p, r), z0: z + Math.min(q, s), z1: z + Math.max(q, s) }; };
+    fillGround(box(-34, -28, 34, 28), G.DIRT);
     const st = farmRng.pick([S.clapW, S.clapW, S.clapY, S.cedar, S.cottage]);
-    landmark('', { x0: x - 30, x1: x - 14, z0: z - 22, z1: z - 8 }, st, [0, 2], { house: true, rise: 4 });
-    landmark('', { x0: x + 2, x1: x + 28, z0: z - 20, z1: z - 4 }, S.barn, [0, 2], { house: true, rise: 6, open: true });
-    const sx = x + 14, sz = z + 14;
+    landmark('', box(-30, -22, -14, -8), st, [0, 2], { house: true, rise: 4 });
+    landmark('', box(2, -20, 28, -4), S.barn, [0, 2], { house: true, rise: 6, open: true });
+    const [so, sw] = at(14, 14), sx = x + so, sz = z + sw;
     const sid = addBuilding({ name: '', style: S.silo, tiers: [0, top(4 + Math.floor(farmRng() * 2))], x0: sx - 4, x1: sx + 4, z0: sz - 4, z1: sz + 4, seed: farms.length * 977, blank: true });
     for (let dz = -4; dz <= 4; dz++) for (let dx = -4; dx <= 4; dx++) if (dx * dx + dz * dz <= 17) { const i = (sz + dz) * WX + sx + dx; ground[i] = G.LOT; lot[i] = sid; mark[i] = 0; }
   }

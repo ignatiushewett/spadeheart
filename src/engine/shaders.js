@@ -812,8 +812,8 @@ void main(){
   vec3 col=mix(uHorizon,uSkyCol,pow(up,.55));
   float sd=max(dot(d,uSunDir),0.);
   // Sun disc and atmosphere glow. Bright enough to drive bloom and flares.
-  col+=uSunCol*(pow(sd,8.)*.08+pow(sd,64.)*.18);
-  col+=uSunCol*smoothstep(.9994,.9998,sd)*14.*uSunUp;
+  col+=uSunCol*(pow(sd,8.)*.05+pow(sd,64.)*.1);
+  col+=uSunCol*smoothstep(.9994,.9998,sd)*7.*uSunUp;
   // A pale moon you can see but that lights nothing. The nights here are truly dark.
   float md=max(dot(d,-uSunDir),0.);
   col+=vec3(.5,.54,.62)*smoothstep(.9992,.9996,md)*uNight*.5;
@@ -836,6 +836,9 @@ void main(){
   // Haze near the horizon and below it.
   float below=smoothstep(.2,-.01,d.y);
   col=mix(col,uFogCol,below*below);
+  // Under the horizon there is nothing to see but the ground, so the sky there goes to a dark grassy green: if a hole ever opens in the
+  // world underfoot, it reads as shadowed ground, not a window onto bright sky. Darker still at night.
+  col=mix(col,vec3(.075,.1,.048)*(1.-uNight*.85),1.-smoothstep(-.18,-.02,d.y));
   outCol=vec4(col,1.);
 }`;
 
@@ -1918,7 +1921,7 @@ vec3 flare(vec2 uv){
   c+=vec3(.55,.68,1.)*streak*.35;
   float halo=exp(-pow(length(p-s)-.38,2.)*220.);
   c+=vec3(1.,.8,.6)*halo*.02;
-  return c*vis*uSunCol;
+  return c*vis*uSunCol*.45;   // all of it kept faint: something you notice, not something in the way
 }
 void main(){
   vec2 uv=vUV;
@@ -1935,13 +1938,13 @@ void main(){
   col*=mix(.72,1.,ao);
   vec3 bloom=texture(uBloom,uv).rgb;
   col+=bloom*uBloomAmt;
-  col+=texture(uRays,uv).rgb*uSunCol*.8*(1.-vm);
+  col+=texture(uRays,uv).rgb*uSunCol*.5*(1.-vm);
   col+=flare(uv);
   if(uGlare>.001){
     // A burn round the disc that swallows the edges of whatever is near it, a wide bright halo, and a milky veil over the rest.
     vec2 sp=(uFlareData.xy-.5)*vec2(uAspect,1.), pp=(uv-.5)*vec2(uAspect,1.);
     float d=length(pp-sp);
-    col+=uSunCol*uGlare*(exp(-d*d*55.)*1.5+exp(-d*5.)*.3+.055);
+    col+=uSunCol*uGlare*(exp(-d*d*55.)*.7+exp(-d*5.)*.14+.022);
   }
   col+=vec3(1.,.82,.6)*uFlash;
   col*=uExposure;
