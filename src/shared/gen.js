@@ -430,13 +430,17 @@ export function makeGenerator(L) {
       // A pine: a tall bare trunk and a cone of dark needles.
       const tall = 9 + size * 2 + seed % 4;
       for (let y = 0; y < tall - 2; y++) put(x, base + y, z, M.TRUNK);
+      // Tiers that step in and out a little as they go up, but never wider than the one below: no flat cap sat on a narrower neck,
+      // just a cone that comes to a point, with a single sprig standing off the top.
+      let prev = 3;
       for (let y = 3 + seed % 2; y <= tall; y++) {
-        const r = Math.min(3, Math.round((tall - y) * .42 + ((y & 1) ? .6 : 0)));
+        const r = prev = Math.min(prev, Math.round((tall - y) * .42 + ((y & 1) ? .6 : 0)));
         for (let dz = -r; dz <= r; dz++) for (let dx = -r; dx <= r; dx++) {
           if (dx * dx + dz * dz > r * r + 1 || (!dx && !dz && y < tall - 2)) continue;
           put(x + dx, base + y, z + dz, M.LEAF);
         }
       }
+      put(x, base + tall + 1, z, M.LEAF);
       return;
     }
     const trunkH = 3 + size + seed % 3;

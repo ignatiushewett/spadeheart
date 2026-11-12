@@ -4227,12 +4227,15 @@ export class Jobs {
     if (this.offerDay[campId] !== this.g.day) {
       this.offerDay[campId] = this.g.day;
       const c = this.g.layout.camps[campId];
-      this.offers[campId] = [this.make(c, 'kill'), this.make(c, 'fetch'), this.make(c, 'hold'), this.make(c, 'bounty')];
+      // The day's run of each kind of work, and then a second, harder run of the same: further out, more to do, better paid. For
+      // whoever wants the hard end of the board before the board would have got round to offering it.
+      const types = ['kill', 'fetch', 'hold', 'bounty'];
+      this.offers[campId] = [...types.map((t) => this.make(c, t)), ...types.map((t) => this.make(c, t, .3))];
     }
     return this.offers[campId];
   }
 
-  make(c, type) {
+  make(c, type, harder = 0) {
     const g = this.g, L = g.layout;
     let x = c.cx, z = c.cz;
     // Someone new to a camp gets errands, not expeditions, and is paid partly in what they lack.
@@ -4241,7 +4244,7 @@ export class Jobs {
     // with you, a little at a time: the first jobs are round the corner from the wall, and the ones after them go further out, ask for
     // more, and pay for it. Each offer on a board sits somewhere near that line, a bit either side, so there is a choice.
     const prog = Math.max(0, Math.min(1, (g.stats.jobs + Math.max(0, g.dialogue.standing(c.id)) / 6) / 32));
-    const p = Math.max(0, Math.min(1, prog + (rand() - .5) * .3));
+    const p = Math.max(0, Math.min(1, prog + harder + (rand() - .5) * .3));
     // Measured from the wall. Raiders keep well clear of a wall full of rifles, so a bounty starts further out than the rest; a cull
     // needs to be far enough out that there is something left to cull. Most of how hard a job is, is how far it is.
     const near = (type === 'bounty' ? 80 : type === 'kill' ? 45 : 35) + p * 300, far = near + 50 + p * 220;

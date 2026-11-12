@@ -1583,11 +1583,11 @@ export class UI {
     this.say(op ? `Operation ${op.name}, ${dd.text.toLowerCase()}.${dd.over ? ' It is running long. Anyone on a contract can take an early payout from me, at a cut.' : ` It is ${g.campSim.opLength(op.predict)}, if it goes to plan.`} It is not too late to sign on. Patrols and night shifts are always open.` : next ? `Operation ${next.name} is on the board, ${g.campSim.opLength(next.predict)}. It starts in about ${g.campSim.opNoticeHours(s)} hours, and you can sign for it now. Patrols and night shifts are always open.` : 'Nothing on the board for an operation yet. You will hear when there is. Patrols and night shifts are always open.');
     const shift = `${SP} ${OP_PAY.shift} a shift`;
     const cards = [
-      { tag: 'Patrol', title: 'Patrol contract', pay: shift, meta: 'Walk the corners round the settlement and keep them clear.',
+      { tag: '', title: 'Patrol contract', pay: shift, meta: 'Walk the corners round the settlement and keep them clear.',
         state: pat ? 'Signed' : patJob ? 'Pay waiting' : signed || clr ? 'Under contract' : '', off: pat || !!patJob || signed || clr, fn: () => this.contractCard(n, 'patrol') },
-      { tag: 'Night shift', title: 'Night shift contract', pay: shift, meta: 'Hold the wall through the night and make your quota.',
+      { tag: '', title: 'Night shift contract', pay: shift, meta: 'Hold the wall through the night and make your quota.',
         state: clr ? 'Signed' : nightJob ? 'Pay waiting' : signed || pat ? 'Under contract' : '', off: clr || !!nightJob || signed || pat, fn: () => this.contractCard(n, 'night') },
-      { tag: 'Operation', title: target ? `Operation ${target.name}` : 'No operation posted', pay: target ? `${SP} ${OP_PAY.vanguard} a kill` : '',
+      { tag: '', title: target ? `Operation ${target.name}` : 'No operation posted', pay: target ? `${SP} ${OP_PAY.vanguard} a kill` : '',
         meta: target ? (op ? 'Under way now.' : `Starts in about ${g.campSim.opNoticeHours(s)} hours.`) : 'You will hear on the radio when there is one.',
         state: signed ? 'Joined' : !target ? '' : pat || clr ? 'Under contract' : j && j.void ? 'Terminated' : '', off: !target || signed || pat || clr || !!(j && j.void), fn: () => this.contractCard(n, 'vanguard') },
     ];
@@ -1631,7 +1631,9 @@ export class UI {
     for (const c of cards) {
       const b = document.createElement('button');
       b.className = `card${c.off ? ' off' : ''}`;
-      b.innerHTML = `<span class="tag"><span>${c.tag}</span>${c.state ? `<i>${c.state}</i>` : ''}</span><b>${c.title}</b>${c.pay ? `<span class="pay">${c.pay}</span>` : ''}${c.meta ? `<span class="meta">${c.meta}</span>` : ''}`;
+      // The small line over the title only when it says something the title does not: the kind of job, or where it stands.
+      const head = c.tag || c.state ? `<span class="tag"><span>${c.tag || ''}</span>${c.state ? `<i>${c.state}</i>` : ''}</span>` : '';
+      b.innerHTML = `${head}<b>${c.title}</b>${c.pay ? `<span class="pay">${c.pay}</span>` : ''}${c.meta ? `<span class="meta">${c.meta}</span>` : ''}`;
       if (c.off) b.disabled = true;
       else b.addEventListener('click', () => { this.finishLine(); this.g.audio.simple('ui'); c.fn(); });
       grid.appendChild(b);
@@ -2019,7 +2021,9 @@ export class UI {
       if (n.dead || !seen(n.x, n.z)) continue;
       if (n.kind === 'raider' && !n.aggro && Math.hypot(n.x - P.x, n.z - P.z) > 45) continue;
       x.fillStyle = n.kind === 'raider' ? '#f0963c' : n.kind === 'wanderer' ? '#d8d2a0' : '#8fd27a';
-      const d = dot + 1;
+      // People shrink with the map: a speck each when the whole island is on screen, a proper marker close in. Raiders stay a little
+      // bigger, so trouble still shows.
+      const d = n.kind === 'raider' ? Math.max(2.2, Math.min(6, s * 2.6)) : Math.max(1.1, Math.min(6, s * 2.4));
       x.fillRect(tx(n.x) - d / 2, tz(n.z) - d / 2, d, d);
     }
     x.globalAlpha = 1;
