@@ -316,7 +316,7 @@ export class UI {
     const pct = (v) => `${Math.round(v * 100)}%`;
     const shows = {
       view: (v) => `${v}`, scale: pct, cap: (v) => fmt(v), fov: (v) => `${v}`, sens: (v) => v.toFixed(2), volume: pct, music: pct,
-      grain: (v) => (v > 0 ? pct(v) : 'Off'), uiScale: pct, brightness: pct, bob: (v) => (v > 0 ? pct(v) : 'Off'), shake: (v) => (v > 0 ? pct(v) : 'Off'),
+      grain: (v) => (v > 0 ? pct(v) : 'Off'), uiScale: pct, uiAlpha: pct, brightness: pct, bob: (v) => (v > 0 ? pct(v) : 'Off'), shake: (v) => (v > 0 ? pct(v) : 'Off'),
       adsSens: (v) => `×${v.toFixed(2)}`,
     };
     // After any change: what has to happen beyond storing the value.
@@ -324,6 +324,7 @@ export class UI {
       minimap: () => $('hud').classList.toggle('no-map', !s.minimap),
       chatterNoHud: () => $('hud').classList.toggle('keep-chatter', !!s.chatterNoHud),
       uiScale: () => document.documentElement.style.setProperty('--ui-scale', s.uiScale),
+      uiAlpha: () => document.documentElement.style.setProperty('--ui-alpha', s.uiAlpha ?? 1),
       drips: () => { if (!s.drips) g.drips.clear(); },
       view: () => g.applySettings(false), scale: () => g.applySettings(false), motion: () => g.applySettings(false), dof: () => g.applySettings(false),
     };
@@ -352,7 +353,7 @@ export class UI {
       $('s-fps').value = String(s.fpsCap);
       clock24 = !!s.clock24;
       $('s-clock').value = clock24 ? '24' : '12';
-      for (const k in after) if (k === 'minimap' || k === 'uiScale' || k === 'chatterNoHud') after[k]();
+      for (const k in after) if (k === 'minimap' || k === 'uiScale' || k === 'uiAlpha' || k === 'chatterNoHud') after[k]();
     };
     this.fillSettings = fill;
     fill();
@@ -631,7 +632,27 @@ export class UI {
     setTimeout(() => i.remove(), 900);
   }
 
+  // The maps take the light of the hour and the weather: the colour each is multiplied by, worked out from how dark it is, how low the
+  // sun sits (warm at sunrise and sunset, a little warm through the afternoon), and the rain. Never so dark the map stops being useful.
+  mapGrade() {
+    const g = this.g, sky = g.renderer.sky, night = Math.min(1, sky.night || 0), elev = sky.sunDir ? sky.sunDir[1] : .5, rain = Math.min(1, g.weather.rain || 0);
+    const low = Math.max(0, 1 - Math.max(0, elev) / .32) * (1 - night), noonish = g.tod > .52 && g.tod < .72 ? Math.sin((g.tod - .52) / .2 * Math.PI) : 0;
+    let r = 1, gg = 1, b = 1;
+    const mix = (c, k) => { r *= 1 + (c[0] - 1) * k; gg *= 1 + (c[1] - 1) * k; b *= 1 + (c[2] - 1) * k; };
+    // The hue is the game's own: the colour the haze is right now (orange at sunset, blue-black at night, grey in rain), brought to full
+    // brightness and taken a good way back towards white, so the map has the same cast as the view without losing its colours.
+    const fog = sky.fog || [1, 1, 1], f = [Math.sqrt(Math.max(0, fog[0])), Math.sqrt(Math.max(0, fog[1])), Math.sqrt(Math.max(0, fog[2]))], top = Math.max(f[0], f[1], f[2], 1e-4);
+    mix([f[0] / top, f[1] / top, f[2] / top], .5);
+    // How light it is: dimmer at night, and a touch in rain and with the sun low, but never so dark it stops being a map.
+    const lit = Math.max(.58, 1 - night * .4 - rain * .1 - low * .06);
+    r *= lit; gg *= lit; b *= lit;
+    mix([1, .97, .92], noonish * .5 * (1 - low));
+    const col = `rgb(${Math.round(r * 255)},${Math.round(gg * 255)},${Math.round(b * 255)})`;
+    if (col !== this.gradeCol) { this.gradeCol = col; for (const el of document.querySelectorAll('.map-grade')) el.style.background = col; }
+  }
+
   updateHUD(dt) {
+    this.mapGrade();
     const g = this.g, P = g.player;
     const it = P.weapon ? ITEMS[P.weapon] : null;
     const scoped = it && it.scope && P.ads > .85;

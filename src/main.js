@@ -47,7 +47,7 @@ const SETTINGS_KEY = 'acez.settings.v2';
 const OLD_SETTINGS_KEY = 'acez.settings.v1';
 const DB_NAME = 'acez';
 const MENU_SHOT = { angle: .62, dist: 185, height: 88, turn: .46, pitch: -.14, fov: 1.05, flight: 125, startHeight: 30, startOff: 44, startPitch: -.1 };
-export const VERSION = 'v0.71';
+export const VERSION = 'v0.72';
 const SAVE_KEY = 'slot15';  // bumped whenever the map changes: old voxel edits no longer line up
 export const SLOTS = 3;
 // Slot 1 keeps the plain key, so a save from before there were slots simply becomes the first character.
@@ -142,7 +142,7 @@ class Game {
   }
 
   defaultSettings() {
-    return { quality: 'high', view: 320, scale: 1, cap: 24000, fov: 105, sens: 1, volume: .8, motion: false, dof: true, fpsCap: 0, muteSiren: false, uiScale: 1, clock24: false, drips: true, grain: .3, minimap: true, chatterNoHud: true, hitmarker: false, crosshair: false,
+    return { quality: 'high', view: 320, scale: 1, cap: 24000, fov: 105, sens: 1, volume: .8, motion: false, dof: true, fpsCap: 0, muteSiren: false, uiScale: 1, uiAlpha: 1, clock24: false, drips: true, grain: .3, minimap: true, chatterNoHud: true, hitmarker: false, crosshair: false,
       brightness: 1, bob: 1, shake: 1, music: 1, adsSens: 1, invertY: false, toggleAim: false, toggleCrouch: false, showFps: false, defaultsV: 5 };
   }
 

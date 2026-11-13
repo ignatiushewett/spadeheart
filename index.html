@@ -123,7 +123,7 @@ select { background: #1c1b18; color: var(--ink); border: 1px solid var(--line); 
 .controls-grid { display: grid; grid-template-columns: auto 1fr auto 1fr; gap: 6px 14px; align-items: center; color: var(--dim); font-size: 13px; }
 
 /* HUD */
-#hud { zoom: var(--ui-scale, 1); }
+#hud { zoom: var(--ui-scale, 1); opacity: var(--ui-alpha, 1); }
 #scope { zoom: calc(1 / var(--ui-scale, 1)); }
 #hud { display: none; }
 #hud.on { display: block; }
@@ -232,6 +232,11 @@ select { background: #1c1b18; color: var(--ink); border: 1px solid var(--line); 
 /* The minimap, and under it, joined on and the same width, where you are. */
 #mapbox { position: absolute; top: 16px; right: 22px; width: 196px; }
 #minimap { display: block; width: 196px; height: 196px; box-sizing: border-box; border: 1px solid rgba(255,255,255,.2); background: #0a0a0a; }
+/* The light of the hour and the weather, laid over the maps: blue and dim (but readable) at night, warm at either end of the day, grey
+   under rain. Multiplied in, so it tints what is drawn rather than covering it. */
+.map-grade { position: absolute; pointer-events: none; mix-blend-mode: multiply; background: #fff; }
+#mm-grade { top: 0; left: 0; width: 196px; height: 196px; }
+#hud.no-map #mm-grade { display: none; }
 #mapbox #loc { box-sizing: border-box; width: 196px; padding: 5px 8px; background: rgba(10,10,10,.72); border: 1px solid rgba(255,255,255,.2); border-top: 0; text-align: center; font-size: 13px; line-height: 1.3; text-shadow: 0 1px 2px #000; }
 #hud.no-map #mapbox #loc { border-top: 1px solid rgba(255,255,255,.2); }
 #prompt { position: absolute; left: 50%; bottom: 25%; transform: translateX(-50%); padding: 5px 12px; background: rgba(0,0,0,.6); display: none; white-space: nowrap; }
@@ -459,7 +464,7 @@ body.talking #hud > *:not(#caption) { visibility: hidden; }
   <div id="dmg"></div>
   <div id="status"></div>
   <div id="topbar"><canvas id="compass" width="840" height="86"></canvas><div id="gate-note"></div><div id="mag-bar"></div><div id="siren-bar"></div></div>
-  <div id="mapbox"><canvas id="minimap" width="392" height="392"></canvas><div id="loc"></div></div>
+  <div id="mapbox"><canvas id="minimap" width="392" height="392"></canvas><div class="map-grade" id="mm-grade"></div><div id="loc"></div></div>
   <div id="vitals">
     <div class="vit-row"><div id="hp-num">100</div><div id="armor-tag"></div></div>
     <div id="bar-hp" class="bar"><i></i></div>
@@ -570,6 +575,7 @@ body.talking #hud > *:not(#caption) { visibility: hidden; }
       </div>
       <div class="s-page" data-page="interface">
         <div class="row" data-hint="The size of everything on the screen around the game."><label>HUD scale</label><input type="range" id="s-ui" data-k="uiScale" min="0.6" max="1.2" step="0.02"><output id="s-ui-o"></output></div>
+        <div class="row" data-hint="How see-through everything on the screen around the game is: the bars, the map, the notes and the rest."><label>Interface opacity</label><input type="range" id="s-ualpha" data-k="uiAlpha" min="0.3" max="1" step="0.05"><output id="s-ualpha-o"></output></div>
         <div class="row" data-hint="A small square at the middle of the screen."><label>Crosshair</label><input type="checkbox" id="s-crosshair" data-k="crosshair"><span></span></div>
         <div class="row" data-hint="A brief cross on the crosshair when a shot hits."><label>Hitmarker</label><input type="checkbox" id="s-hitmarker" data-k="hitmarker"><span></span></div>
         <div class="row" data-hint="A small map in the corner of the screen."><label>Minimap</label><input type="checkbox" id="s-minimap" data-k="minimap"><span></span></div>
@@ -668,7 +674,7 @@ body.talking #hud > *:not(#caption) { visibility: hidden; }
   <div class="panel" id="map-panel">
     <div class="panel-head"><h2>Ballarat</h2><span style="color:var(--faint);font-size:12px">Slider or W / S to move up and down, drag to pan, wheel to zoom</span></div>
     <div id="map-wrap">
-      <div style="position:relative;min-height:0;overflow:hidden"><canvas id="bigmap" style="position:absolute;inset:0"></canvas></div>
+      <div style="position:relative;min-height:0;overflow:hidden"><canvas id="bigmap" style="position:absolute;inset:0"></canvas><div class="map-grade" style="inset:0"></div></div>
       <div id="map-rail"><div id="map-thumb"></div><div id="map-you"></div></div>
     </div>
     <div class="panel-foot"><button class="btn primary" data-close>Close</button></div>
