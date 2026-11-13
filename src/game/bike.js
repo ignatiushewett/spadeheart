@@ -272,7 +272,7 @@ export class Bikes {
     this.ride = b;
     b.v = 0; b.vy = 0; b.vx = 0; b.vz = 0; b.slip = 0; b.yawRate = 0;
     // Picked up off its side if it went over.
-    b.down = 0; b.lean = 0; b.tipping = false;
+    b.down = 0; b.lean = 0; b.tipping = false; b.tipT = 0;
     // Both hands on the bars: the torch goes away, and comes back out the way it was when you get off.
     this.torchWas = P.flashlight;
     P.flashlight = false;
@@ -408,7 +408,8 @@ export class Bikes {
       // through whatever it still has the speed for, until it comes to rest and falls over on its side.
       if (Math.hypot(o.vx || 0, o.vz || 0) > .05 || Math.abs(o.yawRate || 0) > .05) this.drive(o, dt, null);
       else { o.vx = o.vz = 0; o.v = 0; o.slip = 0; o.yawRate = 0; }
-      if (!o.down && Math.abs(o.v || 0) < 3.5 && o.tipping) o.down = (o.lean || 0) >= 0 ? 1.3 : -1.3;
+      // With nobody to hold it up it goes over almost at once, and slides and spins on its side, not upright.
+      if (o.tipping && !o.down && (o.tipT = (o.tipT || 0) + dt) > .35) o.down = (o.yawRate || o.lean || 1) > 0 ? -1.3 : 1.3;
       o.lean += ((o.down || 0) - o.lean) * Math.min(1, dt * (o.down ? 3.5 : 3));
       const gy = this.ground(o.x, o.z, o.y + .5);
       if (gy < o.y) { o.vy -= 26 * dt; o.y = Math.max(gy, o.y + o.vy * dt); if (o.y === gy) o.vy = 0; } else if (gy > o.y + .01 && gy - o.y < 1.2) o.y = gy;
@@ -452,9 +453,9 @@ export class Bikes {
     if (fw > 0 && !st && !hb && long > MAX * .9) b.straight = Math.min(OPEN_T, b.straight + dt);
     else b.straight = Math.max(0, b.straight - dt * (st ? 1 : 1.5));
     const cap = MAX + OPEN * b.straight / OPEN_T;
-    if (fw > 0) long += (long < 0 ? 22 : long < MAX ? 7.5 * (1 - Math.max(0, long) / MAX) + 1 : 2.2) * dt;
+    if (fw > 0) long += (long < 0 ? 22 : long < MAX ? 10.5 * (1 - Math.max(0, long) / MAX) + 1.4 : 2.8) * dt;
     else if (fw < 0) long -= (long > 0 ? 20 : 5) * dt;
-    else long -= Math.sign(long) * Math.min(Math.abs(long), (rider ? 3.2 : 4 + Math.abs(long) * .25) * dt);
+    else long -= Math.sign(long) * Math.min(Math.abs(long), (rider ? 3.2 : b.down ? 7 + Math.abs(long) * .3 : 4 + Math.abs(long) * .25) * dt);
     if (hb) long -= Math.sign(long) * Math.min(Math.abs(long), 8 * dt);
     long = Math.max(-BACK, long);
     if (long > cap) long = Math.max(cap, long - 3 * dt);
