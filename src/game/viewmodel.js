@@ -67,10 +67,25 @@ export const MODELS = {
   ],
   // Bolt-action with a scope: walnut stock, a steel receiver along the top of it, the barrel out of the front, and the scope sat on a
   // rail and two ring mounts right down on the receiver, so there is no daylight anywhere between the glass and the gun.
-  hunting: [
-    [0, 0, -.12, .046, .056, .34, WOOD], [0, -.006, -.31, .04, .044, .04, WOOD_D],
+  // The same kind of bolt-action without the glass: open sights, a notch over the bolt and a post at the muzzle.
+  // Walnut, and lots of it: the forend runs out almost to the muzzle under a brass band, with a sling swivel under it.
+  deer: [
+    [0, 0, -.2, .044, .05, .5, WOOD], [0, .004, -.46, .04, .042, .04, WOOD_D], [0, .03, -.48, .048, .046, .012, 0xb08a3c],
     [0, .036, -.02, .032, .026, .2, STEEL], [0, .03, -.4, .02, .02, .58, STEEL], [0, .03, -.675, .026, .026, .03, DARK],
-    [0, -.034, .1, .042, .072, .1, WOOD], [0, -.03, .25, .05, .1, .2, WOOD], [0, -.03, .354, .052, .104, .012, 0x1a1a1a],
+    [0, -.034, .1, .042, .072, .1, WOOD], [0, -.03, .25, .05, .1, .2, WOOD], [0, -.03, .354, .052, .104, .012, 0x3a2414],
+    [0, -.03, -.42, .008, .016, .012, STEEL],
+    [-.008, .052, .045, .006, .01, .012, DARK], [.008, .052, .045, .006, .01, .012, DARK], [0, .046, .045, .022, .004, .012, DARK],
+    [0, .044, -.655, .02, .006, .02, DARK], [0, .05, -.655, .005, .012, .006, DARK],
+    [.026, .036, .06, .022, .01, .01, STEEL], [.04, .036, .06, .014, .014, .014, STEEL],
+    [0, -.035, .03, .006, .024, .05, STEEL], [0, -.05, -.06, .03, .03, .1, WOOD_D],
+  ],
+  // Dark grey synthetic, a raised cheek rest, a heavy barrel with a muzzle brake, and a bipod folded up under the forend.
+  hunting: [
+    [0, 0, -.12, .048, .058, .34, 0x2c2f2c], [0, -.006, -.31, .042, .046, .04, 0x232624],
+    [0, .036, -.02, .032, .026, .2, STEEL], [0, .03, -.42, .026, .026, .62, DARK], [0, .03, -.745, .036, .032, .05, MID],
+    [-.019, .03, -.745, .002, .02, .012, 0x0c0c0c], [.019, .03, -.745, .002, .02, .012, 0x0c0c0c],
+    [0, -.034, .1, .042, .072, .1, 0x2c2f2c], [0, -.03, .25, .05, .1, .2, 0x2c2f2c], [0, .03, .23, .042, .03, .12, 0x343834], [0, -.03, .354, .052, .104, .012, 0x111111],
+    [-.012, -.032, -.24, .008, .008, .16, MID], [.012, -.032, -.24, .008, .008, .16, MID], [0, -.03, -.3, .03, .012, .014, DARK],
     [0, .055, -.06, .018, .014, .19, DARK], [0, .066, -.13, .02, .022, .026, DARK], [0, .066, .02, .02, .022, .026, DARK],
     [0, .085, -.06, .03, .03, .3, DARK], [0, .085, -.13, .036, .036, .018, DARK], [0, .085, .02, .036, .036, .018, DARK],
     [0, .085, -.245, .046, .046, .07, DARK], [0, .085, .115, .04, .04, .05, DARK],
@@ -123,6 +138,7 @@ const POSES = {
   smg: { pos: [.165, -.19, -.48], rot: [0, .07, -.05], tip: .065, adsZ: -.34 },
   shotgun: { pos: [.17, -.195, -.5], rot: [0, .07, -.05], tip: .047, adsZ: -.32 },
   rifle: { pos: [.17, -.195, -.5], rot: [0, .07, -.05], tip: .107, adsZ: -.34 },
+  deer: { pos: [.17, -.195, -.5], rot: [0, .07, -.05], tip: .056, adsZ: -.34 },
   hunting: { pos: [.17, -.195, -.5], rot: [0, .07, -.05], sight: .09, adsZ: -.34 },
   lmg: { pos: [.19, -.22, -.53], rot: [0, .08, -.05], sight: .09, adsZ: -.34 },
   rocket: { pos: [.2, -.16, -.54], rot: [0, .05, -.03], sight: .15, adsZ: -.4 },
@@ -136,10 +152,10 @@ const POSES = {
 // The mouth of each barrel, in the model's own space: the flash comes out of it.
 const MUZZLE = {
   pistol: [0, .017, -.215], revolver: [0, .02, -.305], smg: [0, .012, -.4], shotgun: [0, .018, -.605], rifle: [0, .014, -.63],
-  hunting: [0, .03, -.69], lmg: [0, .012, -.635],
+  deer: [0, .03, -.69], hunting: [0, .03, -.77], lmg: [0, .012, -.635],
 };
 // How big each gun's flash is, against the rifle's. A shotgun throws a great ragged ball of it; the scoped rifle and the magnum a lot.
-const FLASH_SIZE = { shotgun: 2.1, hunting: 1.45, revolver: 1.4, lmg: 1.15, pistol: 1, smg: .9 };
+const FLASH_SIZE = { shotgun: 2.1, deer: 1.3, hunting: 1.45, revolver: 1.4, lmg: 1.15, pistol: 1, smg: .9 };
 // A flash at the muzzle: a hot core, a short spike straight out, and four petals. Built once, turned and sized every shot.
 const FLASH = [
   [0, 0, -.025, .03, .03, .05, 0xffd08a, 7], [0, 0, -.085, .012, .012, .12, 0xffb060, 6],
@@ -289,6 +305,7 @@ function buildHands(tone) {
     smg: gunHands('smg', { x: 0, y: -.082, z: .03, w: .036, d: .05 }, { x: 0, y: 0, z: -.225, w: .05, h: .07 }),
     shotgun: gunHands('shotgun', { x: 0, y: -.07, z: .11, w: .04, d: .06 }, { x: 0, y: -.024, z: -.32, w: .05, h: .046, len: .12 }),
     rifle: gunHands('rifle', { x: 0, y: -.082, z: .043, w: .036, d: .05 }, { x: 0, y: .014, z: -.31, w: .062, h: .062, len: .11 }),
+    deer: gunHands('deer', { x: 0, y: -.048, z: .1, w: .05, d: .06 }, { x: 0, y: 0, z: -.17, w: .046, h: .056, len: .11 }),
     hunting: gunHands('hunting', { x: 0, y: -.048, z: .1, w: .05, d: .06 }, { x: 0, y: 0, z: -.17, w: .046, h: .056, len: .11 }),
     lmg: gunHands('lmg', { x: 0, y: -.082, z: .075, w: .034, d: .045 }, { x: 0, y: -.03, z: -.28, w: .058, h: .04, len: .12 }),
     rocket: gunHands('rocket', { x: 0, y: -.05, z: -.02, w: .036, d: .06 }, { x: 0, y: .05, z: -.3, w: .08, h: .08, len: .11 }),

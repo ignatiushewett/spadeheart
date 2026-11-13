@@ -81,9 +81,9 @@ export function makeGenerator(L) {
       case G.WATER: surface = terr[i] < -4 ? M.SAND : M.STONE; break;
     }
     const groundEnd = Math.min(top, y1);
-    // You can dig a pit, not a mine: three voxels down the ground stops being diggable. Beside water
-    // the barrier drops with the neighbouring bed, so shores and pond edges can still be cut away.
-    const barrier = g === G.WATER ? 2 : Math.max(2, top - 2 + Math.min(0, terr[Math.max(0, i - 1)] - terr[i], terr[Math.min(terr.length - 1, i + 1)] - terr[i], terr[Math.max(0, i - WX)] - terr[i], terr[Math.min(terr.length - 1, i + WX)] - terr[i]));
+    // Twelve blocks down the ground stops being diggable: room for a proper pit, a trench, a cellar, not a mine to the middle of the
+    // earth. Beside water the barrier drops with the neighbouring bed, so shores and pond edges can still be cut away.
+    const barrier = g === G.WATER ? 2 : Math.max(2, top - 11 + Math.min(0, terr[Math.max(0, i - 1)] - terr[i], terr[Math.min(terr.length - 1, i + 1)] - terr[i], terr[Math.max(0, i - WX)] - terr[i], terr[Math.min(terr.length - 1, i + WX)] - terr[i]));
     if (flags & 16 && g !== G.CAMP) {
       // A bridge or a pier: a deck over open water, on piles.
       const pile = g === G.PROM ? (x & 7) === 0 && (z & 7) === 0 : (x & 15) < 2 && (z & 15) < 2;
@@ -97,6 +97,7 @@ export function makeGenerator(L) {
       return;
     }
     for (let y = y0; y <= groundEnd; y++) {
+      // Topsoil a few blocks deep, then rock all the way down to the bedrock.
       let id = y === top ? surface : y < barrier ? M.BEDROCK : y < top - 3 ? deep : under;
       d[lx | ((y - oy) << 5) | (lz << 10)] = id;
       any = true;

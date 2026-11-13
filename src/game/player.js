@@ -744,7 +744,7 @@ export class Player {
     g.horde.noise(this.x, this.z, it.noise * (this.sanctuary ? .2 : .55), .9);
     g.stats.shots++;
     if (this.sanctuary) g.npcs.firedInCamp();
-    if (id === 'shotgun' || id === 'hunting') setTimeout(() => g.audio.simple('pump'), it.rate * 450);
+    if (id === 'shotgun' || id === 'hunting' || id === 'deer') setTimeout(() => g.audio.simple('pump'), it.rate * 450);
   }
 
   traceBullet(o, dx, dy, dz, it, mx, my, mz, tracer) {

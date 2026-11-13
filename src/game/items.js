@@ -12,6 +12,7 @@ export const ITEMS = {
   smg: { name: 'MP5 SMG', type: 'gun', ammo: 'ammo_pistol', auto: true, value: 520, weight: 4, dmg: 22, rate: .075, mag: 30, reload: 1.9, spread: .02, kick: .009, range: 150, pierce: 1, noise: 90, blockDmg: 1, sound: 'smg', desc: 'ESU issue. Burns ammo quickly.' },
   shotgun: { name: 'Pump Shotgun', type: 'gun', ammo: 'ammo_shell', value: 440, weight: 6, dmg: 19, pellets: 10, rate: .85, mag: 7, reload: .5, perShell: true, spread: .055, kick: .05, range: 70, pierce: 2, noise: 130, blockDmg: 1, sound: 'shotgun', desc: 'Clears a doorway. Wakes the block.' },
   rifle: { name: 'M4 Carbine', type: 'gun', ammo: 'ammo_rifle', auto: true, value: 980, weight: 6, dmg: 38, rate: .095, mag: 30, reload: 2.2, spread: .012, kick: .012, range: 320, pierce: 3, noise: 150, blockDmg: 2, sound: 'rifle', desc: 'National Guard surplus, as of this spring.' },
+  deer: { name: 'Hunting Rifle', type: 'gun', ammo: 'ammo_rifle', value: 480, weight: 6, dmg: 105, rate: .8, mag: 5, reload: 2.3, spread: .004, kick: .045, range: 380, pierce: 4, noise: 150, blockDmg: 3, sound: 'sniper', desc: 'A deer rifle with iron sights and a walnut stock. A bolt to work after every shot, and every shot counts.' },
   hunting: { name: 'Scoped Rifle', type: 'gun', ammo: 'ammo_rifle', value: 760, weight: 7, dmg: 170, rate: 1.05, mag: 5, reload: 2.6, spread: .001, kick: .06, range: 500, pierce: 7, noise: 170, blockDmg: 5, scope: true, sound: 'sniper', desc: 'One round through a whole conga line.' },
   lmg: { name: 'M249 LMG', type: 'gun', ammo: 'ammo_rifle', auto: true, value: 2100, weight: 14, dmg: 34, rate: .08, mag: 100, reload: 4.2, spread: .026, kick: .013, range: 300, pierce: 3, noise: 180, blockDmg: 2, sound: 'rifle', desc: 'For when the street is the target.' },
   rocket: { name: 'M72 Launcher', type: 'gun', ammo: 'ammo_rocket', value: 2800, weight: 12, dmg: 0, rate: 1.5, mag: 1, reload: 2.7, spread: .002, kick: .08, range: 400, pierce: 0, noise: 400, blockDmg: 0, projectile: 'rocket', sound: 'rocket', desc: 'Everything you always wanted to do to Midtown.' },
@@ -56,7 +57,7 @@ export const ITEMS = {
   metrocard: { name: 'Albion Transit Pass', type: 'junk', value: 1, weight: .01, stack: true, desc: 'Insufficient fare.' },
 };
 
-export const WEAPON_ORDER = ['crowbar', 'axe', 'sledge', 'pistol', 'revolver', 'smg', 'shotgun', 'rifle', 'hunting', 'lmg', 'rocket', 'grenade', 'dynamite', 'block_wood', 'block_conc', 'block_steel'];
+export const WEAPON_ORDER = ['crowbar', 'axe', 'sledge', 'pistol', 'revolver', 'smg', 'shotgun', 'rifle', 'deer', 'hunting', 'lmg', 'rocket', 'grenade', 'dynamite', 'block_wood', 'block_conc', 'block_steel'];
 
 const pick = (table) => {
   let total = 0;
@@ -79,7 +80,7 @@ const MEDICAL = [
 ];
 const AMMO = [
   ['ammo_pistol', 12, 20, 54], ['ammo_shell', 8, 8, 20], ['ammo_rifle', 11, 20, 60], ['grenade', 3, 1, 2], ['dynamite', 1.4], ['ammo_rocket', .35],
-  ['pistol', 1.2], ['revolver', .6], ['shotgun', .8], ['smg', .5], ['rifle', .4], ['hunting', .3], ['riot', .4], ['tactical', .08], ['lmg', .05], ['rocket', .03],
+  ['pistol', 1.2], ['revolver', .6], ['shotgun', .8], ['smg', .5], ['rifle', .4], ['deer', .45], ['hunting', .3], ['riot', .4], ['tactical', .08], ['lmg', .05], ['rocket', .03],
 ];
 const TRUNK = [
   ['scrap', 8, 1, 3], ['parts', 5, 1, 2], ['water', 5, 1, 1], ['smokes', 4, 1, 2], ['ammo_pistol', 9, 8, 20], ['ammo_rifle', 6, 6, 18], ['ammo_shell', 4, 3, 8], ['crowbar', .7], ['block_wood', 10, 9, 24], ['block_steel', 5, 4, 10], ['jewelry', 1], ['bandage', 3],
@@ -119,7 +120,7 @@ export function rollZombieDrop(lootMul = 1) {
 // Stock rebuilt each in-game day: [item, chance, min, max].
 export const VENDOR_STOCK = {
   general: [['flashlight', .9, 1, 3], ['beans', 1, 4, 10], ['water', 1, 4, 10], ['bandage', 1, 3, 8], ['ammo_pistol', 1, 40, 120], ['ammo_shell', .8, 8, 24], ['block_wood', 1, 120, 300], ['block_conc', .8, 60, 180], ['crowbar', .9, 1, 1], ['grenade', .5, 1, 3], ['backpack', .4, 1, 1], ['jacket', .5, 1, 1], ['whiskey', .6, 1, 3], ['pistol', .6, 1, 1]],
-  arms: [['ammo_pistol', 1, 80, 200], ['ammo_shell', 1, 24, 60], ['ammo_rifle', 1, 60, 180], ['ammo_rocket', .5, 1, 3], ['grenade', 1, 3, 8], ['dynamite', .9, 2, 5], ['pistol', 1, 1, 1], ['revolver', .8, 1, 1], ['shotgun', .9, 1, 1], ['smg', .7, 1, 1], ['rifle', .7, 1, 1], ['hunting', .6, 1, 1], ['lmg', .25, 1, 1], ['rocket', .2, 1, 1], ['riot', .6, 1, 1], ['tactical', .25, 1, 1], ['axe', .7, 1, 1], ['sledge', .7, 1, 1], ['block_steel', .7, 36, 120]],
+  arms: [['ammo_pistol', 1, 80, 200], ['ammo_shell', 1, 24, 60], ['ammo_rifle', 1, 60, 180], ['ammo_rocket', .5, 1, 3], ['grenade', 1, 3, 8], ['dynamite', .9, 2, 5], ['pistol', 1, 1, 1], ['revolver', .8, 1, 1], ['shotgun', .9, 1, 1], ['smg', .7, 1, 1], ['rifle', .7, 1, 1], ['deer', .7, 1, 1], ['hunting', .6, 1, 1], ['lmg', .25, 1, 1], ['rocket', .2, 1, 1], ['riot', .6, 1, 1], ['tactical', .25, 1, 1], ['axe', .7, 1, 1], ['sledge', .7, 1, 1], ['block_steel', .7, 36, 120]],
   medic: [['sleeping_pills', .9, 2, 5], ['bandage', 1, 6, 14], ['medkit', 1, 2, 6], ['antibiotic', 1, 2, 6], ['stim', .8, 1, 4], ['water', 1, 4, 8], ['beans', .7, 2, 6]],
   food: [['beans', 1, 8, 24], ['water', 1, 8, 24], ['whiskey', .7, 2, 6], ['smokes', .6, 2, 8], ['bandage', .4, 2, 5]],
   builder: [['flashlight', .5, 1, 2], ['block_wood', 1, 240, 540], ['block_conc', 1, 180, 420], ['block_steel', 1, 60, 180], ['sledge', .7, 1, 1], ['axe', .7, 1, 1], ['crowbar', 1, 1, 2], ['dynamite', .5, 1, 3]],
@@ -194,7 +195,7 @@ export function startingGear(kit, campKey) {
   };
 }
 // Standing needed before a camp's traders will part with their best kit.
-export const TRUST_LOCK = { bike_keys: 10, smg: 5, shotgun: 5, revolver: 5, rifle: 10, hunting: 10, riot: 10, dynamite: 10, grenade: 5, lmg: 25, rocket: 25, ammo_rocket: 25, tactical: 25 };
+export const TRUST_LOCK = { bike_keys: 10, smg: 5, shotgun: 5, revolver: 5, rifle: 10, deer: 5, hunting: 10, riot: 10, dynamite: 10, grenade: 5, lmg: 25, rocket: 25, ammo_rocket: 25, tactical: 25 };
 
 export const RUMORS = [
   'Sound carries between the towers. Fire one shot on Kingsway and half of Midtown comes to see.',
