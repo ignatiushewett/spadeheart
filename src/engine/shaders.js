@@ -269,10 +269,12 @@ void main(){
   }
   // Canvas, awnings and flags: a quicker, smaller ripple running through the cloth, every corner on the same pattern so it stays in
   // one piece. Only what is drawn moves; it is as solid as ever to walk into.
+  // Broad waves, so the corners of any one face move almost together and the face stays flat; half as much a block from where it is
+  // fixed, so it bends there gently instead of folding.
   if((flags&32)!=0&&uSway>0.&&(aInfo.w&2u)==0u){
-    float t=uTime,k=min(uSway,1.6);
-    float r=sin(t*2.3+p.x*.7+p.y*.45+p.z*.6)*.6+sin(t*3.7+p.z*.9-p.x*.4)*.4;
-    p.x+=r*.045*k; p.z+=cos(t*2.1+p.z*.65+p.y*.5)*.045*k; p.y+=r*.02*k;
+    float t=uTime,k=min(uSway,1.6)*((aInfo.w&4u)!=0u?.45:1.);
+    float r=sin(t*2.1+p.x*.33+p.y*.22+p.z*.29)*.6+sin(t*3.1+p.z*.41-p.x*.19)*.4;
+    p.x+=r*.04*k; p.z+=cos(t*1.9+p.z*.31+p.y*.24)*.04*k; p.y+=r*.018*k;
   }
   // Grass in the wind: the top edge of each grass block lifted up to a fifth of a block and let down again, in long waves running
   // across the ground on the diagonal. Only what is drawn moves; nothing anyone stands on or bumps into does.

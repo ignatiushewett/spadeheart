@@ -41,14 +41,20 @@ export function makeMesher(L) {
 
   let still = 0;   // set while meshing at distance: the leaves there are merged into big faces and must not sway apart
   let atRef = null; // the voxels of the chunk being meshed, for pinning cloth
-  // Cloth stays fixed wherever it touches something solid that is not cloth (a pole, a wall, the ground): only what hangs free moves, so
-  // it never pulls away from what holds it up and opens a gap.
+  // Cloth stays fixed wherever it touches something solid that is not cloth (a pole, a wall, the ground), moves half as much a block
+  // further out, and only fully where it hangs free: it never pulls away from what holds it up, and never folds sharply next to it.
+  // Returns the vertex bits: 2 held still, 4 held to half.
   const pinned = (px, py, pz) => {
-    for (let dz = -1; dz <= 0; dz++) for (let dy = -1; dy <= 0; dy++) for (let dx = -1; dx <= 0; dx++) {
-      const id = atRef(px + dx, py + dy, pz + dz);
-      if (id && !(FLAGS[id] & F_CLOTH)) return true;
+    let near = false;
+    for (let dz = -2; dz <= 1; dz++) for (let dy = -2; dy <= 1; dy++) for (let dx = -2; dx <= 1; dx++) {
+      const qx = px + dx, qy = py + dy, qz = pz + dz;
+      if (qx < -1 || qy < -1 || qz < -1 || qx > CS || qy > CS || qz > CS) continue;   // past the padding round the chunk
+      const id = atRef(qx, qy, qz);
+      if (!id || (FLAGS[id] & F_CLOTH)) continue;
+      if (dx >= -1 && dx <= 0 && dy >= -1 && dy <= 0 && dz >= -1 && dz <= 0) return 2;
+      near = true;
     }
-    return false;
+    return near ? 4 : 0;
   };
   function quad(t, x, y, z, ax, du, dv, n, id, ao, sky) {
     grow(t, 32);
@@ -64,7 +70,7 @@ export function makeMesher(L) {
     const cloth = !hold && (FLAGS[id] & F_CLOTH);
     const emit = (px, py, pz, a) => {
       b[i++] = px; b[i++] = py; b[i++] = pz; b[i++] = ni;
-      b[i++] = id; b[i++] = a; b[i++] = sky; b[i++] = (wave && py === topY ? 1 : 0) | hold | (cloth && pinned(px, py, pz) ? 2 : 0);
+      b[i++] = id; b[i++] = a; b[i++] = sky; b[i++] = (wave && py === topY ? 1 : 0) | hold | (cloth ? pinned(px, py, pz) : 0);
     };
     if (flip) {
       emit(x + ux, y + uy, z + uz, a1);

@@ -2,7 +2,7 @@
 // planCamp turns a definition into plain data; stampCamp turns that data into voxels chunk by chunk.
 // Everything placed reserves its footprint first, so no two pieces of a camp can overlap.
 import { STREET_Y, WX, G } from './constants.js';
-import { M, CLOTH_OF } from './materials.js';
+import { M, CLOTH_OF, FLAGS, F_CLOTH } from './materials.js';
 import { h2, makeRng } from './rng.js';
 
 // A real bed, a block off the floor: headboard, pillows, the sheet turned down, then the blanket, and maybe a spare folded at the foot.
@@ -1048,11 +1048,16 @@ function stampPart(p, c, box, put, car, letterAt) {
         clinic: { wall: M.TENT_W, post: M.ALUM, a: M.TENT_W, b: M.TENT_W, top: M.ALUM, trim: M.AWN_R },
         garage: { wall: M.ROOF_TIN, post: M.IRON, a: M.ROOF_TIN, b: M.RUST, top: M.STEEL_D, trim: M.PAINT_K },
       }[style];
+      // A striped awning is all cloth, whatever colour its stripes are: a stripe in the stall's sign colour is the cloth of that colour,
+      // or the canvas stripes either side of it would be held still by it and only the ends would move in the wind.
+      const cl = (id) => CLOTH_OF[id] || id;
+      const clothRoof = !!((FLAGS[S.a] | FLAGS[S.b]) & F_CLOTH), clothTrim = !!(FLAGS[S.trim] & F_CLOTH);
+      const RA = clothRoof ? cl(S.a) : S.a, RB = clothRoof ? cl(S.b) : S.b, VS = clothTrim ? cl(sign) : sign;
       // Every one works the same way at the front, however it was built. A counter one block high, the seller right behind it,
       // and a valance hanging down over it: you can see straight in, and you can't climb up and stand on the goods.
       for (let l = 1; l < lenL; l++) {
         T(l, 0, YB, l % 3 === 1 ? (h2(l + x0, z0) % 2 ? M.CRATE_OPEN : sign) : S.top);
-        T(l, 0, YB + 3, l % 2 ? S.trim : sign);
+        T(l, 0, YB + 3, l % 2 ? S.trim : VS);
       }
       for (const l of [0, lenL]) {
         for (let y = YB; y < YB + 4; y++) T(l, 0, y, S.post);
@@ -1062,10 +1067,10 @@ function stampPart(p, c, box, put, car, letterAt) {
       for (let l = 1; l < lenL; l++) for (let y = YB; y < YB + 4; y++) T(l, depth, y, S.wall);
       // The roof.
       const roofTo = depth;
-      for (let l = 0; l <= lenL; l++) for (let d = 0; d <= roofTo; d++) T(l, d, YB + 4, l % 2 ? S.a : S.b);
+      for (let l = 0; l <= lenL; l++) for (let d = 0; d <= roofTo; d++) T(l, d, YB + 4, l % 2 ? RA : RB);
       if (style === 'awning' || style === 'cart') {
         // Out over the street on a slope, so whoever is buying stands in the shade of it.
-        for (let l = 0; l <= lenL; l++) { T(l, -1, YB + 4, l % 2 ? S.a : S.b); T(l, -2, YB + 3, l % 2 ? S.a : S.b); }
+        for (let l = 0; l <= lenL; l++) { T(l, -1, YB + 4, l % 2 ? RA : RB); T(l, -2, YB + 3, l % 2 ? RA : RB); }
       } else if (style !== 'container') {
         // Every stall keeps its customers dry: something run out over the front, whatever it was made of. Patched, not matched.
         const over = { kiosk: [M.ROOF_TAR, M.RUST], tarp: [tarp, M.CANVAS], yard: [M.RUST, M.STEEL], clinic: [M.TENT_W, M.CANVAS], garage: [M.ROOF_TIN, M.RUST] }[style] || [S.a, S.b];

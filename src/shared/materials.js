@@ -97,7 +97,7 @@ m('COTTON', 0xe2ded2, 1, F_LEAF); m('PEANUT', 0x5f6e34, 1, F_LEAF);
 for (const k of ['TENT_W', 'TENT_G', 'TENT_B', 'CANVAS', 'AWN_R', 'AWN_G', 'AWN_B']) { FLAGS[M[k]] |= F_CLOTH; PALETTE[M[k] * 4 + 3] |= F_CLOTH; }
 // A flag is cloth too, whatever colour it is, but the same colour on a wall or a car is not: flags get a cloth twin of each colour.
 export const CLOTH_OF = new Uint8Array(256);
-for (const k of ['PAINT_Y', 'PAINT_K', 'BARN_R', 'CONT_G', 'RUST', 'STAINED']) {
+for (const k of ['PAINT_Y', 'PAINT_K', 'BARN_R', 'CONT_G', 'RUST', 'STAINED', 'CONT_O', 'PLANK', 'PAINT_C', 'CONT_B', 'CONT_R', 'WOOD', 'ALUM']) {
   const src = M[k], id = next++;
   M[`CLOTH_${k}`] = id; NAMES[id] = `cloth_${k.toLowerCase()}`;
   for (let c = 0; c < 3; c++) PALETTE[id * 4 + c] = PALETTE[src * 4 + c];
