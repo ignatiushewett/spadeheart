@@ -465,11 +465,42 @@ export function makeGenerator(L) {
     }
   }
 
+  // A farm tractor, long abandoned: big rear wheels and small front ones, a long bonnet with the exhaust stack up through it, the
+  // seat and wheel out in the open behind, mudguards over the back wheels, and sometimes a roll cage with a roof. Paint gone to rust
+  // in patches. dir 0-3: which way it faces.
+  function tractor(x, z, dir, seed, base) {
+    const paint = [M.CAR_R, M.AWN_G, M.CONT_O, M.CAR_B, M.BARN_R][seed % 5], cage = seed % 3 === 0;
+    const p = (l, w, h, id) => {
+      const L = dir & 1 ? 8 - l : l, W = dir & 2 ? 4 - w : w;
+      if (dir < 2) put(x + W, base + h, z + L, id); else put(x + L, base + h, z + W, id);
+    };
+    const col = (l, w, h) => ((seed + l * 7 + w * 13 + h * 3) % 11 === 0 ? M.RUST : paint);
+    // Rear wheels, four high, a rusted hub in each; front wheels, two high.
+    for (const w of [0, 4]) {
+      for (let l = 0; l <= 3; l++) for (let h = 0; h <= 3; h++) p(l, w, h, (l === 1 || l === 2) && (h === 1 || h === 2) ? M.RUST : M.TIRE);
+      for (let l = 6; l <= 7; l++) for (let h = 0; h <= 1; h++) p(l, w, h, M.TIRE);
+      for (let l = 0; l <= 3; l++) p(l, w, 4, col(l, w, 4));
+    }
+    // Chassis and bonnet, the grille at the front, the stack up through the bonnet.
+    for (let l = 1; l <= 8; l++) for (let w = 1; w <= 3; w++) p(l, w, 1, col(l, w, 1));
+    for (let l = 4; l <= 8; l++) for (let w = 1; w <= 3; w++) p(l, w, 2, l === 8 ? M.IRON : col(l, w, 2));
+    for (let w = 1; w <= 3; w++) p(8, w, 1, M.IRON);
+    for (let h = 3; h <= 5; h++) p(6, 3, h, M.IRON);
+    // Where the driver sat: the seat, the wheel on its column, a step up.
+    p(1, 2, 2, M.CAR_K); p(0, 2, 2, M.CAR_K); p(0, 2, 3, M.CAR_K);
+    p(3, 2, 2, M.IRON); p(3, 2, 3, M.CAR_K);
+    if (cage) {
+      for (const l of [0, 3]) for (const w of [1, 3]) for (let h = 2; h <= 5; h++) p(l, w, h, M.IRON);
+      for (let l = 0; l <= 3; l++) for (let w = 1; w <= 3; w++) p(l, w, 6, col(l, w, 6));
+    }
+  }
+
   function prop(idx) {
     const t = props[idx], x = props[idx + 1], z = props[idx + 2], a = props[idx + 3], b = props[idx + 4], c = props[idx + 5];
     const base = STREET_Y + terr[z * WX + x];
     switch (t) {
       case P.CAR: car(x, z, a, b, c, base); break;
+      case P.TRACTOR: tractor(x, z, a, b, base); break;
       case P.BALE: { const y = STREET_Y + terr[z * WX + x]; if (a % 3) box(x, y, z, x + 2, y + 1, z + 1, M.HAY); else box(x, y, z, x + 1, y + 1, z + 2, M.HAY); break; }
       case P.TREE: if (ground[z * WX + x] === G.WALK) tree(x, z, a, 0); break;
       case P.PARKTREE: tree(x, z, a, 1 + a % 3); break;

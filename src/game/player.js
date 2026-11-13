@@ -548,6 +548,14 @@ export class Player {
       this.infection = Math.min(100, this.infection + 2 + rand() * 5);
     }
     this.g.audio.simple('hurt');
+    // A round landing is something you feel: a flash of red in from the edges, a flinch, the thud of it.
+    if (type === 'shot') {
+      this.shotFx = Math.min(1, (this.shotFx || 0) + .45 + d / 25);
+      this.shake = Math.min(1.2, this.shake + .25 + d / 40);
+      this.pitch = Math.min(1.4, this.pitch + .015 + d * .002);
+      this.yaw += (rand() - .5) * (.02 + d * .002);
+      this.g.audio.simple('flesh');
+    }
     if (sx !== null && sx !== undefined) this.g.ui.damageIndicator(sx - this.x, sz - this.z, this.yaw);
     if (this.health <= 0) this.die();
   }

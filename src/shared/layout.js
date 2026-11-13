@@ -54,7 +54,7 @@ export const STYLES = [
 ];
 const S = Object.fromEntries(STYLES.map((s, i) => [s.name, i]));
 
-export const P = { CAR: 1, TREE: 2, LAMP: 3, HYDRANT: 4, TRASH: 5, DUMPSTER: 6, CHECKPOINT: 7, PARKTREE: 8, BENCH: 9, NEWS: 10, ROCK: 11, BALE: 12 };
+export const P = { CAR: 1, TREE: 2, LAMP: 3, HYDRANT: 4, TRASH: 5, DUMPSTER: 6, CHECKPOINT: 7, PARKTREE: 8, BENCH: 9, NEWS: 10, ROCK: 11, BALE: 12, TRACTOR: 13 };
 export const PROP_STRIDE = 6;
 
 export const ROLES = {
@@ -1505,6 +1505,17 @@ export function buildLayout(seed = 1609) {
       if (tk > .2 && r2(x + 3, z + 3) < tk * .85) addProp(P.PARKTREE, x + 3, z + 3, Math.floor(r2(z + 3, x) * 9999));
     } else if (g === G.ROCK && !mark[i] && r2(x, z + 1) < .12) addProp(P.ROCK, x, z, Math.floor(r2(z, x) * 999));
     else if (g === G.FIELD && mark[i] === 6 && r2(x, z + 2) < .16) addProp(P.BALE, x, z, Math.floor(r2(z, x) * 999));
+  }
+  // Tractors: one left in most farmyards, and now and then one out in a field, stopped where it was when everyone stopped coming out.
+  {
+    const tr = makeRng(seed + 1313), placed = [];
+    for (const f of farms) if (tr() < .75) { const x = f.x + Math.floor(tr() * 12) - 6, z = f.z + Math.floor(tr() * 10) - 5; addProp(P.TRACTOR, x, z, Math.floor(tr() * 4), Math.floor(tr() * 9999)); placed.push([x, z]); }
+    for (let t = 0; t < 9000 && placed.length < 150; t++) {
+      const x = 40 + Math.floor(tr() * (WX - 80)), z = 40 + Math.floor(tr() * (WZ - 80)), i = z * WX + x;
+      if (ground[i] !== G.FIELD || ground[i + 6] !== G.FIELD || ground[i + 6 * WX] !== G.FIELD || placed.some(([a, b]) => Math.hypot(a - x, b - z) < 90)) continue;
+      addProp(P.TRACTOR, x, z, Math.floor(tr() * 4), Math.floor(tr() * 9999));
+      placed.push([x, z]);
+    }
   }
   // Abandoned army checkpoints where each highway comes into a town, and at a few of Albion's boulevards.
   for (const [x, z] of [[2610, 180], [4180, 300], [4080, 882], [4620, 1990], [4350, 2830], [3720, 3240], [1400, 3536], [380, 3554], [2330, 2310], [2330, 2740],

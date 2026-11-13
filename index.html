@@ -180,7 +180,9 @@ select { background: #1c1b18; color: var(--ink); border: 1px solid var(--line); 
 #mag-bar.locked { color: #ffe0da; background: rgba(120,30,24,.86); }
 #mag-bar.evac { font-size: 16px; color: #fff; background: rgba(205,30,20,.9); animation: siren-pulse .55s ease-in-out infinite; }
 #mag-bar .sep, #siren-bar .sep { display: inline-block; width: 1px; height: 1em; margin: 0 9px; vertical-align: -.12em; background: rgba(255,255,255,.75); }
-#status { position: absolute; top: 14px; left: 26px; font-size: 13px; text-shadow: 0 1px 2px #000; }
+#status { position: absolute; top: 14px; left: 26px; font-size: 13px; text-shadow: 0 1px 2px #000; font-family: var(--mono); }
+/* Hit by a round: the edges of the screen flare red and fade. */
+#shot-fx { position: absolute; inset: 0; pointer-events: none; opacity: 0; background: radial-gradient(ellipse at center, rgba(120,0,0,0) 38%, rgba(140,6,4,.55) 78%, rgba(90,0,0,.85) 100%); }
 #status div { display: flex; gap: 10px; }
 #status b { color: var(--amber); font-weight: 600; }
 #status span { color: var(--dim); }
@@ -458,6 +460,7 @@ body.talking #hud > *:not(#caption) { visibility: hidden; }
 <canvas id="gl"></canvas>
 
 <div id="hud" class="layer">
+  <div id="shot-fx"></div>
   <div id="scope"></div>
   <div id="crosshair"></div>
   <div id="hitmark"></div>

@@ -620,9 +620,9 @@ export class Bikes {
     const g = this.g, P = g.player, L = g.layout, W = g.world;
     this.trafficT = (this.trafficT ?? 60 + Math.random() * 60) - dt;
     if (this.trafficT <= 0) {
-      this.trafficT = 120 + Math.random() * 160;
+      this.trafficT = 90 + Math.random() * 120;
       const riding = this.list.filter((b) => b.npc).length;
-      if (riding < 5 && !g.horde.inCamp(P.x, P.z, 60) && Math.random() < .45) this.spawnTraffic(Math.random() < .55 ? 'wanderer' : 'raider');
+      if (riding < 5 && !g.horde.inCamp(P.x, P.z, 60) && Math.random() < .55) this.spawnTraffic(Math.random() < .68 ? 'wanderer' : 'raider');
     }
     for (const b of this.list.slice()) {
       if (!b.npc) {

@@ -653,6 +653,12 @@ export class UI {
 
   updateHUD(dt) {
     this.mapGrade();
+    {
+      const P = this.g.player, k = P.shotFx || 0;
+      if (k > 0) P.shotFx = Math.max(0, k - dt * 1);
+      const o = Math.min(1, k * 1.15).toFixed(2);
+      if (o !== this.shotFxO) { this.shotFxO = o; $('shot-fx').style.opacity = o; }
+    }
     const g = this.g, P = g.player;
     const it = P.weapon ? ITEMS[P.weapon] : null;
     const scoped = it && it.scope && P.ads > .85;
