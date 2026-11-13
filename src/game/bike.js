@@ -884,7 +884,9 @@ export class Bikes {
       };
       // Each voxel's size carries a tag far too small to see, where on the bike it is, so the rain drops on it stay with the bike as it
       // goes rather than sliding across it.
-      const tag = (x, y, z) => VS * 1.001 + (((x * 7 + y * 13 + z * 31) & 127) + 1) * 1.5e-6;
+      // How fast it is going goes in there too, in steps of three blocks a second, so the drops on it can blow back along it.
+      const sb = Math.min(7, Math.round(Math.hypot(b.vx || 0, b.vz || 0) / 3)) * 2.2e-4;
+      const tag = (x, y, z) => VS * 1.001 + sb + (((x * 7 + y * 13 + z * 31) & 127) + 1) * 1.5e-6;
       const vox = (x, y, z, col, metal, glow = 0) => { const p = at(x, y, z); add(p[0], p[1], p[2], tag(x, y, z), col[0], col[1], col[2], metal, glow); };
       const L = LOOKS[b.look || 0];
       for (const [x, y, z, r, g, bl, metal, glow, part] of MODEL) {

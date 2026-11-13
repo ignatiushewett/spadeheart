@@ -404,9 +404,14 @@ export function buildLayout(seed = 1609) {
   const farmK = (x, z) => Math.max(sstep(1 - capsule(x, z, 2540, 2480, 2520, 4096) / 520), sstep(1 - capsule(x, z, 2700, 3150, 2900, 3420) / 400), sstep(1 - capsule(x, z, 2080, 2980, 2020, 3820) / 380));
   const trinityK = (x, z) => Math.max(sstep(1 - capsule(x, z, 2570, 950, 4470, 2150) / 430), sstep(1 - capsule(x, z, 2270, 60, 4120, 380) / 300), sstep(1 - capsule(x, z, 3500, 1700, 2820, 2380) / 380));
   const pageK = (x, z) => sstep(1 - capsule(x, z, 560, 1650, 2040, 2380) / 560);
+  // The southern border below Carver Yard and Southview: open country rising into wooded hills as it nears the edge of the map, and on
+  // past it, west of the fields (it fades out before it reaches them). Strongest right at the border.
+  const southHillsK = (x, z) => sstep((z - 3760) / 340) * sstep((1720 - x) / 260) * sstep((x - 380) / 300);
   const elev0 = (x, z) => {
     let e = 4 + 30 * sstep((2800 - z) / 2500) + 8 * sstep((1800 - x) / 1600);
     e += (fbm2(x * .0028 + 11, z * .0028 + 5, 4) - .45) * 34;
+    const sH = southHillsK(x, z);
+    if (sH > 0) e += sH * (9 + 24 * fbm2(x * .0065 + 5, z * .0065 + 9, 3));
     const mP = pageK(x, z);
     if (mP > 0) {
       const n = fbm2(x * .0042 + 31, z * .0042 + 17, 3);
@@ -1389,6 +1394,8 @@ export function buildLayout(seed = 1609) {
       const patch = (fbm2(x * .0024 + 41, z * .0024 + 17, 3) - .44) * 3.4 + .35 * sstep((-x - 300) / 900);
       k += (patch - k) * sstep(out / 420);
     }
+    // The hills along the southern border below Carver are wooded, in and out of the map.
+    k += 1.25 * southHillsK(x, z);
     return Math.max(0, Math.min(1, k));
   };
   const rowB = new Float32Array(QW), rowE = new Float32Array(QW);

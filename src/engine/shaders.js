@@ -27,6 +27,19 @@ uniform float uRunTime;
 uniform vec4 uCrackPts[16];   // where glass was last broken: xyz, and a seed for its pattern (w < 0: unused)
 `;
 
+// A drop of water on a face: a round bead with a crisp edge however close you get, and a bright point in it where it catches the light.
+// f: where in its cell (-.5 to .5 each way), ln: which way the face points, r: its radius in the cell. Returns how much of this spot it
+// covers; hi is the highlight. Fragment shaders only (it measures the pixel).
+const DROP = /* glsl */`
+float dropShape(vec3 f,vec3 ln,float r,out float hi){
+  vec3 p=f-ln*dot(f,ln);
+  float d=length(p), aa=max(fwidth(d),.002)*1.1;
+  vec3 o=vec3(.09,.11,.07); o-=ln*dot(o,ln);
+  hi=smoothstep(r*.4+aa,r*.4-aa,length(p+o*r*2.4));
+  return smoothstep(r+aa,r-aa,d);
+}
+`;
+
 const LIGHTING = /* glsl */`
 uniform sampler2DArrayShadow uShadow;
 uniform mat4 uShadowMat[3];
@@ -1131,7 +1144,7 @@ void main(){
   if(hide) gl_Position=vec4(2.,2.,2.,1.);
 }`;
 
-export const ACTOR_FS = COMMON + FRAME_UNIFORMS + LIGHTING + /* glsl */`
+export const ACTOR_FS = COMMON + FRAME_UNIFORMS + LIGHTING + DROP + /* glsl */`
 in vec3 vWorld;
 in vec3 vNormal;
 in vec3 vLocal;
@@ -1209,11 +1222,14 @@ void main(){
       vec3 q=bp;
       if(hash12(cell.zx+gen*.37+3.)<.3*uRainNow) q.y+=life*life*2.;   // sampled higher as it goes: the drop itself slides down
       vec3 rc=floor(q), f=fract(q)-.5, ln=normalize(vLocalN);
+      float hi;
       // More of them the harder it rains, from the first drops on, and more again once they are soaked through.
       float on=step(1.-.08*uRainNow*(.45+.55*wetK),hash12(rc.xy+rc.z*7.1+gen*1.13+float(vVariant)))*smoothstep(0.,.12,life)*smoothstep(1.,.6,life);
-      float bead=on*smoothstep(.36,.0,length(f-ln*dot(f,ln)));
+      float bead=on*dropShape(f,ln,.3,hi);
       vec3 L=shade(vec3(1.),vWorld,n,1.,ao,dist);
-      c+=(L*.75+env*.25+vec3(.01))*mix(vec3(1.),.35+col*2.2,.45)*bead*(.5+.5*wetK)*.68;
+      vec3 glint=(L*.75+env*.25+vec3(.01))*mix(vec3(1.),.35+col*2.2,.45);
+      c=mix(c,c*.8,bead*.5);
+      c+=glint*(on*hi*.9+bead*.18)*(.5+.5*wetK)*.68;
     }
   }
   // What a torch throws back off the ground and off whatever it lands on: just enough to make out who is holding it.
@@ -1257,10 +1273,14 @@ out vec3 vLoc;          // where on its own little cube this is, for the drops o
 out vec3 vLocN;
 flat out float vBuilt;  // part of something built (a bike): it gets wet
 flat out float vSeed;
+flat out float vSpeed;
 void main(){
   float a=iCol.a, c=cos(a), s=sin(a);
   // A bike's voxel carries where on the bike it is in the last places of its size: a seed that goes where the bike goes.
-  vLoc=aPos; vLocN=aNormal; vSeed=fract(iPos.w*7919.37)*91.;
+  // The tag in the last places of a bike voxel's size: how fast the bike is going, in steps of three blocks a second, and where on the bike
+  // this voxel is.
+  float tg=max(0.,iPos.w-.125125), sb=floor(tg/2.2e-4+.0001);
+  vLoc=aPos; vLocN=aNormal; vSpeed=sb*3.; vSeed=fract((tg-sb*2.2e-4)/1.5e-6*.618)*91.;
   // A glow below zero marks a part of something built (a vehicle): turned about the vertical, and leaned over sideways, not tumbling.
   // Its glow is -1 - that, with how metal it is (0 to 3) in fours on top, and its lean in sixteens on top of that (24 is upright,
   // each step a fortieth of a radian).
@@ -1282,7 +1302,7 @@ void main(){
   gl_Position=uViewProj*vec4(p,1.);
 }`;
 
-export const CUBE_FS = COMMON + FRAME_UNIFORMS + LIGHTING + /* glsl */`
+export const CUBE_FS = COMMON + FRAME_UNIFORMS + LIGHTING + DROP + /* glsl */`
 in vec3 vWorld;
 in vec3 vNormal;
 in vec3 vCol;
@@ -1292,6 +1312,7 @@ in vec3 vLoc;
 in vec3 vLocN;
 flat in float vBuilt;
 flat in float vSeed;
+flat in float vSpeed;
 uniform sampler2D uRainMap;
 uniform vec3 uRainMapO;
 layout(location=0) out vec4 outCol;
@@ -1335,16 +1356,24 @@ void main(){
       c+=(env*(.03+.5*fres)+L*.35*fres)*w*.6;
       c+=uSunCol*pow(max(dot(Rf,uSunDir),0.),90.)*sh*w*.9;
       if(uRainNow>.01){
-        // Drops: each spot on the bike gets one now and then, holds it and loses it on its own clock; some run before they go.
-        // On the bike's own voxel, four spots to a side, not in the world: they ride along with it.
-        vec3 wp=vLoc*4.+.5, cell=floor(wp)+vec3(vSeed*.7,vSeed*1.3,vSeed*2.1);
+        // Drops: each spot on the bike gets one now and then, holds it and loses it on its own clock. On the bike's own voxel, four
+        // spots to a side, not in the world, so they go where it goes; and with the bike moving, blown back along it and drawn out into
+        // streaks, the faster the further, coming off the back of each piece and new ones coming on at the front.
+        vec3 ln=normalize(vLocN);
+        float mv=clamp(vSpeed/14.,0.,1.)*(1.-abs(ln.z));
+        vec3 wp=vLoc*4.+.5;
+        wp.z+=uTime*vSpeed*.9*(1.-abs(ln.z));
+        vec3 cell=floor(wp)+vec3(vSeed*.7,vSeed*1.3,vSeed*2.1);
         float seed=hash12(cell.xy*1.7+cell.z*3.1), ph=uTime*(.45+seed*.9)*.8+seed*9.;
         float life=fract(ph), gen=floor(ph);
-        vec3 f=fract(wp)-.5, ln=normalize(vLocN);
-        float on=step(1.-.065*w*uRainNow*1.5,hash12(cell.xy+cell.z*7.1+gen*1.13))*smoothstep(0.,.12,life)*smoothstep(1.,.6,life);
-        float bead=on*smoothstep(.36,.0,length(f-ln*dot(f,ln)));
-        // A bead takes some of the colour of what it sits on: water on dark paint, not a white fleck.
-        c+=(L*.75+env*.25+vec3(.01))*mix(vec3(1.),.35+col*2.2,.45)*bead*w*.68;
+        vec3 f=fract(wp)-.5;
+        f.z*=mix(1.,.42,mv);
+        float on=step(1.-.065*w*uRainNow*1.5,hash12(cell.xy+cell.z*7.1+gen*1.13))*mix(smoothstep(0.,.12,life)*smoothstep(1.,.6,life),1.,mv);
+        float hi, bead=on*dropShape(f,ln,.3,hi);
+        // Water on dark paint, a little darker where it sits, with a point of whatever light there is in it.
+        vec3 glint=(L*.75+env*.25+vec3(.01))*mix(vec3(1.),.35+col*2.2,.45);
+        c=mix(c,c*.8,bead*w*.5);
+        c+=glint*(on*hi*.9+bead*.18)*w*.68;
       }
     }
   }
@@ -1482,8 +1511,9 @@ out vec3 vCol;
 out float vGlow;
 out vec3 vView;
 out vec3 vModel;
+out vec3 vModelN;
 void main(){
-  vModel=aPos;
+  vModel=aPos; vModelN=aNormal;
   vec4 v=uModelView*vec4(aPos,1.);
   vView=v.xyz;
   vNormal=uNormalMat*aNormal;
@@ -1491,7 +1521,7 @@ void main(){
   gl_Position=uProj*v;
 }`;
 
-export const BOX_FS = COMMON + /* glsl */`
+export const BOX_FS = COMMON + DROP + /* glsl */`
 in vec3 vNormal;
 in vec3 vCol;
 in float vGlow;
@@ -1511,6 +1541,7 @@ uniform float uDropScale; // drops to the metre on it: fewer and bigger on a too
 uniform float uRunVM;   // 1 on a long wooden handle: water gathers and runs down it
 uniform float uAdd;     // the muzzle flash: light only, added on
 in vec3 vModel;
+in vec3 vModelN;
 layout(location=0) out vec4 outCol;
 float bh(vec3 p){ return fract(sin(dot(p,vec3(12.9898,78.233,37.719)))*43758.5453); }
 void main(){
@@ -1540,9 +1571,12 @@ void main(){
     if(runs) q.y+=life*life*2.;
     vec3 rc=floor(q);
     float on=step(1.-.1*w*uRainVM,bh(rc+gen*1.13))*smoothstep(0.,.12,life)*smoothstep(1.,.6,life);
-    float bead=on*smoothstep(.35,.0,length(fract(q)-.5));
+    // Round and crisp-edged however big a face it sits on and however close it is held, with a point of light in it.
+    float hi, bead=on*dropShape(fract(q)-.5,normalize(vModelN),.32,hi);
     // A bead takes some of the colour of what it sits on: water on dark metal, not a white fleck.
-    c+=(light*.6+uFlash*.3+vec3(.008))*mix(vec3(1.),.35+col*2.2,.45)*bead*w*1.05;
+    vec3 glint=(light*.6+uFlash*.3+vec3(.008))*mix(vec3(1.),.35+col*2.2,.45);
+    c=mix(c,c*.82,bead*w*.5);
+    c+=glint*(on*hi*1.1+bead*.35)*w*1.05;
   }
   // Down a long handle the rain gathers into runs: a drop slides down the wood towards your hand, leaving a wet line behind it, and
   // the next one starts at the top. Only on the handle itself (the shaft under the head), and only while rain is landing on it.
