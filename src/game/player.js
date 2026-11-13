@@ -83,6 +83,8 @@ export class Player {
     this.wanted = {};
     // Camps you owe bail to: 'in' if you did it inside their wall (they shoot), 'out' if it was outside (they only shut the gate).
     this.bail = {};
+    this.bailExtra = {};   // what each camp has added to your bail since, for what you did while you owed it
+    this.bailLock = {};    // and when (in seconds of play) they will take your money again after a killing
     this.dlg = { flags: {}, met: {}, day: {} };
     this.sanctuary = false;
     this.jobs = [];
@@ -1042,13 +1044,15 @@ export class Player {
     return {
       x: this.x, y: this.y, z: this.z, yaw: this.yaw, pitch: this.pitch, health: this.health, infection: this.infection, stamina: this.stamina, hunger: this.hunger, rest: this.rest, sedated: this.sedated, home: this.home, torchItem: true,
       scrip: this.scrip, inventory: this.inventory, mags: this.mags, weapon: this.weapon, armor: this.armor, rep: this.rep,
-      loadout: this.loadout, charName: this.charName, skin: this.skin, bornDay: this.bornDay, kills: this.kills, headshots: this.headshots, voxelsBroken: this.voxelsBroken, discovered: this.discovered, campRep: this.campRep, grief: this.grief, wanted: this.wanted, bail: this.bail || {}, dlg: this.dlg, perks: this.perks || {}, pendingKit: this.pendingKit || null,
+      loadout: this.loadout, charName: this.charName, skin: this.skin, bornDay: this.bornDay, kills: this.kills, headshots: this.headshots, voxelsBroken: this.voxelsBroken, discovered: this.discovered, campRep: this.campRep, grief: this.grief, wanted: this.wanted, bail: this.bail || {}, bailExtra: this.bailExtra || {}, bailLock: this.bailLock || {}, dlg: this.dlg, perks: this.perks || {}, pendingKit: this.pendingKit || null,
     };
   }
 
   fromSave(s) {
     Object.assign(this, s);
     this.bail = s.bail || {};
+    this.bailExtra = s.bailExtra || {};
+    this.bailLock = s.bailLock || {};
     if (typeof this.rest !== 'number') this.rest = 100;
     this.alive = true;
     // From before the flashlight was something you carried.

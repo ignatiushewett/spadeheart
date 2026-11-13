@@ -1133,7 +1133,10 @@ export class NPCs {
         if (q.seekT > 0 && nd > 9) {
           if (nd < (q.seekBest ?? 1e9) - 3) { q.seekBest = nd; q.stallT = 0; }
           else if ((q.stallT = (q.stallT || 0) + 4) >= 8) {
-            const spot = nd < 45 ? this.bailSpot(8, 10) : this.bailSpot(18, 22);
+            // Round the block and up another street: only ever somewhere you can't see, a fair way off, and only while you can't
+            // see them either. Never popped down in front of you.
+            const seen = q.members.some((m) => !m.dead && w.los(P.x, P.y + 2.4, P.z, m.x, m.y + 2, m.z));
+            const spot = seen || nd < 30 ? null : this.bailSpot(30, 20, true);
             if (spot) {
               for (const m of q.members) if (!m.dead) { m.x = spot[0] + (rand() - .5) * 4; m.z = spot[1] + (rand() - .5) * 4; m.y = w.terrainTop(Math.floor(m.x), Math.floor(m.z)); }
               q.seekBest = Math.hypot(spot[0] - P.x, spot[1] - P.z); q.stallT = 0;
@@ -1142,8 +1145,11 @@ export class NPCs {
         }
         return;
       }
-      const spot = this.bailSpot(25, 30);
+      // A fresh crew only now and then, from out of sight a good way off, and not while you have a patrol after you for blood.
+      if (g.time < (this.bailNext || 0) || P.wanted[-1] > 0) return;
+      const spot = this.bailSpot(50, 30, true);
       if (spot) {
+        this.bailNext = g.time + 150 + rand() * 90;
         this.addCrew(c, spot[0], spot[1], Math.max(10, Math.min(PATROL_REACH, wall + 10)), 3 + Math.floor(rand() * 2), false);
         const q = this.list[this.list.length - 1].squad;
         q.seekT = 90; q.seekBest = 1e9; q.stallT = 0;
@@ -1157,7 +1163,7 @@ export class NPCs {
   }
 
   // Open street a short walk from you that you cannot see from where you stand, if there is any.
-  bailSpot(r0, span) {
+  bailSpot(r0, span, hidden = false) {
     const g = this.g, P = g.player, w = g.world;
     let fallback = null;
     for (let t = 0; t < 70; t++) {
@@ -1172,7 +1178,7 @@ export class NPCs {
       if (!w.los(P.x, P.y + 2.4, P.z, x + .5, y + 2, z + .5)) return [x + .5, z + .5];
       if (!fallback) fallback = [x + .5, z + .5];
     }
-    return fallback;
+    return hidden ? null : fallback;
   }
 
   addCrew(near, x, z, ring, n, trader) {
@@ -3984,8 +3990,28 @@ export class NPCs {
   }
 
   bailFor(id) {
-    const c = this.g.layout.camps[id];
-    return Math.round(c.folk * (BAIL_WEALTH[c.key] || 1) / 10) * 10;
+    const c = this.g.layout.camps[id], P = this.g.player;
+    return Math.round(c.folk * (BAIL_WEALTH[c.key] || 1) / 10) * 10 + ((P.bailExtra && P.bailExtra[id]) || 0);
+  }
+
+  // Seconds of play until they will take your money again (0: they will now).
+  bailWait(id) {
+    const P = this.g.player, until = P.bailLock && P.bailLock[id];
+    return until ? Math.max(0, until - (this.g.stats.playSecs || 0)) : 0;
+  }
+
+  // Something more on the charge sheet while you already owe: the bail goes up, and after a killing they will not hear about money
+  // for a good while. Shooting at a patrol sets it on you.
+  bailOffence(home, extra, lock) {
+    const g = this.g, P = g.player, c = g.layout.camps[home];
+    P.bailExtra = P.bailExtra || {}; P.bailLock = P.bailLock || {};
+    const base = Math.round(c.folk * (BAIL_WEALTH[c.key] || 1) / 10) * 10, add = Math.round(base * extra / 10) * 10;
+    if (add > 0) P.bailExtra[home] = (P.bailExtra[home] || 0) + add;
+    if (lock) P.bailLock[home] = Math.max(P.bailLock[home] || 0, (g.stats.playSecs || 0) + lock);
+    if (add > 0 && g.time - (this.bailRaisedSaid ?? -99) > 20) {
+      this.bailRaisedSaid = g.time;
+      g.ui.toast(`${c.name} raised your bail to ${this.bailFor(home).toLocaleString('en-US')} spades.${lock ? ' They will not take it for a while.' : ''}`, 'bad');
+    }
   }
 
   // Paid in full: the camp takes you back, and word gets round that you settled up.
@@ -3998,6 +4024,8 @@ export class NPCs {
     delete P.grief[-1];
     delete P.wanted[-1];
     if (P.bail) delete P.bail[id];
+    if (P.bailExtra) delete P.bailExtra[id];
+    if (P.bailLock) delete P.bailLock[id];
     this.warned = false;
     this.g.saveGame();
   }
@@ -4080,6 +4108,13 @@ export class NPCs {
       }
       n.headless = behead;
       this.kill(n, true);
+      // One of theirs dead at your hand, while you already owe them: the bail goes up by a good part again, and for four minutes or
+      // so nobody of theirs will take your money. Their patrols come for you instead.
+      const home = n.camp >= 0 ? n.camp : n.factionId ? n.factionId - 1 : -1;
+      if (home >= 0 && this.owesBail(home) && (!fighting || deliberate)) {
+        this.bailOffence(home, n.kid ? 1 : .35, 240);
+        if (n.kind === 'roamer') P.wanted[-1] = Math.max(P.wanted[-1] || 0, 150);
+      }
       this.addGrief(n, (fighting && !deliberate ? 1.5 * ease : 6) + (n.kid ? 4 : 0), outside);
       return;
     }
@@ -4098,7 +4133,12 @@ export class NPCs {
     // A patrol reports back to the camp it came from.
     const home = key >= 0 ? key : n.factionId ? n.factionId - 1 : -1;
     if (key >= 0 && this.hostileCamp(key)) return;
-    if (home >= 0 && P.bail && P.bail[home] && !(P.bail[home] === 'out' && !outside)) return;
+    if (home >= 0 && P.bail && P.bail[home] && !(P.bail[home] === 'out' && !outside)) {
+      // Already owing them, and at it again. A patrol shot at shoots back; and it all goes on the bill.
+      if (key < 0) P.wanted[-1] = Math.max(P.wanted[-1] || 0, 75);
+      this.bailOffence(home, weight * .02, 0);
+      return;
+    }
     if (before < 2.5 && now >= 2.5 && now < 5) g.ui.toast('People are reaching for their guns. Put yours down.', 'bad');
     if (now < 5) return;
     const name = home >= 0 ? g.layout.camps[home].name : 'The patrol';

@@ -1386,8 +1386,9 @@ export class UI {
     if (owedTo >= 0 && g.npcs.owesBail(owedTo) && (g.npcs.hostileCamp(owedTo) || n.kind === 'clerk' || n.kind === 'roamer')) {
       const list = [];
       if (n.kind === 'clerk' || n.kind === 'roamer') {
-        const bail = g.npcs.bailFor(owedTo);
-        list.push({ label: `Pay my bail (${bail} spades)`, cls: 'quest', fn: () => {
+        const bail = g.npcs.bailFor(owedTo), wait = g.npcs.bailWait(owedTo);
+        if (wait > 0) list.push({ label: `Pay my bail (not for another ${Math.ceil(wait / 60)} min)`, off: true });
+        else list.push({ label: `Pay my bail (${bail} spades)`, cls: 'quest', fn: () => {
           if (P.scrip < bail) { this.toast('Not enough spades', 'bad'); return; }
           g.npcs.payBail(owedTo);
           this.say(n.kind === 'clerk' ? 'Fine. It is in the book. Everybody gets one of these. Do not make me regret it.' : `That squares it. Word will reach ${g.layout.camps[owedTo].name} before you do.`);

@@ -36,8 +36,12 @@ export class Dialogue {
     // Once you are Trusted somewhere, everybody there knows who you are, whether or not you have spoken before.
     const first = !flags[key] && !(npc.camp >= 0 && this.standing(npc.camp) >= 25);
     flags[key] = (flags[key] || 0) + 1;
-    if (npc.kind === 'roamer' && npc.factionId && this.g.npcs.owesBail(npc.factionId - 1)) return `You are on the list at ${npc.campName}. ${this.g.npcs.bailFor(npc.factionId - 1)} spades squares it, then you can walk back in. Nobody out here is going to shoot you over it.`;
     if (npc.kind === 'roamer' && P.wanted[-1] > 0) return 'You have got some nerve, after that.';
+    if (npc.kind === 'roamer' && npc.factionId && this.g.npcs.owesBail(npc.factionId - 1)) {
+      const id = npc.factionId - 1, wait = this.g.npcs.bailWait(id);
+      if (wait > 0) return `After what you did? Nobody at ${npc.campName} is taking your money today. Come back when it has cooled off, and it will cost you ${this.g.npcs.bailFor(id)}.`;
+      return `You are on the list at ${npc.campName}. ${this.g.npcs.bailFor(id)} spades squares it, then you can walk back in. Nobody out here is going to shoot you over it, so long as you don't start anything.`;
+    }
     if (npc.camp >= 0 && npc.kind !== 'follower' && this.g.npcs.hostileCamp(npc.camp)) return 'Keep walking. Everyone knows what you did.';
     if (npc.camp >= 0) {
       // Nobody has time for small talk while the wall is failing.
