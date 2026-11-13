@@ -154,7 +154,7 @@ const MUZZLE = {
   pistol: [0, .017, -.215], revolver: [0, .02, -.305], smg: [0, .012, -.4], shotgun: [0, .018, -.605], rifle: [0, .014, -.63],
   deer: [0, .03, -.69], hunting: [0, .03, -.77], lmg: [0, .012, -.635],
 };
-// How big each gun's flash is, against the rifle's. A shotgun throws a great ragged ball of it; the scoped rifle and the magnum a lot.
+// How big each gun's flash is, against the rifle's. A shotgun throws a great ragged ball of it; the sniper rifle and the magnum a lot.
 const FLASH_SIZE = { shotgun: 2.1, deer: 1.3, hunting: 1.45, revolver: 1.4, lmg: 1.15, pistol: 1, smg: .9 };
 // A flash at the muzzle: a hot core, a short spike straight out, and four petals. Built once, turned and sized every shot.
 const FLASH = [
