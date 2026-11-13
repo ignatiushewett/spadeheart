@@ -409,6 +409,10 @@ export function planCamp(def, id, r, ground) {
   if (!c.spots.hq) c.spots.hq = { x: px + 18.5, z: pz - 12.5 };
   if (!c.spots.field) c.spots.field = { x: px - 20.5, z: pz + 22.5 };
 
+  // The strings of bulbs across the avenues are not built on, but nothing should be built through them either: hold their poles and
+  // the line between them clear before the yard and the tent look for ground.
+  for (const q of c.parts) if (q.t === 'lights') reserve(q.x0 - 1, q.z0 - 1, q.x1 + 1, q.z1 + 1);
+
   // --- The mechanic's yard: tucked into a corner of the town ------------------------------------------
   // A fenced corner with a bench, tyres and drums, a cot under a tarp, and two bikes: one in pieces that the mechanic is always at, and
   // one going that is for sale. Laid out the same everywhere, turned so the fence runs along the outside wall and it opens onto the town.

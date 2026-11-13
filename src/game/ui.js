@@ -1130,15 +1130,15 @@ export class UI {
       x.fillText(p.name, sx, sy - 15);
     }
     x.shadowBlur = 0;
-    // In or near a camp you know, its pins as well: the same marks as on the full map, held at the rim when they are further off.
+    // In or near a camp you know, its pins as well: the same marks as on the full map.
     const inside = g.horde.inCamp(P.x, P.z, 60);
     if (inside && P.discovered[inside.id] && g.campSim.state[inside.id].status === 'holding') {
       x.textAlign = 'center'; x.textBaseline = 'middle';
       for (const q of this.campPins(inside)) {
-        let dx = (q.x - P.x) * scale, dz = (q.z - P.z) * scale;
-        const rr = cx - 16, dd = Math.hypot(dx, dz);
-        if (dd > rr) { dx *= rr / dd; dz *= rr / dd; }
+        const dx = (q.x - P.x) * scale, dz = (q.z - P.z) * scale;
         const sx = cx + dx * cosY - dz * sinY, sy = cx + dx * sinY + dz * cosY;
+        // The minimap is square: a pin shows anywhere on it, right out into the corners, and goes once it is off the edge.
+        if (sx < -10 || sy < -10 || sx > W + 10 || sy > W + 10) continue;
         x.beginPath(); x.arc(sx, sy, 12, 0, 6.2832);
         x.fillStyle = 'rgba(12,12,12,.85)'; x.fill();
         x.lineWidth = 2.5; x.strokeStyle = q.col; x.stroke();
