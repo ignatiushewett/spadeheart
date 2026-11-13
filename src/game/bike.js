@@ -1,6 +1,6 @@
 import { SKIN_TONES } from './viewmodel.js';
 import { FLAGS, F_GLASS, F_LEAF, M } from '../shared/materials.js';
-import { G, WX, STREET_Y } from '../shared/constants.js';
+import { G, WX, WZ, STREET_Y } from '../shared/constants.js';
 
 // Motorbikes. The dev menu puts one down in front of you; from then on it is a thing in the world like any other: walk up to it and
 // E gets you on, E again gets you off, and it stays where you leave it, in the save too. A rough old scrambler: knobbly tyres, a
@@ -186,7 +186,7 @@ export class Bikes {
     this.ride = null;
   }
 
-  toSave() { return this.list.map(b => [+b.x.toFixed(2), +b.y.toFixed(2), +b.z.toFixed(2), +b.yaw.toFixed(3), b.light ? 1 : 0, b.owned ? 1 : 0, +b.fuel.toFixed(3)]); }
+  toSave() { return this.list.filter((b) => !b.npc && !b.broken && !b.locked).map(b => [+b.x.toFixed(2), +b.y.toFixed(2), +b.z.toFixed(2), +b.yaw.toFixed(3), b.light ? 1 : 0, b.owned ? 1 : 0, +b.fuel.toFixed(3)]); }
   fromSave(s) {
     this.clear();
     if (Array.isArray(s)) for (const [x, y, z, yaw, light, owned, fuel] of s) if (isFinite(x + y + z + yaw)) { const b = new Bike(x, y, z, yaw); b.light = !!light; b.owned = !!owned; b.fuel = isFinite(fuel) ? fuel : 1; this.list.push(b); }
@@ -266,9 +266,13 @@ export class Bikes {
 
   mount(b) {
     const P = this.g.player;
-    if (this.ride || !b) return;
+    if (this.ride || !b || b.npc) return;
+    if (b.broken) { this.g.ui.toast('Wrecked. The engine will not turn over.'); return; }
+    if (b.locked) { this.g.ui.toast('No keys. Whoever rode it in still has them.'); return; }
     this.ride = b;
-    b.v = 0; b.vy = 0;
+    b.v = 0; b.vy = 0; b.vx = 0; b.vz = 0; b.slip = 0; b.yawRate = 0;
+    // Picked up off its side if it went over.
+    b.down = 0; b.lean = 0; b.tipping = false;
     // Both hands on the bars: the torch goes away, and comes back out the way it was when you get off.
     this.torchWas = P.flashlight;
     P.flashlight = false;
@@ -297,7 +301,12 @@ export class Bikes {
     P.vx = fx * b.v * .3; P.vz = fz * b.v * .3; P.vy = 0;
     P.eyeSmooth = SIT_EYE;
     P.flashlight = !!this.torchWas;
-    b.v = 0; b.lean = 0;
+    // Off it while it is still going, it keeps going without you: weaving off line as it goes, slowing, and once it has run out of
+    // speed, down on its side. Stepped off standing still, it stays on its stand.
+    b.straight = 0;
+    const sp = Math.hypot(b.vx || 0, b.vz || 0);
+    b.yawRate = (Math.random() < .5 ? -1 : 1) * (.4 + Math.random() * .6) * Math.min(3, sp * .14);
+    b.tipping = sp > 2.5;
   }
 
   toggleLight() {
@@ -371,7 +380,7 @@ export class Bikes {
   lookAt(o, f, reach) {
     let best = null, bd = reach;
     for (const b of this.list) {
-      if (b === this.ride) continue;
+      if (b === this.ride || b.npc) continue;
       const fx = Math.sin(b.yaw), fz = -Math.cos(b.yaw);
       for (let s = -1.6; s <= 1.61; s += .4) for (const h of [.6, 1.6]) {
         const cx = b.x + fx * s - o[0], cy = b.y + h - o[1], cz = b.z + fz * s - o[2];
@@ -393,77 +402,122 @@ export class Bikes {
 
   update(dt, keys) {
     const b = this.ride;
-    // Any you have left standing, left on a ledge, or had the ground taken from under: they settle onto whatever is below.
-    for (const o of this.list) if (o !== b) {
+    this.traffic(dt);
+    for (const o of this.list) if (o !== b && !o.npc) {
+      // Rolling on with nobody on it: the same road under it as with you on it, spinning out, slowing, knocking down and smashing
+      // through whatever it still has the speed for, until it comes to rest and falls over on its side.
+      if (Math.hypot(o.vx || 0, o.vz || 0) > .05 || Math.abs(o.yawRate || 0) > .05) this.drive(o, dt, null);
+      else { o.vx = o.vz = 0; o.v = 0; o.slip = 0; o.yawRate = 0; }
+      if (!o.down && Math.abs(o.v || 0) < 3.5 && o.tipping) o.down = (o.lean || 0) >= 0 ? 1.3 : -1.3;
+      o.lean += ((o.down || 0) - o.lean) * Math.min(1, dt * (o.down ? 3.5 : 3));
       const gy = this.ground(o.x, o.z, o.y + .5);
       if (gy < o.y) { o.vy -= 26 * dt; o.y = Math.max(gy, o.y + o.vy * dt); if (o.y === gy) o.vy = 0; } else if (gy > o.y + .01 && gy - o.y < 1.2) o.y = gy;
       o.sy = o.y;
     }
     if (!b) return;
-    const g = this.g, P = g.player, W = g.world;
-    // Out of petrol, the throttle does nothing: it coasts, and the brake still works.
+    const g = this.g, P = g.player;
+    const fw = this.drive(b, dt, keys);
+    if (this.ride !== b) return;   // thrown off on the way
+    // Petrol goes with the miles, a little more with the throttle open, and a trickle just ticking over.
+    if (b.fuel > 0) {
+      const was = b.fuel;
+      b.fuel = Math.max(0, b.fuel - (Math.abs(b.v) * dt * (fw > 0 ? 1.15 : .85) + dt * .15) / TANK);
+      if (was > .1 && b.fuel <= .1) g.ui.toast('Petrol is low.', 'bad');
+      if (b.fuel > 0) b.dryTold = false;
+    }
+    // The engine: revs climbing through each gear and dropping back as it changes up, a bit more when you open it up.
+    const sp = Math.abs(b.v), gear = MAX / 4.2 + (sp > MAX ? 1.5 : 0), inGear = sp < .3 ? 0 : ((sp % gear) / gear) * .8 + .2;
+    const want = Math.min(1, inGear * (sp < gear ? 1 : .9) + (fw ? .12 : 0) + (b.drift ? .15 : 0));
+    b.rev += (want - b.rev) * Math.min(1, dt * (want > b.rev ? 5 : 9));
+    b.load += ((fw > 0 ? 1 : 0) - b.load) * Math.min(1, dt * 6);
+    g.audio.engineSet(b.rev, b.load, b.x, b.y + .8, b.z);
+    this.seat(b);
+  }
+
+  // One step of a bike on the road, ridden (keys) or not (null). Returns the throttle.
+  // It keeps a velocity of its own, in the world, which the tyres pull round to where the bike points: hard, normally, so it goes where
+  // it is steered; hardly at all with the handbrake on or a hard turn at speed, so the back steps out and it slides, drifting, with
+  // smoke off the back tyre. Slide it too far sideways at speed and it throws you.
+  drive(b, dt, keys) {
+    const g = this.g, P = g.player, W = g.world, rider = !!keys, isP = rider && b === this.ride;
+    if (b.vx === undefined) { b.vx = Math.sin(b.yaw) * (b.v || 0); b.vz = -Math.cos(b.yaw) * (b.v || 0); }
+    let fx = Math.sin(b.yaw), fz = -Math.cos(b.yaw), rx = Math.cos(b.yaw), rz = Math.sin(b.yaw);
+    let long = b.vx * fx + b.vz * fz, lat = b.vx * rx + b.vz * rz;
+    // Out of petrol, the throttle does nothing: it coasts, and the brakes still work.
     const dry = b.fuel <= 0;
-    const fw = (keys.KeyW && !dry ? 1 : 0) - (keys.KeyS ? 1 : 0), st = (keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0);
-    if (dry && keys.KeyW && !b.dryTold) { b.dryTold = true; g.ui.toast('Out of petrol. A mechanic will fill it up, for a price.', 'bad'); }
-    // Flat out in a straight line it keeps winding on past its usual top speed; any real turn or letting off and that is lost.
-    if (fw > 0 && !st && b.v > MAX * .9) b.straight = Math.min(OPEN_T, b.straight + dt);
-    else b.straight = Math.max(0, b.straight - dt * (st ? 2.5 : 1.5));
+    const fw = rider ? (keys.KeyW && !dry ? 1 : 0) - (keys.KeyS ? 1 : 0) : 0, st = rider ? (keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0) : 0;
+    const hb = rider && !!keys.Space;
+    if (isP && dry && keys.KeyW && !b.dryTold) { b.dryTold = true; g.ui.toast('Out of petrol. A mechanic will fill it up, for a price.', 'bad'); }
+    // Flat out in a straight line it keeps winding on past its usual top speed; a turn costs some of that, not all of it at once.
+    if (fw > 0 && !st && !hb && long > MAX * .9) b.straight = Math.min(OPEN_T, b.straight + dt);
+    else b.straight = Math.max(0, b.straight - dt * (st ? 1 : 1.5));
     const cap = MAX + OPEN * b.straight / OPEN_T;
-    if (fw > 0) b.v += (b.v < 0 ? 22 : b.v < MAX ? 10 * (1 - Math.max(0, b.v) / MAX) + 1.2 : 2.6) * dt;
-    else if (fw < 0) b.v -= (b.v > 0 ? 20 : 5) * dt;
-    else b.v -= Math.sign(b.v) * Math.min(Math.abs(b.v), 3.2 * dt);
-    b.v = Math.max(-BACK, b.v);
-    if (b.v > cap) b.v = Math.max(cap, b.v - 6 * dt);   // eased back down when the run is lost, not snapped
-    // The faster it goes the more a turn takes it round, up to a point.
-    const turn = st * dt * 1.9 * Math.min(1, Math.abs(b.v) / 3) * Math.sign(b.v || 1) * (1 - Math.min(.45, Math.abs(b.v) / MAX * .45));
+    if (fw > 0) long += (long < 0 ? 22 : long < MAX ? 10 * (1 - Math.max(0, long) / MAX) + 1.2 : 2.6) * dt;
+    else if (fw < 0) long -= (long > 0 ? 20 : 5) * dt;
+    else long -= Math.sign(long) * Math.min(Math.abs(long), (rider ? 3.2 : 4 + Math.abs(long) * .25) * dt);
+    if (hb) long -= Math.sign(long) * Math.min(Math.abs(long), 8 * dt);
+    long = Math.max(-BACK, long);
+    if (long > cap) long = Math.max(cap, long - 3 * dt);
+    // Steering. A hard turn at speed, or the handbrake, lets the back come round: it turns in quicker, and slides.
+    const drifting = rider && Math.abs(long) > 6 && (hb || (st && Math.abs(long) > 15));
+    b.drift = drifting;
+    let turn;
+    if (rider) turn = st * dt * 1.9 * Math.min(1, Math.abs(long) / 3) * Math.sign(long || 1) * (1 - Math.min(.45, Math.abs(long) / MAX * .45)) * (drifting ? 1.5 : 1);
+    else { turn = (b.yawRate || 0) * dt; b.yawRate *= 1 - Math.min(1, dt * (Math.hypot(long, lat) > 2 ? .7 : 3)); }
+    // The world velocity stays as it was; the bike turns under it, so the same motion is now partly sideways to it.
+    const vx0 = b.vx, vz0 = b.vz;
     b.yaw += turn;
-    P.yaw += turn;
-    // Leaned into the turn, more the faster and tighter it is, and back up as it straightens.
-    const leanTo = Math.max(-.42, Math.min(.42, b.v * (turn / Math.max(dt, 1e-3)) * .03));
-    b.lean += (leanTo - b.lean) * Math.min(1, dt * 5);
-    const fx = Math.sin(b.yaw), fz = -Math.cos(b.yaw), dir = Math.sign(b.v);
-    const nx = b.x + fx * b.v * dt, nz = b.z + fz * b.v * dt;
-    // What the leading wheel runs onto: a kerb it rides up, a wall it does not, nor anything low enough to take your head off.
-    const reach = (dir >= 0 ? FRONT : REAR) * VS;
-    const lx = nx + fx * reach * dir, lz = nz + fz * reach * dir;
-    const ny = this.ground(lx, lz, b.y + 1.2);
-    const top = Math.max(ny, b.y);
+    if (isP) P.yaw += turn;
+    fx = Math.sin(b.yaw); fz = -Math.cos(b.yaw); rx = Math.cos(b.yaw); rz = Math.sin(b.yaw);
+    {
+      // Re-measured against where it now points, with this step's throttle and brakes put back in along it.
+      const oldLong = vx0 * Math.sin(b.yaw - turn) + vz0 * -Math.cos(b.yaw - turn);
+      const dl = long - oldLong;
+      long = vx0 * fx + vz0 * fz + dl;
+      lat = vx0 * rx + vz0 * rz;
+    }
+    // The tyres pull the sideways part away. Most of it goes into carrying on along the bike, not lost: a turn costs a little speed.
+    const grip = !rider ? 1.4 : drifting ? (hb ? 1.5 : 2.6) : 11;
+    const keep = Math.exp(-grip * dt), shed = lat * (1 - keep);
+    lat *= keep;
+    long += Math.sign(long || 1) * Math.abs(shed) * (rider ? .82 : .3);
+    const speed = Math.hypot(long, lat), slipA = Math.atan2(Math.abs(lat), Math.abs(long) + .001);
+    b.vx = fx * long + rx * lat; b.vz = fz * long + rz * lat;
+    b.v = long; b.slip = lat;
+    // Skidding: smoke off the back tyre and the scream of it.
+    if (Math.abs(lat) > 2.2 && speed > 5) {
+      const bx = b.x - fx * 10 * VS, bz = b.z - fz * 10 * VS;
+      if (Math.random() < Math.min(1, Math.abs(lat) * .12)) g.particles.smoke(bx + (Math.random() - .5) * .6, b.y + .3, bz + (Math.random() - .5) * .6, .8, 0, .55, .3, .5);
+      if ((b.skidT = (b.skidT || 0) - dt) <= 0) { g.audio.simple('skid', bx, b.y + .3, bz); b.skidT = .16 + Math.random() * .08; }
+    }
+    // Too far sideways, too fast: off you come.
+    if (isP && speed > 11 && slipA > 1.0) { this.throwOff(b, speed); return fw; }
+    // Leaned into the turn, more the faster and tighter it is, further still sliding, and back up as it straightens.
+    if (rider) {
+      const leanTo = Math.max(-.5, Math.min(.5, long * (turn / Math.max(dt, 1e-3)) * .03 + (drifting ? Math.sign(st) * .08 : 0)));
+      b.lean += (leanTo - b.lean) * Math.min(1, dt * 5);
+    }
+    // Where it is going this step, and what the front of it (whichever way it is moving) runs into.
+    const mv = Math.hypot(b.vx, b.vz), mx = mv > .01 ? b.vx / mv : fx, mz = mv > .01 ? b.vz / mv : fz;
+    const nx = b.x + b.vx * dt, nz = b.z + b.vz * dt, along = mx * fx + mz * fz;
+    const reach = (Math.abs(along) > .6 ? (along > 0 ? FRONT : REAR) : 6) * VS;
+    const lx = nx + mx * reach, lz = nz + mz * reach;
+    const ny = this.ground(lx, lz, b.y + 1.2), top = Math.max(ny, b.y);
     let blocked = ny > b.y + 1.05;
-    for (const [px, pz] of [[lx, lz], [nx, nz]]) for (let k = 1; k <= 3 && !blocked; k++) if (W.solid(Math.floor(px), top + k, Math.floor(pz))) blocked = true;
-    if (b.v !== 0 && blocked) {
-      const hit = Math.abs(b.v);
-      // A hard enough hit goes through what it hit, and the hole is the shape of a crash, not a doorway: a ragged blob round where
-      // it struck, wider the harder the hit, shallow front to back, torn at the edges, with the gap the bike and you need always in it.
-      let broke = 0;
-      if (hit > 11) {
-        const dmg = (hit - 9) * 1.15, rx = Math.cos(b.yaw), rz = Math.sin(b.yaw), ex = lx + fx * .5 * dir, ez = lz + fz * .5 * dir;
-        const cy = b.y + 1.5, R = 1.5 + Math.min(1.5, (hit - 11) * .1), n = Math.ceil(R) + 1;
-        const ix = Math.floor(ex), iz = Math.floor(ez);
-        for (let dy = -n; dy <= n; dy++) for (let dz = -n; dz <= n; dz++) for (let dx = -n; dx <= n; dx++) {
-          const x = ix + dx, y = Math.floor(cy) + dy, z = iz + dz;
-          if (y < Math.floor(b.y)) continue;   // never the ground it is riding on
-          const id = W.get(x, y, z);
-          if (!id) continue;
-          const px = x + .5 - ex, pu = y + .5 - cy, pz = z + .5 - ez;
-          const across = px * rx + pz * rz, deep = (px * fx + pz * fz) * dir;
-          if (deep < -.8) continue;
-          let d = Math.hypot(across / R, pu / (R * 1.1), deep / (R * .5)) + (hash(x, y, z) - .5) * .7;
-          if (Math.abs(across) < .75 && pu > -1.6 && pu < 1.7 && deep < .9) d = Math.min(d, .45);
-          if (d >= 1) continue;
-          if (FLAGS[id] & F_GLASS) { g.breakGlass(x, y, z); broke++; continue; }
-          if (Math.random() < .5) g.particles.debris(x, y, z, id, 2, 4);
-          const gone = W.hit(x, y, z, dmg * (1.35 - d * .55));
-          if (gone) { g.onVoxelBroken(x, y, z, gone); broke++; }
-        }
-        if (broke) { g.audio.simple('smash', ex, b.y + 1, ez); g.horde.noise(b.x, b.z, 30, .8); }
-      }
-      // Into something that held: the clang and thud of it, harder the faster.
-      if (!broke && hit > 2.5) { g.audio.simple('thump', lx, b.y + .8, lz); if (hit > 7) g.audio.simple('block', lx, b.y + .8, lz); }
-      if (hit > 9) { g.audio.simple('hurt'); P.shake = Math.min(1, P.shake + (broke ? .3 : .5)); }
-      if (hit > 12) P.damage((hit - 12) * (broke ? 1.5 : 3), null, null, 'fall');
-      // Through it, it loses a good deal of what it had; into something that held, it bounces back off.
-      b.v *= broke ? .55 : -.15;
+    for (const [px, pz] of [[lx, lz], [nx, nz]]) for (let k = 1; k <= (rider ? 3 : 2) && !blocked; k++) if (W.solid(Math.floor(px), top + k, Math.floor(pz))) blocked = true;
+    if (mv > .01 && blocked) {
+      const broke = this.smash(b, lx, lz, mx, mz, mv);
+      if (isP) {
+        if (!broke && mv > 2.5) { g.audio.simple('thump', lx, b.y + .8, lz); if (mv > 7) g.audio.simple('block', lx, b.y + .8, lz); }
+        if (mv > 9) { g.audio.simple('hurt'); P.shake = Math.min(1, P.shake + (broke ? .3 : .5)); }
+        if (mv > 12) P.damage((mv - 12) * (broke ? 1.5 : 3), null, null, 'fall');
+      } else if (!broke && mv > 2.5) g.audio.simple('thump', lx, b.y + .8, lz);
+      // Through it, it loses a good deal of what it had; into something that held, it bounces back off (and, riderless, spins).
+      const k = broke ? .55 : -.15;
+      b.vx *= k; b.vz *= k;
+      if (!rider) b.yawRate = (b.yawRate || 0) + (Math.random() - .5) * mv * .3;
       b.straight = 0;
+      b.v = b.vx * fx + b.vz * fz; b.slip = b.vx * rx + b.vz * rz;
     } else {
       b.x = nx; b.z = nz;
       // It sits on the higher of what is under its two wheels.
@@ -471,55 +525,246 @@ export class Bikes {
       const gy = Math.max(this.ground(rx2, rz2, b.y + 1.2), this.ground(fx2, fz2, b.y + 1.2), this.ground(b.x, b.z, b.y + 1.2));
       if (gy >= b.y) { b.y = gy; b.vy = 0; } else { b.vy -= 26 * dt; b.y = Math.max(gy, b.y + b.vy * dt); if (b.y === gy) b.vy = 0; }
     }
-    b.sy = b.y < b.sy ? b.y : b.sy + (b.y - b.sy) * Math.min(1, dt * (7 + Math.abs(b.v) * .35));
+    if (rider) b.sy = b.y < b.sy ? b.y : b.sy + (b.y - b.sy) * Math.min(1, dt * (7 + Math.abs(b.v) * .35));
     b.spin += b.v * dt / (WR * VS);
-    // Petrol goes with the miles, a little more with the throttle open, and a trickle just ticking over.
-    if (!dry) {
-      const was = b.fuel;
-      b.fuel = Math.max(0, b.fuel - (Math.abs(b.v) * dt * (fw > 0 ? 1.15 : .85) + dt * .15) / TANK);
-      if (was > .1 && b.fuel <= .1) g.ui.toast('Petrol is low.', 'bad');
-      if (b.fuel > 0) b.dryTold = false;
-    }
-    // Crops go down under it: anything soft and leafy that is not up a tree, the whole plant, anywhere under its length and width.
-    // Cut a little ahead of the front wheel, more the faster it goes, so they burst as it hits them and not a moment after.
-    if (Math.abs(b.v) > .3) {
-      const rx = Math.cos(b.yaw), rz = Math.sin(b.yaw), ahead = .05 + Math.abs(b.v) * .055, ground = g.layout.ground;
-      let cut = 0;
-      const s0 = dir >= 0 ? -REAR * VS : -REAR * VS - ahead, s1 = dir >= 0 ? FRONT * VS + ahead : FRONT * VS, done = new Set();
-      for (let s = s0; s <= s1 + .01; s += .35) for (const w of [-.65, 0, .65]) {
-        const x = Math.floor(b.x + fx * s + rx * w), z = Math.floor(b.z + fz * s + rz * w), key = x * 8192 + z;
-        if (done.has(key)) continue;
-        done.add(key);
-        const field = x >= 0 && z >= 0 && x < WX && ground[z * WX + x] === G.FIELD;
-        for (let y = Math.floor(b.y) - 1, top = y + 7; y <= top; y++) {
-          const id = W.get(x, y, z);
-          if (!id || !(FLAGS[id] & F_LEAF) || (TREE.has(id) && !field)) continue;
-          cut++;
-          // A few bits thrown low and off to the sides; none up where they would be in your face.
-          if (W.set(x, y, z, 0) && y < b.y + 2 && Math.random() < .6) g.particles.debris(x, y, z, id, 1, 1.6);
-        }
-      }
-      b.thrashT -= dt;
-      if (cut && b.thrashT <= 0) { g.audio.simple('thrash', b.x + fx * 1.6 * dir, b.y + .6, b.z + fz * 1.6 * dir); b.thrashT = .07 + Math.random() * .06; }
-    }
+    this.mow(b, dt);
     // Anything dead in the way goes down under it, if it is going fast enough to matter.
-    if (Math.abs(b.v) > 5) {
+    if (mv > 5) {
       const H = g.horde;
-      H.forRadius(b.x + fx * 1.4 * dir, b.z + fz * 1.4 * dir, 1.2, (i) => {
+      H.forRadius(b.x + mx * 1.4, b.z + mz * 1.4, 1.2, (i) => {
         if (Math.abs(H.py[i] - b.y) > 1.5) return;
-        if (H.damage(i, 60 + Math.abs(b.v) * 25, false, H.px[i], H.py[i] + 1, H.pz[i])) P.kills++;
-        g.particles.blood(H.px[i], H.py[i] + 1, H.pz[i], fx, .3, fz, 8, 4);
+        if (H.damage(i, 60 + mv * 25, false, H.px[i], H.py[i] + 1, H.pz[i]) && isP) P.kills++;
+        g.particles.blood(H.px[i], H.py[i] + 1, H.pz[i], mx, .3, mz, 8, 4);
         g.audio.simple('hurt', H.px[i], H.py[i], H.pz[i]);
-        b.v *= .82;
+        b.vx *= .82; b.vz *= .82;
       });
     }
-    // The engine: revs climbing through each gear and dropping back as it changes up, a bit more when you open it up.
-    const sp = Math.abs(b.v), gear = MAX / 4.2 + (sp > MAX ? 1.5 : 0), inGear = sp < .3 ? 0 : ((sp % gear) / gear) * .8 + .2;
-    const want = Math.min(1, inGear * (sp < gear ? 1 : .9) + (fw ? .12 : 0));
-    b.rev += (want - b.rev) * Math.min(1, dt * (want > b.rev ? 5 : 9));
-    b.load += ((fw > 0 ? 1 : 0) - b.load) * Math.min(1, dt * 6);
-    g.audio.engineSet(b.rev, b.load, b.x, b.y + .8, b.z);
-    this.seat(b);
+    return fw;
+  }
+
+  // Through whatever it hit, if it hit hard enough. The hole is the shape of a crash, not a doorway: a ragged blob round where it struck,
+  // wider the harder the hit, shallow front to back, torn at the edges, with the gap the bike needs always in it. Returns how much went.
+  smash(b, lx, lz, mx, mz, hit) {
+    if (hit <= 11) return 0;
+    const g = this.g, W = g.world;
+    const dmg = (hit - 9) * 1.15, rx = -mz, rz = mx, ex = lx + mx * .5, ez = lz + mz * .5;
+    const cy = b.y + 1.5, R = 1.5 + Math.min(1.5, (hit - 11) * .1), n = Math.ceil(R) + 1;
+    const ix = Math.floor(ex), iz = Math.floor(ez);
+    let broke = 0;
+    for (let dy = -n; dy <= n; dy++) for (let dz = -n; dz <= n; dz++) for (let dx = -n; dx <= n; dx++) {
+      const x = ix + dx, y = Math.floor(cy) + dy, z = iz + dz;
+      if (y < Math.floor(b.y)) continue;   // never the ground it is on
+      const id = W.get(x, y, z);
+      if (!id) continue;
+      const px = x + .5 - ex, pu = y + .5 - cy, pz = z + .5 - ez;
+      const across = px * rx + pz * rz, deep = px * mx + pz * mz;
+      if (deep < -.8) continue;
+      let d = Math.hypot(across / R, pu / (R * 1.1), deep / (R * .5)) + (hash(x, y, z) - .5) * .7;
+      if (Math.abs(across) < .75 && pu > -1.6 && pu < 1.7 && deep < .9) d = Math.min(d, .45);
+      if (d >= 1) continue;
+      if (FLAGS[id] & F_GLASS) { g.breakGlass(x, y, z); broke++; continue; }
+      if (Math.random() < .5) g.particles.debris(x, y, z, id, 2, 4);
+      const gone = W.hit(x, y, z, dmg * (1.35 - d * .55));
+      if (gone) { g.onVoxelBroken(x, y, z, gone); broke++; }
+    }
+    if (broke) { g.audio.simple('smash', ex, b.y + 1, ez); g.horde.noise(b.x, b.z, 30, .8); }
+    return broke;
+  }
+
+  // Crops go down under it: anything soft and leafy that is not up a tree, the whole plant, anywhere under its length and width.
+  // Cut a little ahead of the front wheel, more the faster it goes, so they burst as it hits them and not a moment after.
+  mow(b, dt) {
+    if (Math.abs(b.v) <= .3 && Math.abs(b.slip || 0) <= .3) return;
+    const g = this.g, W = g.world, fx = Math.sin(b.yaw), fz = -Math.cos(b.yaw), dir = Math.sign(b.v || 1);
+    const rx = Math.cos(b.yaw), rz = Math.sin(b.yaw), ahead = .05 + Math.abs(b.v) * .055, ground = g.layout.ground;
+    let cut = 0;
+    const s0 = dir >= 0 ? -REAR * VS : -REAR * VS - ahead, s1 = dir >= 0 ? FRONT * VS + ahead : FRONT * VS, done = new Set();
+    for (let s = s0; s <= s1 + .01; s += .35) for (const w of [-.65, 0, .65]) {
+      const x = Math.floor(b.x + fx * s + rx * w), z = Math.floor(b.z + fz * s + rz * w), key = x * 8192 + z;
+      if (done.has(key)) continue;
+      done.add(key);
+      const field = x >= 0 && z >= 0 && x < WX && ground[z * WX + x] === G.FIELD;
+      for (let y = Math.floor(b.y) - 1, top = y + 7; y <= top; y++) {
+        const id = W.get(x, y, z);
+        if (!id || !(FLAGS[id] & F_LEAF) || (TREE.has(id) && !field)) continue;
+        cut++;
+        // A few bits thrown low and off to the sides; none up where they would be in your face.
+        if (W.set(x, y, z, 0) && y < b.y + 2 && Math.random() < .6) g.particles.debris(x, y, z, id, 1, 1.6);
+      }
+    }
+    b.thrashT = (b.thrashT || 0) - dt;
+    if (cut && b.thrashT <= 0) { g.audio.simple('thrash', b.x + fx * 1.6 * dir, b.y + .6, b.z + fz * 1.6 * dir); b.thrashT = .07 + Math.random() * .06; }
+  }
+
+  // Slid out from under you: you go off the side, hurt by how fast it was going, and it carries on without you, spinning.
+  throwOff(b, speed) {
+    const P = this.g.player;
+    const vx = b.vx, vz = b.vz, lat = b.slip || 0;
+    this.dismount();
+    P.vx = vx * .45; P.vz = vz * .45; P.vy = 5;
+    P.damage(6 + speed * .7, null, null, 'fall');
+    P.shake = Math.min(1.2, P.shake + .8);
+    b.yawRate = Math.sign(lat || 1) * (2.5 + speed * .15);
+    b.tipping = true;
+    this.g.audio.simple('hurt');
+    this.g.ui.toast('Thrown off the motorbike!', 'bad');
+  }
+
+  // --- Other people on bikes ----------------------------------------------------------------------------------------------------
+  // Now and then, out on the roads: a lone rider passing through, or a raider crew of two to four riding in a line. They keep to the
+  // roads the way anyone would, round the bends and through the junctions, not across country. Raiders who spot you pull up, get off
+  // and come for you, and take the keys with them. Shoot someone off a bike and it goes down skidding, wrecked: nothing to ride away.
+  traffic(dt) {
+    const g = this.g, P = g.player, L = g.layout, W = g.world;
+    this.trafficT = (this.trafficT ?? 60 + Math.random() * 60) - dt;
+    if (this.trafficT <= 0) {
+      this.trafficT = 120 + Math.random() * 160;
+      const riding = this.list.filter((b) => b.npc).length;
+      if (riding < 5 && !g.horde.inCamp(P.x, P.z, 60) && Math.random() < .45) this.spawnTraffic(Math.random() < .55 ? 'wanderer' : 'raider');
+    }
+    for (const b of this.list.slice()) {
+      if (!b.npc) {
+        // Wrecks and bikes left by people who got off them do not hang about once you are well away.
+        if ((b.broken || b.locked) && Math.hypot(b.x - P.x, b.z - P.z) > 320) this.list.splice(this.list.indexOf(b), 1);
+        continue;
+      }
+      const n = b.npc;
+      if (n.dead || !g.npcs.list.includes(n)) { this.unseat(n, true); if (!g.npcs.list.includes(n)) this.list.splice(this.list.indexOf(b), 1); continue; }
+      if (Math.hypot(b.x - P.x, b.z - P.z) > 380) {
+        // Out of sight, gone on their way.
+        this.list.splice(this.list.indexOf(b), 1);
+        const i = g.npcs.list.indexOf(n);
+        if (i >= 0) g.npcs.list.splice(i, 1);
+        continue;
+      }
+      this.drive(b, dt, this.steerAI(b, dt));
+    }
+  }
+
+  // A road cell somewhere out of the way, a ride away from you, and the way the road runs there.
+  spawnTraffic(kind) {
+    const g = this.g, P = g.player, L = g.layout, W = g.world;
+    for (let t = 0; t < 60; t++) {
+      const a = Math.random() * 6.283, r = 120 + Math.random() * 60;
+      const x = Math.floor(P.x + Math.cos(a) * r), z = Math.floor(P.z + Math.sin(a) * r);
+      if (x < 20 || z < 20 || x >= WX - 20 || z >= WZ - 20 || L.ground[z * WX + x] !== G.ROAD || g.horde.inCamp(x, z, 40)) continue;
+      // Which way the road runs: the heading with the most road straight ahead of it, and riding towards you rather than away.
+      let best = -1, yaw = 0;
+      for (let k = 0; k < 16; k++) {
+        const h = k / 16 * 6.283;
+        let s = 0;
+        for (let d = 3; d <= 24; d += 3) { const px = Math.floor(x + Math.sin(h) * d), pz = Math.floor(z - Math.cos(h) * d); if (L.ground[pz * WX + px] === G.ROAD) s++; }
+        const toward = Math.sin(h) * (P.x - x) - Math.cos(h) * (P.z - z) > 0 ? 1.5 : 0;
+        if (s + toward > best) { best = s + toward; yaw = h; }
+      }
+      if (best < 6) continue;
+      const count = kind === 'raider' ? 2 + Math.floor(Math.random() * 3) : 1, gang = x * 7 + z, night = g.renderer.sky.night > .5;
+      let lead = null;
+      for (let i = 0; i < count; i++) {
+        const bx = x + .5 - Math.sin(yaw) * 7 * i, bz = z + .5 + Math.cos(yaw) * 7 * i, by = this.ground(bx, bz, W.terrainTop(Math.floor(bx), Math.floor(bz)) + 2);
+        const b = new Bike(bx, by, bz, yaw);
+        b.sy = by;
+        b.light = night;
+        b.ai = { bias: 0, biasT: 0, lead, trail: [], gone: 0 };
+        const n = g.npcs.makeRider(kind, bx, bz, gang);
+        b.npc = n; n.onBike = b;
+        this.list.push(b);
+        lead = lead || b;
+      }
+      return true;
+    }
+    return false;
+  }
+
+  // Where a rider wants to go next, as the keys they would press. Along the road: of the headings ahead, the one with the most road
+  // under it, a little in favour of straight on and, at a junction, of whichever way this rider has a mind to go this time. A crew
+  // follows its leader's line at a bike's length or so apart. Raiders who see you stop.
+  steerAI(b, dt) {
+    const g = this.g, P = g.player, L = g.layout, W = g.world, ai = b.ai, n = b.npc;
+    const keys = {};
+    const dp = Math.hypot(P.x - b.x, P.z - b.z);
+    if (n.kind === 'raider' && !ai.stop && P.alive && dp < 46 && W.los(b.x, b.y + 2.6, b.z, P.x, P.y + 1.8, P.z)) {
+      for (const o of this.list) if (o.npc && o.npc.gang === n.gang) o.ai.stop = true;
+    }
+    if (ai.stop) {
+      keys.KeyS = Math.abs(b.v) > .6;
+      if (Math.abs(b.v) < 1.5) {
+        // Off, and at you. They take the keys.
+        b.locked = true;
+        this.unseat(n, false);
+        n.calm = false;
+        g.npcs.raiderAlert(n);
+      }
+      return keys;
+    }
+    let want;
+    const lead = ai.lead && ai.lead.npc && this.list.includes(ai.lead) ? ai.lead : null;
+    if (lead) {
+      // Along the leader's line, so many bike lengths back.
+      const tr = lead.ai.trail, back = 7 * (1 + this.list.filter((o) => o.ai && o.ai.lead === lead).indexOf(b));
+      let tx = lead.x, tz = lead.z, acc = 0;
+      for (let i = tr.length - 1; i > 0; i--) {
+        acc += Math.hypot(tr[i][0] - tr[i - 1][0], tr[i][1] - tr[i - 1][1]);
+        if (acc >= back) { tx = tr[i - 1][0]; tz = tr[i - 1][1]; break; }
+      }
+      want = Math.atan2(tx - b.x, -(tz - b.z));
+      const gap = Math.hypot(lead.x - b.x, lead.z - b.z);
+      ai.target = Math.max(0, Math.min(18, lead.v + (gap - back) * .8));
+    } else {
+      if ((ai.biasT -= dt) <= 0) { ai.bias = [-1, 0, 0, 1][Math.floor(Math.random() * 4)]; ai.biasT = 4 + Math.random() * 6; }
+      let best = -1e9, ba = 0;
+      for (let a = -1.4; a <= 1.41; a += .175) {
+        const h = b.yaw + a;
+        let s = 0;
+        for (const d of [4, 8, 13, 19, 26]) {
+          const x = Math.floor(b.x + Math.sin(h) * d), z = Math.floor(b.z - Math.cos(h) * d);
+          if (x < 2 || z < 2 || x >= WX - 2 || z >= WZ - 2) { s -= 4; continue; }
+          const gr = L.ground[z * WX + x];
+          s += gr === G.ROAD ? 2 : gr === G.WALK || gr === G.PLAZA ? .2 : -1.2;
+          if (W.solid(x, Math.floor(b.y) + 1, z)) s -= 6;
+        }
+        s -= Math.abs(a) * 1.1;
+        s += a * ai.bias * .8;
+        if (s > best) { best = s; ba = a; }
+      }
+      // Nowhere ahead worth riding: round, and back the way it came.
+      want = best < 0 ? b.yaw + Math.PI * .9 * (ai.bias || 1) : b.yaw + ba;
+      const sharp = Math.abs(ba);
+      ai.target = (n.kind === 'raider' ? 15 : 13) - sharp * 7;
+      if (best < 0) ai.target = 4;
+      // The leader leaves a line for the others to follow.
+      const last = ai.trail[ai.trail.length - 1];
+      if (!last || Math.hypot(last[0] - b.x, last[1] - b.z) > 1.5) { ai.trail.push([b.x, b.z]); if (ai.trail.length > 60) ai.trail.shift(); }
+    }
+    let d = want - b.yaw;
+    while (d > Math.PI) d -= 6.2832;
+    while (d < -Math.PI) d += 6.2832;
+    if (d > .05) keys.KeyD = true; else if (d < -.05) keys.KeyA = true;
+    if (b.v < ai.target) keys.KeyW = true;
+    else if (b.v > ai.target + 3) keys.KeyS = true;
+    return keys;
+  }
+
+  // Off the bike. Shot off (or killed on it): the bike goes down skidding and is wrecked for good. Getting off of their own accord:
+  // it stays where they left it, but locked; the keys went with them.
+  unseat(n, crash) {
+    const b = n.onBike;
+    if (!b) return;
+    n.onBike = null;
+    b.npc = null;
+    const sp = Math.hypot(b.vx || 0, b.vz || 0);
+    const rx = Math.cos(b.yaw), rz = Math.sin(b.yaw);
+    n.x = b.x - rx * 1.2; n.z = b.z - rz * 1.2; n.y = b.y; n.ys = n.yaw = b.yaw;
+    n.state = 0;
+    if (crash) {
+      b.broken = true;
+      b.light = false;
+      b.yawRate = (Math.random() < .5 ? -1 : 1) * (1.5 + sp * .16);
+      b.tipping = true;
+      if (sp > 3) n.knock = { t: 0, vx: (b.vx || 0) * .5, vz: (b.vz || 0) * .5, vy: 4 };
+    } else {
+      b.vx = b.vz = 0; b.v = 0;
+    }
   }
 
   // You go where the seat goes, and sit at the height of it.
@@ -540,7 +785,7 @@ export class Bikes {
         if ((this.n + 1) * 9 > c.length) return;
         const k = this.n++ * 9;
         c[k] = wx; c[k + 1] = wy; c[k + 2] = wz; c[k + 3] = size; c[k + 4] = r; c[k + 5] = g; c[k + 6] = bl; c[k + 7] = -b.yaw;
-        c[k + 8] = -1 - glow - 4 * metal - 16 * (24 + Math.round(b.lean * 40));
+        c[k + 8] = -1 - glow - 4 * metal - 16 * (24 + Math.max(-24, Math.min(24, Math.round(b.lean * 16))));
       };
       // Every voxel on one grid, the same size, sat a hair off the ground: no two faces ever lie in the same place to fight.
       // Leaned over about the line the tyres touch the ground along, the same way the shader leans each voxel.

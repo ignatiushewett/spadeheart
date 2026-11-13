@@ -2789,6 +2789,23 @@ export class NPCs {
     return den ? { cx: den.cx, cz: den.cz } : true;
   }
 
+  // Someone out on a motorbike: a lone rider on the road, or one of a raider crew riding together.
+  makeRider(kind, x, z, gang) {
+    const g = this.g, w = g.world;
+    if (kind === 'raider') {
+      const role = RAIDER_ROLES[pickOf(['gunman', 'scav', 'shotgun', 'gunman', 'rusher'])], tough = 1 + Math.min(.9, g.day * .03);
+      const m = new NPC('raider', x, w.terrainTop(Math.floor(x), Math.floor(z)), z, { weapon: pickOf(role.weapons), variant: wardrobeRow(['raider']), hp: role.hp * tough * (.9 + rand() * .2), name: pickOf(RAIDER_NAMES), title: 'Raider biker' });
+      m.gang = gang; m.bounty = 0; m.homeX = x; m.homeZ = z; m.raider = role; m.maxHp = m.hp; m.flank = rand() * 6.283;
+      m.grenades = 0; m.hunting = false; m.crew = 3; m.den = null; m.dx = 0; m.dz = 1;
+      this.list.push(m);
+      return m;
+    }
+    const m = new NPC('wanderer', x, w.terrainTop(Math.floor(x), Math.floor(z)), z, { weapon: pickOf(['pistol', 'shotgun', 'pistol', 'smg']), kid: false, variant: wardrobeRow(['civ', 'scrap', 'civ']), hp: 200, title: 'Rider' });
+    m.dest = -1; m.squad = { members: [m] }; m.flank = rand() * 6.283; m.fromCamp = -1;
+    this.list.push(m);
+    return m;
+  }
+
   // A building near (x, z) a crew can hole up in: one still standing, not a camp's, with enough clear floor on its ground floor for them
   // all (room to stand, something underfoot, nothing over their heads for three blocks). The nearest that will do, or nothing.
   hideout(x, z, size) {
@@ -3385,6 +3402,13 @@ export class NPCs {
 
   updateNPC(n, dt, dp, hostile) {
     const g = this.g, w = g.world, P = g.player;
+    // On a motorbike: sat on it, going where it goes. The bike does the moving.
+    if (n.onBike) {
+      const b = n.onBike, fx = Math.sin(b.yaw), fz = -Math.cos(b.yaw);
+      n.x = b.x - fx * .55; n.z = b.z - fz * .55; n.y = b.sy + .9; n.yaw = n.ys = Math.atan2(fx, fz);
+      n.state = 5; n.aim = 0;
+      return;
+    }
     // Thrown by a blast: through the air, down, a moment on the ground, and only then back to whatever they were doing.
     if (n.knock) {
       const k = n.knock;
@@ -3791,6 +3815,7 @@ export class NPCs {
   }
 
   kill(n, byPlayer = false) {
+    if (n.onBike) this.g.bikes.unseat(n, true);
     if (n.kind === 'wanderer' && n.fromCamp >= 0 && n.dest >= 0) this.g.director.diedOnRoad(n.fromCamp, n.dest);
     const g = this.g;
     n.dead = true;
@@ -3999,12 +4024,18 @@ export class NPCs {
   playerHit(n, dmg, behead = false) {
     if (n.dead) return;
     const g = this.g, P = g.player;
+    // Shot off a moving bike: they come off, and it goes down wrecked.
+    if (n.onBike) g.bikes.unseat(n, true);
     // Raiders are fair game, and nobody is keeping score.
     if (n.kind === 'raider') {
-      // Shot at, they have a score to settle: the whole crew turns on you, and the dead come second unless they are right on top of them.
-      if (!n.provoked) for (const m of this.list) if (m.kind === 'raider' && !m.dead && m.gang === n.gang) m.provoked = true;
-      // One of them knows about you, so all of them do: the crew turns as one, whatever it was in the middle of.
-      if (!n.aggro || n.calm) { n.calm = false; this.raiderAlert(n); }
+      // A crew going over a settlement's wall has its hands full: only the one you hit turns on you, and the rest keep at the wall.
+      if (n.raidCamp !== undefined) { n.provoked = true; n.aggro = true; n.calm = false; }
+      else {
+        // Anywhere else, shot at, they have a score to settle: the whole crew turns on you, and the dead come second unless they are
+        // right on top of them. One of them knows about you, so all of them do.
+        if (!n.provoked) for (const m of this.list) if (m.kind === 'raider' && !m.dead && m.gang === n.gang) m.provoked = true;
+        if (!n.aggro || n.calm) { n.calm = false; this.raiderAlert(n); }
+      }
       // Tough enough to last against a camp full of cooks, and to take a few rounds from you: these are people who live by the gun.
       n.hp -= dmg * (n.raidCamp !== undefined ? 1.5 : .95);
       if (n.hp <= 0) { n.headless = behead; this.kill(n, true); }
@@ -4344,7 +4375,7 @@ export class Jobs {
     } else if (type === 'fetch') {
       job = { type, title, reward: Math.round(base * 1.3 + 15), desc: `A cache was left at ${where} when the last team got swarmed. Get it. It is marked on your map.`, where };
     } else if (type === 'bounty') {
-      const gang = Math.max(1, Math.min(7, Math.round(1 + p * 4.5 + (rand() - .3) * 1.6)));
+      const gang = Math.max(2, Math.min(11, Math.round(2.5 + p * 6.5 + (rand() - .3) * 2.2)));
       const boss = pickOf(RAIDER_NAMES);
       job = { type, title: `${title}: ${boss}`, gang, left: gang, spawned: false, reward: Math.round(base * 1.1 + gang * 38), desc: `${boss} and ${gang - 1 > 1 ? `${gang - 1} others have` : gang > 1 ? 'one other has' : 'nobody else has'} been robbing our people around ${where}. Put a stop to it.`, where };
     } else {
@@ -5052,7 +5083,12 @@ export class Jobs {
           const a = rand() * 6.283, r = t * .6;
           const got = g.npcs.addGang(Math.floor(j.x + Math.cos(a) * r), Math.floor(j.z + Math.sin(a) * r), j.left, j.id);
           // Holed up in a building: the marker goes to their door, not the street they were last seen on.
-          if (got) { j.spawned = true; if (got.cx !== undefined) { j.x = got.cx; j.z = got.cz; } }
+          if (got) {
+            j.spawned = true;
+            if (got.cx !== undefined) { j.x = got.cx; j.z = got.cz; }
+            // A crew that has set up somewhere has been keeping the dead down round it: there are fewer about than usual.
+            g.horde.thinAround(Math.floor(j.x), Math.floor(j.z), 70, .4);
+          }
         }
       }
       if (j.type === 'hold' && d < 16) {

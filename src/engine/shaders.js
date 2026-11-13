@@ -1218,7 +1218,7 @@ void main(){
   bool built=iGlow<-.5;
   float bg=-1.-iGlow, bri=floor((bg+.01)/16.);
   bg-=bri*16.;
-  float bm=floor((bg+.01)/4.), lean=built?(bri-24.)/40.:0., cl=cos(lean), sl=sin(lean);
+  float bm=floor((bg+.01)/4.), lean=built?(bri-24.)/16.:0., cl=cos(lean), sl=sin(lean);   // sixteenths of a radian: far enough to lie on its side
   mat3 R=built?mat3(c,0,-s, 0,1,0, s,0,c)*mat3(cl,-sl,0, sl,cl,0, 0,0,1):mat3(c,0,-s, 0,1,0, s,0,c)*mat3(1,0,0, 0,c,s, 0,-s,c);
   vec3 sc=vec3(iPos.w);
   // Below -1000, a length of limb: its own length and its tilt packed into the rest, turned to its heading by the angle, iPos.w thick.
