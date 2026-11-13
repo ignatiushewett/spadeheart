@@ -1050,7 +1050,7 @@ export class Player {
     const dog = !open && g.dogs ? g.dogs.lookAt(o, f, Math.min(3.4, hit ? hit.dist : 3.4)) : null;
     if (dog) { this.interact = { kind: 'dog', dog, label: `Pet ${dog.name}` }; return; }
     const bike = !open && g.bikes ? g.bikes.lookAt(o, f, Math.min(3.8, hit ? hit.dist + .8 : 3.8)) : null;
-    if (bike) { this.interact = { kind: 'bike', bike, label: bike.broken ? 'Wrecked motorbike' : bike.locked ? 'Motorbike (no keys)' : 'Ride the motorbike' }; return; }
+    if (bike) { this.interact = { kind: 'bike', bike, label: bike.inBits ? 'Motorbike (being fixed up)' : bike.forSale ? 'Motorbike (for sale: ask the mechanic)' : bike.broken ? 'Wrecked motorbike' : bike.locked ? 'Motorbike (no keys)' : 'Ride the motorbike' }; return; }
     if (atHole) {
       const done = Math.round(Math.min(1, br.progress) * 100);
       this.interact = { kind: 'breach', breach: br, label: br.busy ? 'Breach: cannot repair while they are coming through' : done > 0 ? `Hold to repair the breach: ${done}%` : 'Hold to repair the breach' };

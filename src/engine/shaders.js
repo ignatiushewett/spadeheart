@@ -249,6 +249,7 @@ uniform vec3 uOrigin;
 uniform sampler2D uPalette;
 uniform float uSway;
 uniform float uGrassT;
+uniform float uGrassWave;   // 1 with grass moving in the wind (a setting), 0 for it standing still
 out vec3 vWorld;
 out vec3 vNormal;
 out float vAO;
@@ -266,11 +267,19 @@ void main(){
     p.z+=(cos(t*.7+p.z*.29+p.y*.23+p.x*.11)*.65+sin(t*1.6+p.x*.47)*.35)*.13*k;
     p.y+=sin(t*1.05+p.x*.4+p.z*.4)*.035*k;
   }
+  // Canvas, awnings and flags: a quicker, smaller ripple running through the cloth, every corner on the same pattern so it stays in
+  // one piece. Only what is drawn moves; it is as solid as ever to walk into.
+  if((flags&32)!=0&&uSway>0.&&(aInfo.w&2u)==0u){
+    float t=uTime,k=min(uSway,1.6);
+    float r=sin(t*2.3+p.x*.7+p.y*.45+p.z*.6)*.6+sin(t*3.7+p.z*.9-p.x*.4)*.4;
+    p.x+=r*.045*k; p.z+=cos(t*2.1+p.z*.65+p.y*.5)*.045*k; p.y+=r*.02*k;
+  }
   // Grass in the wind: the top edge of each grass block lifted up to a fifth of a block and let down again, in long waves running
   // across the ground on the diagonal. Only what is drawn moves; nothing anyone stands on or bumps into does.
   if((aInfo.w&1u)!=0u){
     float ph=uGrassT*.9-(p.x+p.z)*.075;
-    p.y+=.05+(.5+.5*sin(ph))*.17;   // never right down: always a little proud of the path or kerb beside it
+    // Never right down: always a little proud of the path or kerb beside it. Still, unless the wind setting is on.
+    p.y+=.05+mix(.09,(.5+.5*sin(ph))*.17,uGrassWave);
   }
   vWorld=p;
   vNormal=NORMALS[aPos.w];
@@ -1144,6 +1153,16 @@ void main(){
     else if(style==1&&front&&my==23&&mx>=-4&&mx<=2) col=mix(col,vec3(.42,.03,.02),.85);
     else if(style==2&&my==20) col=vec3(.46,.06,.04);   // a red rag at the throat
   }
+  // A mechanic: oil smeared across a cheek and the forehead, black hands, and grease worked into the coveralls.
+  if(vVariant>=304&&vVariant<312){
+    vec3 oc=floor(vLocal*10.);
+    float o=hash12(oc.xy*1.7+oc.z*3.1+float(vVariant)*5.3);
+    bool face=vSlot==0&&vLocal.y>1.98&&vLocal.z>.2;
+    int mx=int(oc.x),my=int(oc.y);
+    if(face&&((my==22&&(mx==1||mx==2))||(my==24&&mx>=-3&&mx<=-1)||(my==25&&mx==-2)||(my==21&&mx==-3)))col=mix(col,vec3(.05,.04,.035),.75);
+    else if(vSlot==0&&vLocal.y<1.45)col=mix(col,vec3(.06,.05,.045),.7);
+    else if((vSlot==1||vSlot==2||vSlot==3||vSlot==7)&&o>.72)col=mix(col,vec3(.06,.055,.05),.65);
+  }
   vec3 q=floor(vLocal*10.);
   float h=hash12(q.xy+q.z*11.3+float(vVariant)*3.1);
   col*=.86+.24*h;
@@ -1465,9 +1484,10 @@ void main(){
       float inLane=smoothstep(.3,.08,across);
       float drop=smoothstep(.0075,.002,abs(dy))*inLane;
       float trail=step(0.,dy)*smoothstep(.16,0.,dy)*smoothstep(.2,.05,across);
-      c=mix(c,c*.55,trail*w*.6);
-      c+=(light*.5+vec3(.006))*trail*w*.25;
-      c+=(light*.9+uFlash*.3+vec3(.014))*mix(vec3(1.),.35+col*2.2,.35)*drop*w*uRainVM*1.7;
+      // Clear water: only a little darker where it has run, and the drop itself a faint glint over the wood, not a bright bead.
+      c=mix(c,c*.7,trail*w*.4);
+      c+=(light*.5+vec3(.006))*trail*w*.1;
+      c=mix(c,c*.85+(light*.9+uFlash*.3+vec3(.014))*mix(vec3(1.),.35+col*2.2,.35)*.6,drop*w*uRainVM*.55);
     }
   }
   outCol=vec4(c,1.-uVM);

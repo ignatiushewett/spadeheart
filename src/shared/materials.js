@@ -1,5 +1,5 @@
 // Voxel material table: colour, hit points and flags per voxel id.
-export const F_EMISSIVE = 1, F_GLASS = 2, F_LOOT = 4, F_LEAF = 8, F_CRACK = 16;
+export const F_EMISSIVE = 1, F_GLASS = 2, F_LOOT = 4, F_LEAF = 8, F_CRACK = 16, F_CLOTH = 32;
 export const PALETTE = new Uint8Array(256 * 4);
 export const HP = new Uint8Array(256);
 export const FLAGS = new Uint8Array(256);
@@ -93,6 +93,20 @@ m('HAY', 0xb89c4c, 3); m('WHEAT', 0xb9a558, 1, F_LEAF); m('SNOW', 0xd8dce0, 4); 
 m('COTTON', 0xe2ded2, 1, F_LEAF); m('PEANUT', 0x5f6e34, 1, F_LEAF);
 
 // Which voxels the mesher treats as see-through (neighbouring faces stay visible).
+// Cloth moves in the wind (drawn only: it is as solid to walk into as ever). Tents, tarps and awnings are cloth wherever they are.
+for (const k of ['TENT_W', 'TENT_G', 'TENT_B', 'CANVAS', 'AWN_R', 'AWN_G', 'AWN_B']) { FLAGS[M[k]] |= F_CLOTH; PALETTE[M[k] * 4 + 3] |= F_CLOTH; }
+// A flag is cloth too, whatever colour it is, but the same colour on a wall or a car is not: flags get a cloth twin of each colour.
+export const CLOTH_OF = new Uint8Array(256);
+for (const k of ['PAINT_Y', 'PAINT_K', 'BARN_R', 'CONT_G', 'RUST', 'STAINED']) {
+  const src = M[k], id = next++;
+  M[`CLOTH_${k}`] = id; NAMES[id] = `cloth_${k.toLowerCase()}`;
+  for (let c = 0; c < 3; c++) PALETTE[id * 4 + c] = PALETTE[src * 4 + c];
+  PALETTE[id * 4 + 3] = FLAGS[src] | F_CLOTH;
+  HP[id] = HP[src];
+  FLAGS[id] = FLAGS[src] | F_CLOTH;
+  CLOTH_OF[src] = id;
+}
+
 export const isGlass = (id) => (FLAGS[id] & F_GLASS) !== 0;
 // Glass around a hole: crazed right across, still in the frame, barely. Each pane colour has its broken self.
 export const CRACKED = new Uint8Array(256);

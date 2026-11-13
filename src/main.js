@@ -14,7 +14,7 @@ import { Player } from './game/player.js';
 import { NPCs, Jobs } from './game/npcs.js';
 import { Dialogue } from './game/dialogue.js';
 import { CampSim } from './game/campsim.js';
-import { UI } from './game/ui.js';
+import { UI, LOOKS } from './game/ui.js';
 import { Audio2 } from './game/audio.js';
 import { ViewModel } from './game/viewmodel.js';
 import { START_CAMP, CITIZENSHIP, papersFor, ITEMS, rollLoot, rollZombieDrop, CAMP_START, randomName, SURVIVAL_TIERS } from './game/items.js';
@@ -47,7 +47,7 @@ const SETTINGS_KEY = 'acez.settings.v2';
 const OLD_SETTINGS_KEY = 'acez.settings.v1';
 const DB_NAME = 'acez';
 const MENU_SHOT = { angle: .62, dist: 185, height: 88, turn: .46, pitch: -.14, fov: 1.05, flight: 125, startHeight: 30, startOff: 44, startPitch: -.1 };
-export const VERSION = 'v0.81';
+export const VERSION = 'v0.82';
 const SAVE_KEY = 'slot15';  // bumped whenever the map changes: old voxel edits no longer line up
 export const SLOTS = 3;
 // Slot 1 keeps the plain key, so a save from before there were slots simply becomes the first character.
@@ -142,8 +142,8 @@ class Game {
   }
 
   defaultSettings() {
-    return { quality: 'high', view: 320, scale: 1, cap: 24000, fov: 105, sens: 1, volume: .8, motion: false, dof: true, fpsCap: 0, muteSiren: false, uiScale: 1, uiAlpha: 1, clock24: false, drips: true, grain: .3, minimap: true, chatterNoHud: true, hitmarker: false, crosshair: false,
-      brightness: 1, bob: 1, shake: 1, music: 1, adsSens: 1, invertY: false, toggleAim: false, toggleCrouch: false, showFps: false, defaultsV: 5 };
+    return { ...LOOKS.cinematic, quality: 'high', view: 320, scale: 1, cap: 24000, sens: 1, volume: .8, motion: false, dof: true, fpsCap: 0, muteSiren: false, clock24: false, drips: true, grassWave: false, sway: 1, minimap: true, chatterNoHud: true, hitmarker: false, crosshair: false,
+      brightness: 1, bob: 1, music: 1, adsSens: 1, invertY: false, toggleAim: false, toggleCrouch: false, showFps: false, defaultsV: 6 };
   }
 
   loadSettings() {
@@ -167,6 +167,8 @@ class Game {
         if ((mine.defaultsV ?? 0) < 4) { s.minimap = true; s.defaultsV = 4; }
         // The crosshair is off by default now, once, for everyone; turn it back on and it stays on.
         if ((mine.defaultsV ?? 0) < 5) { s.crosshair = false; s.defaultsV = 5; }
+        // The Cinematic style is the default now, once, for everyone; pick Casual (or anything else) and it stays.
+        if ((mine.defaultsV ?? 0) < 6) { Object.assign(s, LOOKS.cinematic); s.defaultsV = 6; }
         return s;
       }
       // Older settings carry over, except motion blur, which now starts off for everyone.
@@ -889,7 +891,17 @@ class Game {
     const P = this.player, it = P.interact;
     if (!it) return;
     if (it.kind === 'npc') {
-      if (it.npc.state === 7) { this.ui.caption(it.npc.name, 'Mmph. Let me sleep.'); return; }
+      // Woken, they grumble from where they lie, over their heads like any other chatter, and go back to sleep. The mechanic sends
+      // you away until the yard opens.
+      if (it.npc.state === 7) {
+        const m = it.npc;
+        if (this.time - (m.sleepSaid ?? -99) > 2) {
+          m.sleepSaid = this.time;
+          this.ui.floatSay(m, m.mech ? pickBusy(['Yard is shut. Come back in the morning.', 'Morning. Come back in the morning.', 'Bikes can wait till morning. So can you.'])
+            : pickBusy(['Mmph. Let me sleep.', 'Go away...', 'Not now. Sleeping.', 'Five more minutes.', 'Mm? No.']), 2.2);
+        }
+        return;
+      }
       // Nobody stops to chat with the dead coming at them, or while they are running from them.
       const m = it.npc;
       // The people you come to for business (the clerk, the traders, the doctor, whoever runs the place) keep their post through a fight
@@ -2642,6 +2654,8 @@ class Game {
     else if (this.state === 'play') this.world.update(this.player.x, this.player.z);
     r.setTimeOfDay(this.tod);
     r.grain = this.settings.grain ?? .3;
+    r.grassWave = !!this.settings.grassWave;
+    r.swayK = this.settings.sway ?? 1;
     this.statueLights(paused);
     this.drawScene(dt, paused);
     if (this.state === 'play') this.ui.updateHUD(dt);

@@ -9,7 +9,7 @@ import { G, WX, WZ, STREET_Y } from '../shared/constants.js';
 
 const VS = .125;            // one voxel of the model, in blocks: the same as a person
 const MAX = 19, BACK = 5;   // blocks a second, flat out forward and in reverse
-const TANK = 2400;          // blocks on a full tank: right across the island and a good way back
+const TANK = 3000;          // blocks on a full tank: right across the island and back again, nearly
 const OPEN = 9, OPEN_T = 5; // held flat out and straight, it keeps winding on: this much more, over this many seconds
 const TREE = new Set([M.LEAF, M.LEAF2, M.LEAF3]);   // leaves are up in the trees, except in a field, where the crops are made of them too
 const WR = 5.5;             // wheel radius, in voxels
@@ -206,14 +206,56 @@ export class Bikes {
   // Never more than a dozen about. The ones you paid for are the last to go.
   trim() {
     while (this.list.length > 12) {
-      const i = this.list.findIndex((o) => !o.owned && o !== this.ride);
+      const i = this.list.findIndex((o) => !o.owned && o !== this.ride && o.yard === undefined);
       this.list.splice(i >= 0 ? i : 0, 1);
     }
   }
 
-  // Bought from a mechanic: one of theirs, wheeled out and stood in the street in front of the garage, side on to it.
+  // The two in every mechanic's yard, while you are anywhere near: the one in pieces they are always working on, and the one for sale,
+  // which is there as long as the mechanic has its keys to sell (a new one comes in each day it is sold). Not kept in the save: they
+  // are put back where they belong whenever you come by.
+  yards(dt) {
+    if ((this.yardT = (this.yardT || 0) - dt) > 0) return;
+    this.yardT = 1;
+    const g = this.g, P = g.player;
+    for (const c of g.layout.camps) {
+      const Y = c.mechYard;
+      if (!Y) continue;
+      const near = Math.hypot(c.cx - P.x, c.cz - P.z) < 260 && g.campSim.state[c.id].status === 'holding';
+      const mine = this.list.filter((b) => b.yard === c.id);
+      if (!near) { for (const b of mine) if (b !== this.ride) this.list.splice(this.list.indexOf(b), 1); continue; }
+      const v = c.vendors.find((q) => q.yard === Y);
+      const stock = v ? g.npcs.stockFor(c.id, 'mechanic', `${c.id}:mechanic:${Math.floor(v.x)},${Math.floor(v.z)}`) : null;
+      // The keys to the one in the yard are always on the mechanic's list, until they are sold for the day.
+      if (stock && stock.bike_keys === undefined) stock.bike_keys = 1;
+      const selling = !!(stock && stock.bike_keys > 0);
+      const put = (slot, sale) => {
+        const s = Y.bikes[slot], b = new Bike(s.x, 0, s.z, s.yaw);
+        b.y = b.sy = this.ground(s.x, s.z, STREET_Y + 2);
+        b.yard = c.id;
+        if (sale) { b.forSale = true; b.locked = true; } else { b.broken = true; b.inBits = true; }
+        this.list.push(b);
+      };
+      if (!mine.some((b) => b.inBits)) put(0, false);
+      const sale = mine.find((b) => b.forSale);
+      if (selling && !sale) put(1, true);
+      else if (!selling && sale) this.list.splice(this.list.indexOf(sale), 1);
+    }
+  }
+
+  // Bought from a mechanic: the one standing in their yard, keys handed over and the tank filled. With no yard to hand, one of theirs
+  // wheeled out and stood in the street in front of them, side on.
   deliver(npc) {
     const g = this.g, W = g.world, c = npc.camp >= 0 ? g.layout.camps[npc.camp] : null;
+    if (c && c.mechYard) {
+      this.yardT = 0;
+      this.yards(0);
+      const b = this.list.find((o) => o.yard === c.id && o.forSale);
+      if (b) {
+        b.forSale = false; b.locked = false; b.yard = undefined; b.owned = true; b.fuel = 1;
+        return b;
+      }
+    }
     const v = c && c.vendors.find((q) => q.role === 'mechanic' && Math.hypot(q.x - npc.x, q.z - npc.z) < 8);
     const vx = v ? v.x : npc.x, vz = v ? v.z : npc.z;
     let ox = 0, oz = 0;
@@ -267,6 +309,8 @@ export class Bikes {
   mount(b) {
     const P = this.g.player;
     if (this.ride || !b || b.npc) return;
+    if (b.inBits) { this.g.ui.toast('Half of it is on the bench. It is not going anywhere yet.'); return; }
+    if (b.forSale) { this.g.ui.toast('For sale. The mechanic has the keys.'); return; }
     if (b.broken) { this.g.ui.toast('Wrecked. The engine will not turn over.'); return; }
     if (b.locked) { this.g.ui.toast('No keys. Whoever rode it in still has them.'); return; }
     this.ride = b;
@@ -403,6 +447,7 @@ export class Bikes {
   update(dt, keys) {
     const b = this.ride;
     this.traffic(dt);
+    this.yards(dt);
     for (const o of this.list) if (o !== b && !o.npc) {
       // Rolling on with nobody on it: the same road under it as with you on it, spinning out, slowing, knocking down and smashing
       // through whatever it still has the speed for, until it comes to rest and falls over on its side.
@@ -627,7 +672,7 @@ export class Bikes {
     for (const b of this.list.slice()) {
       if (!b.npc) {
         // Wrecks and bikes left by people who got off them do not hang about once you are well away.
-        if ((b.broken || b.locked) && Math.hypot(b.x - P.x, b.z - P.z) > 320) this.list.splice(this.list.indexOf(b), 1);
+        if ((b.broken || b.locked) && b.yard === undefined && Math.hypot(b.x - P.x, b.z - P.z) > 320) this.list.splice(this.list.indexOf(b), 1);
         continue;
       }
       const n = b.npc;

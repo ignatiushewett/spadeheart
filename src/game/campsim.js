@@ -811,11 +811,16 @@ export class CampSim {
     for (let t = 0; t < 60 && budget > 0; t++) {
       // Out from the wall itself, whatever the camp's shape: a ring around a long camp lands too far off.
       const a = s.dir + Math.floor(rand() * (s.arms || 1)) * (Math.PI * 2 / (s.arms || 1)) + (rand() - .5) * 1.4, ux = Math.sin(a), uz = -Math.cos(a);
-      const d = Math.min(hx / (Math.abs(ux) + .001), hz / (Math.abs(uz) + .001)) + 35 + rand() * 70;
+      // Well out from the wall, so they are seen coming up the streets rather than appearing at it.
+      const d = Math.min(hx / (Math.abs(ux) + .001), hz / (Math.abs(uz) + .001)) + 95 + rand() * 90;
       const x = Math.floor(c.cx + ux * d), z = Math.floor(c.cz + uz * d);
       if (x < 2 || z < 2 || x >= WX - 2 || z >= WZ - 2) continue;
-      if (Math.hypot(x - P.x, z - P.z) > R || Math.hypot(x - P.x, z - P.z) < 30) continue;
+      const dp = Math.hypot(x - P.x, z - P.z);
+      if (dp > R || dp < 60) continue;
       if (!W.walk[(x >> 1) + (z >> 1) * W.walkW] || H.campAt(x, z, 12)) continue;
+      // And never where you are looking and could see it happen: in front of you with nothing in the way, it waits for another spot.
+      const fx = Math.sin(P.yaw), fz = -Math.cos(P.yaw), ahead = ((x - P.x) * fx + (z - P.z) * fz) / (dp || 1);
+      if (ahead > .2 && W.los(P.x, P.y + 1.7, P.z, x + .5, W.terrainTop(x, z) + 1.5, z + .5)) continue;
       const i = H.spawnOne(x + .5, W.terrainTop(x, z), z + .5, 1);
       if (i < 0) break;
       H.siege[i] = c.id + 1;

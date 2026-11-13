@@ -304,8 +304,10 @@ export class NPCs {
     for (const v of c.vendors) {
       const part = byRole(v.role, used);
       if (part) used.add(part.id);
-      const seller = add(new NPC('vendor', v.x, STREET_Y, v.z, { role: v.role, name: part ? part.name : pickName(), part: part || null, weapon: part ? part.weapon : pickOf(c.folkWeapons), variant: row(part ? [part.wardrobe] : v.doctor ? ['med'] : c.wardrobe), hp: 400, yaw: v.yaw, title: part ? undefined : v.doctor ? 'Doctor' : ROLES[v.role].title }));
+      const seller = add(new NPC('vendor', v.x, STREET_Y, v.z, { role: v.role, name: part ? part.name : pickName(), part: part || null, weapon: part ? part.weapon : pickOf(c.folkWeapons), variant: v.yard ? row(['grease']) : row(part ? [part.wardrobe] : v.doctor ? ['med'] : c.wardrobe), hp: 400, yaw: v.yaw, title: part ? undefined : v.doctor ? 'Doctor' : ROLES[v.role].title }));
       if (v.doctor) seller.doctor = true;
+      if (v.yard) seller.mech = v.yard;
+      if (v.clinic) seller.clinic = v.clinic;
       seller.stall = v;
       seller.stockKey = `${c.id}:${v.role}:${Math.floor(v.x)},${Math.floor(v.z)}`;
     }
@@ -356,8 +358,13 @@ export class NPCs {
       if (passing) { passing.browser = true; passing.home = stalls[k % stalls.length]; }
     }
     this.holdGround(c, st);
+    // Laid up in the tent, and waiting on the bench to be seen.
+    if (c.clinic) {
+      for (const q of c.clinic.lie) { const n = add(new NPC('resident', q.x, STREET_Y + 1, q.z, { weapon: null, variant: row(c.wardrobe), hp: 160, yaw: q.yaw })); n.patient = { ...q, lie: true }; }
+      for (const q of c.clinic.sit) { const n = add(new NPC('resident', q.x, STREET_Y, q.z, { weapon: null, variant: row(c.wardrobe), hp: 180, yaw: q.yaw })); n.patient = { ...q, lie: false }; }
+    }
     for (const n of st.npcs) {
-      if (n.kind !== 'resident') continue;
+      if (n.kind !== 'resident' || n.patient) continue;
       giveBed(n);
       if (!n.home) n.home = n.bed || pickOf(c.pois);
       this.startTask(n, c, true);
@@ -401,9 +408,11 @@ export class NPCs {
     let filled = 0;
     for (const v of c.vendors) {
       if (st.npcs.some((n) => n.stall === v && !n.dead)) continue;
-      const n = new NPC('vendor', v.x, STREET_Y, v.z, { role: v.role, name: pickName(), weapon: pickOf(c.folkWeapons), variant: wardrobeRow(v.doctor ? ['med'] : c.wardrobe), hp: 400, yaw: v.yaw, title: v.doctor ? 'Doctor' : ROLES[v.role].title });
+      const n = new NPC('vendor', v.x, STREET_Y, v.z, { role: v.role, name: pickName(), weapon: pickOf(c.folkWeapons), variant: wardrobeRow(v.yard ? ['grease'] : v.doctor ? ['med'] : c.wardrobe), hp: 400, yaw: v.yaw, title: v.doctor ? 'Doctor' : ROLES[v.role].title });
       n.camp = c.id; n.campKey = c.key; n.campName = c.name;
       n.stall = v;
+      if (v.yard) n.mech = v.yard;
+      if (v.clinic) n.clinic = v.clinic;
       n.stockKey = `${c.id}:${v.role}:${Math.floor(v.x)},${Math.floor(v.z)}`;
       if (v.doctor) n.doctor = true;
       st.npcs.push(n);
@@ -3501,6 +3510,15 @@ export class NPCs {
       n.state = n.aim > 0 ? 3 : 0;
       return;
     }
+    if (n.mech && !(n.busyT > 0) && !n.threat) { this.updateMechanic(n, dt, dp); return; }
+    if (n.clinic && !(n.busyT > 0) && !n.threat) { this.updateDoctor(n, dt, dp); return; }
+    // In the tent: laid up on a cot or sat on the bench, and there they stay.
+    if (n.patient && !n.flee && !n.giving) {
+      const q = n.patient;
+      n.x = q.x; n.z = q.z; n.yaw = q.yaw; n.y = STREET_Y + (q.lie ? 1 : 0);
+      n.state = q.lie ? 7 : 5;
+      return;
+    }
     if (n.kind === 'vendor' || n.kind === 'boss' || n.kind === 'clerk' || n.kind === 'named' || n.kind === 'sentry') {
       if (n.busyT > 0 || n.threat) {
         // There is a fight on. They keep their eyes on it, and only look elsewhere once it has moved on.
@@ -3513,6 +3531,76 @@ export class NPCs {
     if (n.kind === 'follower') { this.updateFollower(n, dt, dp); return; }
     if (n.kind === 'wanderer') { this.updateWanderer(n, dt, dp); return; }
     if (n.squad) this.updatePatrol(n, dt, dp);
+  }
+
+  // The doctor goes round the tent: the foot of one cot, then another, the bench, back to the table, a while at each. Turns to you when
+  // you come up and deals with you there.
+  updateDoctor(n, dt, dp) {
+    const g = this.g, P = g.player, C = n.clinic;
+    if ((n.roundT = (n.roundT ?? 0) - dt) <= 0) {
+      n.roundT = 10 + rand() * 16;
+      n.roundAt = n.roundAt === 'desk' || n.roundAt === undefined ? Math.floor(rand() * C.stops.length) : rand() < .4 ? 'desk' : Math.floor(rand() * C.stops.length);
+    }
+    const goal = n.roundAt === 'desk' || n.roundAt === undefined ? C.desk : C.stops[n.roundAt];
+    if (n.inConvo || (dp < 3.2 && P.alive)) { n.yaw = Math.atan2(P.x - n.x, P.z - n.z); n.state = 0; n.y = STREET_Y; return; }
+    // Along the aisle between the cots and the bench: out to it, along, and in.
+    const aisle = C.stops[0].z, dx = goal.x - n.x, dz = goal.z - n.z, d = Math.hypot(dx, dz);
+    if (d > .3) {
+      const off = Math.abs(n.z - aisle) > .4 && Math.abs(goal.x - n.x) > .6;
+      const tx = off ? n.x : goal.x, tz = off ? aisle : goal.z;
+      const ex = tx - n.x, ez = tz - n.z, e = Math.hypot(ex, ez) || 1, step = Math.min(e, 1.4 * dt);
+      n.x += ex / e * step; n.z += ez / e * step; n.y = STREET_Y;
+      n.yaw = Math.atan2(ex, ez); n.state = .7;
+      n.phase += 3 * dt * 2.1;
+      return;
+    }
+    n.x = goal.x; n.z = goal.z; n.y = STREET_Y; n.yaw = goal.yaw;
+    n.state = goal === C.desk ? 0 : 6;
+  }
+
+  // The mechanic's day, in the yard. Up with the light and at the bikes: the one in pieces, and, while the other is still there to be
+  // sold, that one too, going from one to the other every so often. Stops to look round at you when you come up, and deals with you
+  // where they stand. After dark, off to the cot under the tarp, and asleep there till morning.
+  updateMechanic(n, dt, dp) {
+    const g = this.g, P = g.player, Y = n.mech, tod = g.tod;
+    const night = tod > .87 || tod < .24;
+    const sale = g.bikes.list.some((b) => b.yard === n.camp && b.forSale);
+    let goal;
+    if (night) goal = Y.bed;
+    else {
+      if ((n.mechT = (n.mechT ?? 0) - dt) <= 0) { n.mechT = 22 + rand() * 30; n.mechAt = sale && !n.mechAt ? 1 : 0; }
+      if (!sale) n.mechAt = 0;
+      goal = Y.work[n.mechAt || 0];
+    }
+    // The way there, round the stands rather than through them.
+    if (n.routeFor !== goal) {
+      n.routeFor = goal;
+      const ch = Y.chain || [goal], gi = ch.indexOf(goal);
+      let ci = -1, cd = 1.6;
+      ch.forEach((q, i) => { const e = Math.hypot(q.x - n.x, q.z - n.z); if (e < cd) { cd = e; ci = i; } });
+      n.route = ci < 0 || gi < 0 ? [goal] : ci <= gi ? ch.slice(ci + 1, gi + 1) : ch.slice(gi, ci).reverse();
+      if (!n.route.length) n.route = [goal];
+    }
+    const to = n.route[0] || goal;
+    const dx = to.x - n.x, dz = to.z - n.z, d = Math.hypot(dx, dz);
+    if (d <= .3 && n.route.length > 1) { n.route.shift(); return; }
+    // Someone at the yard to see them: a look round, and whatever they are doing waits.
+    const asleep = night && d < .3 && to === goal;
+    if (!asleep && (n.inConvo || (dp < 3.2 && P.alive))) {
+      n.yaw = Math.atan2(P.x - n.x, P.z - n.z);
+      n.state = 0; n.y = STREET_Y;
+      return;
+    }
+    if (d > .3) {
+      const step = Math.min(d, 1.5 * dt);
+      n.x += dx / d * step; n.z += dz / d * step; n.y = STREET_Y;
+      n.yaw = Math.atan2(dx, dz); n.state = .7;
+      n.phase += 3 * dt * 2.1;
+      return;
+    }
+    n.x = goal.x; n.z = goal.z;
+    if (night) { n.state = 7; n.yaw = Y.bed.yaw; n.y = STREET_Y + 1; return; }
+    n.y = STREET_Y; n.yaw = goal.yaw; n.state = 6;
   }
 
   // Nobody stands still while the dead close in round them. They back off, still firing, keeping the crowd in front of them;

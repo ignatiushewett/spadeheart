@@ -43,7 +43,7 @@ export const ITEMS = {
   tactical: { name: 'Plate Carrier', type: 'armor', armor: .45, value: 1200, weight: 10, desc: 'Guard issue with ceramic plates. 45% protection.' },
   // Upgrades
   flashlight: { name: 'Flashlight', type: 'tool', value: 38, weight: .4, desc: 'Press F to switch it on. Batteries are the least of your problems.' },
-  bike_keys: { name: 'Motorbike Keys', type: 'keys', value: 3400, weight: .05, stack: true, desc: 'To a motorbike the mechanic wheeled out and left in the street in front of their garage. Use them to find out where it is. E to get on, F for the headlamp.' },
+  bike_keys: { name: 'Motorbike Keys', type: 'keys', value: 3400, weight: .05, stack: true, desc: 'To the motorbike that was standing in the mechanic\'s yard. Use them to find out where it is. E to get on, F for the headlamp.' },
   backpack: { name: 'Hiking Pack', type: 'pack', carry: 40, value: 200, weight: 1, desc: 'Adds 40 carry capacity while you own it.' },
   // Junk, valuable only to traders
   scrap: { name: 'Scrap Metal', type: 'junk', value: 5, weight: .8, stack: true, desc: 'Scrap merchants pay well.' },

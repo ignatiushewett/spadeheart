@@ -233,9 +233,16 @@ function pistolHands(id, g) {
   return { right, left };
 }
 
+// A grenade is held in the fingertips: the hand is one square block on the corner of it nearest you, the rest of the grenade clear.
+function cornerHand(id, { x, y, z, size }) {
+  const pose = POSES[id], right = [];
+  right.push([x, y, z, size, size, size, SKIN]);
+  forearm(right, [x + size * .1, y - size * .2, z + size * .5], viewToModel(pose, RIGHT_ELBOW), 1);
+  return { right, left: [] };
+}
 function heldHands(id, grip) {
   const pose = POSES[id], right = [];
-  wrap(right, { ...grip, side: 1, fingers: 3, elbow: viewToModel(pose, RIGHT_ELBOW) });
+  wrap(right, { fingers: 3, ...grip, side: 1, elbow: viewToModel(pose, RIGHT_ELBOW) });
   return { right, left: [] };
 }
 
@@ -272,7 +279,7 @@ function buildHands(tone) {
     hunting: gunHands('hunting', { x: 0, y: -.048, z: .1, w: .05, d: .06 }, { x: 0, y: 0, z: -.17, w: .046, h: .056, len: .11 }),
     lmg: gunHands('lmg', { x: 0, y: -.082, z: .075, w: .034, d: .045 }, { x: 0, y: -.03, z: -.28, w: .058, h: .04, len: .12 }),
     rocket: gunHands('rocket', { x: 0, y: -.05, z: -.02, w: .036, d: .06 }, { x: 0, y: .05, z: -.3, w: .08, h: .08, len: .11 }),
-    grenade: heldHands('grenade', { x: 0, y: -.005, z: -.02, w: .07, d: .07 }),
+    grenade: cornerHand('grenade', { x: -.026, y: -.03, z: .012, size: .05 }),
     dynamite: bothHands('dynamite', .045, .01, -.02, .05, .08),
     block_wood: bothHands('block_wood', .07, 0, 0, .07, .2, .12),
     block_conc: bothHands('block_conc', .07, 0, 0, .07, .2, .12),
@@ -354,7 +361,7 @@ export class ViewModel {
     this.bolt = buildVAO(gl, BOLT);
     this.lmgBox = buildVAO(gl, LMG_BOX);
     // A drop of water, for the ones that gather on the end of a handle and fall off it.
-    this.dripVao = buildVAO(gl, [[0, 0, 0, .009, .013, .009, 0x9fb4c0, .45]]);
+    this.dripVao = buildVAO(gl, [[0, 0, 0, .007, .01, .007, 0x7d8a92, .2]]);
     this.roundVao = buildVAO(gl, [[0, 0, .006, .0105, .0105, .026, 0xb8893a], [0, 0, .02, .0125, .0125, .003, 0xa07a34], [0, 0, -.011, .0085, .0085, .009, 0x8d8f94]]);
     // The gun on springs: where the last shot threw it, and how fast it is coming back. A stiff spring, lightly damped, so it snaps back
     // with a little overshoot rather than sliding home.

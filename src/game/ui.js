@@ -97,6 +97,12 @@ function playedAgo(at) {
   return days === 1 ? 'yesterday' : `${days} days ago`;
 }
 
+// The two styles of play the settings offer, each a set of display and interface values. Casual is how the game used to start.
+export const LOOKS = {
+  cinematic: { fov: 95, shake: 1.5, grain: .4, uiScale: .9, uiAlpha: .75 },
+  casual: { fov: 105, shake: 1, grain: .3, uiScale: 1, uiAlpha: 1 },
+};
+
 export class UI {
   constructor(game) {
     this.g = game;
@@ -316,7 +322,7 @@ export class UI {
     const pct = (v) => `${Math.round(v * 100)}%`;
     const shows = {
       view: (v) => `${v}`, scale: pct, cap: (v) => fmt(v), fov: (v) => `${v}`, sens: (v) => v.toFixed(2), volume: pct, music: pct,
-      grain: (v) => (v > 0 ? pct(v) : 'Off'), uiScale: pct, uiAlpha: pct, brightness: pct, bob: (v) => (v > 0 ? pct(v) : 'Off'), shake: (v) => (v > 0 ? pct(v) : 'Off'),
+      grain: (v) => (v > 0 ? pct(v) : 'Off'), uiScale: pct, uiAlpha: pct, brightness: pct, sway: (v) => (v > 0 ? pct(v) : 'Off'), bob: (v) => (v > 0 ? pct(v) : 'Off'), shake: (v) => (v > 0 ? pct(v) : 'Off'),
       adsSens: (v) => `×${v.toFixed(2)}`,
     };
     // After any change: what has to happen beyond storing the value.
@@ -340,6 +346,17 @@ export class UI {
     }
     const q = $('s-quality');
     q.addEventListener('change', () => { g.setQualityPreset(q.value); fill(); });
+    // The style: a handful of values set together. Shown as Custom once any of them is moved off it.
+    const look = $('s-look');
+    look.addEventListener('change', () => {
+      const L = LOOKS[look.value];
+      if (!L) return;
+      Object.assign(s, L);
+      g.saveSettings();
+      fill();
+    });
+    const lookOf = () => Object.keys(LOOKS).find((k) => Object.entries(LOOKS[k]).every(([key, v]) => Math.abs((s[key] ?? 0) - v) < 1e-6)) || 'custom';
+    for (const el of document.querySelectorAll('#settings [data-k]')) el.addEventListener('input', () => { look.value = lookOf(); });
     $('s-fps').addEventListener('change', (e) => { s.fpsCap = +e.target.value; g.saveSettings(); });
     $('s-clock').addEventListener('change', (e) => { clock24 = s.clock24 = e.target.value === '24'; g.saveSettings(); });
     // Puts every control in step with the settings, for opening the panel and after a reset or a preset.
@@ -350,6 +367,7 @@ export class UI {
         else { el.value = s[k]; if (out) out.textContent = (shows[k] || String)(s[k]); }
       }
       q.value = s.quality;
+      look.value = lookOf();
       $('s-fps').value = String(s.fpsCap);
       clock24 = !!s.clock24;
       $('s-clock').value = clock24 ? '24' : '12';
@@ -1002,6 +1020,21 @@ export class UI {
     x.restore();
   }
 
+  // Who to go and see in a camp: where to buy a gun, where to get patched up, the mechanic, and who has work. The ones there is only one
+  // of come first, so they get their names first.
+  campPins(c2) {
+    const g = this.g, P = g.player, out = [];
+    const pin = (x, z, mark, col, label) => out.push({ x, z, mark, col, label });
+    if (c2.clerk) pin(c2.clerk.x, c2.clerk.z, '!', '#6ec6ff', 'Town Hall');
+    for (const v of c2.vendors) if (v.doctor) pin(v.x, v.z, '+', '#ff8a7a', 'Doctor');
+    for (const v of c2.vendors) if (v.role === 'arms') pin(v.x, v.z, 'W', '#f0b35a', 'Weapons');
+    for (const v of c2.vendors) if (v.role === 'mechanic') pin(v.x, v.z, 'M', '#c9d27a', 'Mechanic');
+    // A leader with a favour still to ask of you.
+    const lead = LORE[c2.key].cast.find((m) => m.role === 'leader');
+    if (lead && lead.favours && !g.campSim.dead[lead.id] && Object.keys(lead.favours).some((k) => !P.dlg.flags[`${k}_paid`])) pin(c2.boss.x + .5, c2.boss.z + .5, '!', '#6ec6ff', lead.name);
+    return out;
+  }
+
   drawMinimap() {
     const g = this.g, P = g.player, c = $('minimap');
     let x = c.getContext('2d');
@@ -1097,6 +1130,22 @@ export class UI {
       x.fillText(p.name, sx, sy - 15);
     }
     x.shadowBlur = 0;
+    // In or near a camp you know, its pins as well: the same marks as on the full map, held at the rim when they are further off.
+    const inside = g.horde.inCamp(P.x, P.z, 60);
+    if (inside && P.discovered[inside.id] && g.campSim.state[inside.id].status === 'holding') {
+      x.textAlign = 'center'; x.textBaseline = 'middle';
+      for (const q of this.campPins(inside)) {
+        let dx = (q.x - P.x) * scale, dz = (q.z - P.z) * scale;
+        const rr = cx - 16, dd = Math.hypot(dx, dz);
+        if (dd > rr) { dx *= rr / dd; dz *= rr / dd; }
+        const sx = cx + dx * cosY - dz * sinY, sy = cx + dx * sinY + dz * cosY;
+        x.beginPath(); x.arc(sx, sy, 12, 0, 6.2832);
+        x.fillStyle = 'rgba(12,12,12,.85)'; x.fill();
+        x.lineWidth = 2.5; x.strokeStyle = q.col; x.stroke();
+        x.fillStyle = q.col; x.font = '700 15px Quantico, Bahnschrift, Segoe UI, sans-serif';
+        x.fillText(q.mark, sx, sy + 1);
+      }
+    }
   }
 
   updateMarkers() {
@@ -1300,7 +1349,7 @@ export class UI {
     stock[id] -= can;
     if (ITEMS[id].type === 'keys') {
       for (let i = 0; i < can; i++) this.g.bikes.deliver(this.tradeNpc);
-      this.toast('It is out in the street in front of the garage.');
+      this.toast(this.tradeNpc && this.tradeNpc.mech ? 'It is yours: the one standing in the yard, tank full.' : 'It is out in the street in front of the garage.');
     }
     this.g.audio.simple('coin');
     this.renderTrade();
@@ -2176,14 +2225,7 @@ export class UI {
       };
       for (const c2 of g.layout.camps) {
         if (!P.discovered[c2.id] || g.campSim.state[c2.id].status !== 'holding') continue;
-        // The ones there is only one of get their names first.
-        if (c2.clerk) pin(c2.clerk.x, c2.clerk.z, '!', '#6ec6ff', 'Town Hall');
-        for (const v of c2.vendors) if (v.doctor) pin(v.x, v.z, '+', '#ff8a7a', 'Doctor');
-        for (const v of c2.vendors) if (v.role === 'arms') pin(v.x, v.z, 'W', '#f0b35a', 'Weapons');
-        for (const v of c2.vendors) if (v.role === 'mechanic') pin(v.x, v.z, 'M', '#c9d27a', 'Mechanic');
-        // A leader with a favour still to ask of you.
-        const lead = LORE[c2.key].cast.find((m) => m.role === 'leader');
-        if (lead && lead.favours && !g.campSim.dead[lead.id] && Object.keys(lead.favours).some((k) => !P.dlg.flags[`${k}_paid`])) pin(c2.boss.x + .5, c2.boss.z + .5, '!', '#6ec6ff', lead.name);
+        for (const q of this.campPins(c2)) pin(q.x, q.z, q.mark, q.col, q.label);
       }
       for (const q of pins) drawPin(q);
       // Then the names, on top of the pins, and only where one fits without covering another pin or name. The pin is there either way.

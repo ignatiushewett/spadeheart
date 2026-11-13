@@ -2,7 +2,7 @@
 // planCamp turns a definition into plain data; stampCamp turns that data into voxels chunk by chunk.
 // Everything placed reserves its footprint first, so no two pieces of a camp can overlap.
 import { STREET_Y, WX, G } from './constants.js';
-import { M } from './materials.js';
+import { M, CLOTH_OF } from './materials.js';
 import { h2, makeRng } from './rng.js';
 
 // A real bed, a block off the floor: headboard, pillows, the sheet turned down, then the blanket, and maybe a spare folded at the foot.
@@ -86,7 +86,7 @@ export function planCamp(def, id, r, ground) {
     return true;
   };
   // Parts you can walk under or across say so; everything else is solid to the people who live here.
-  const OPEN = { hallchurch: 1, crops: 1, court: 1, graves: 1, bigtent: 1, cloister: 1, firepit: 1, table: 1, lamp: 1, lights: 1, flag: 1, school: 1, range: 1, laundry: 1, garden: 1, kitchen: 1, nest: 1, well: 1 };
+  const OPEN = { hallchurch: 1, crops: 1, court: 1, graves: 1, bigtent: 1, cloister: 1, firepit: 1, table: 1, mechyard: 1, clinic: 1, lamp: 1, lights: 1, flag: 1, school: 1, range: 1, laundry: 1, garden: 1, kitchen: 1, nest: 1, well: 1 };
   const add = (t, x0, z0, x1, z1, h, extra = {}) => {
     c.parts.push({ t, x0, z0, x1, z1, h, ...extra });
     reserve(x0, z0, x1, z1);
@@ -267,7 +267,7 @@ export function planCamp(def, id, r, ground) {
   for (let d = PW + 3; px - d > r.x0 + 16; d += 11) for (const s of [-1, 1]) stallSlots.push({ x: px - d, z: pz + s * (AV + 1), face: s < 0 ? 'S' : 'N' });
   for (let d = PW + 3; px + d < r.x1 - 16; d += 11) for (const s of [-1, 1]) stallSlots.push({ x: px + d, z: pz + s * (AV + 1), face: s < 0 ? 'S' : 'N' });
   stallSlots.sort((a, b) => Math.hypot(a.x - px, a.z - pz) - Math.hypot(b.x - px, b.z - pz));
-  let stalls = 0, hasDoctor = false;
+  let stalls = 0, hasDoctor = true;
   for (const s of stallSlots) {
     if (stalls >= def.stallCount) break;
     const horizontalFront = s.face === 'E' || s.face === 'W';
@@ -282,11 +282,8 @@ export function planCamp(def, id, r, ground) {
       continue;
     }
     // The first and best spot on the market is the camp's doctor.
-    const doctor = !hasDoctor;
-    // One mechanic in every town, well out from the middle where the market thins and there is room to wheel a bike out into the street,
-    // and away from the rest of the traders so the market does not all huddle in one place.
-    const mechAt = def.stalls.length + Math.floor((def.stallCount - def.stalls.length) * .6);
-    const role = doctor ? 'medic' : stalls < def.stalls.length ? def.stalls[stalls] : ((r) => stalls === mechAt ? 'mechanic' : r)(def.stalls[Math.floor(rng() * def.stalls.length)]);
+    const doctor = false;
+    const role = doctor ? 'medic' : stalls < def.stalls.length ? def.stalls[stalls] : def.stalls[Math.floor(rng() * def.stalls.length)];
     const style = doctor ? 'clinic' : STALL_STYLES[role][Math.floor(rng() * STALL_STYLES[role].length)];
     add('stall', b.x0, b.z0, b.x1, b.z1, 7, { sign: ROLE_SIGN[role], face: s.face, role, style });
     const cx = (b.x0 + b.x1 + 1) / 2, cz = (b.z0 + b.z1 + 1) / 2;
@@ -411,6 +408,113 @@ export function planCamp(def, id, r, ground) {
   }
   if (!c.spots.hq) c.spots.hq = { x: px + 18.5, z: pz - 12.5 };
   if (!c.spots.field) c.spots.field = { x: px - 20.5, z: pz + 22.5 };
+
+  // --- The mechanic's yard: tucked into a corner of the town ------------------------------------------
+  // A fenced corner with a bench, tyres and drums, a cot under a tarp, and two bikes: one in pieces that the mechanic is always at, and
+  // one going that is for sale. Laid out the same everywhere, turned so the fence runs along the outside wall and it opens onto the town.
+  {
+    const YW = 14, YD = 10;
+    const corners = [[r.x0 + 11, r.z0 + 11, 0, 0], [r.x1 - 11 - YW, r.z0 + 11, 1, 0], [r.x0 + 11, r.z1 - 11 - YD, 0, 1], [r.x1 - 11 - YW, r.z1 - 11 - YD, 1, 1]];
+    for (let i = corners.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [corners[i], corners[j]] = [corners[j], corners[i]]; }
+    let at = null;
+    for (const [tx, tz, fx, fz] of corners) {
+      const s = placeNear(YW, YD, tx, tz, 1);
+      if (s && Math.hypot(s.x - tx, s.z - tz) < 34) { at = { ...s, fx, fz }; break; }
+    }
+    if (!at) {
+      const [tx, tz, fx, fz] = corners[0];
+      const s = placeNear(YW, YD, tx, tz, 1);
+      if (s) at = { ...s, fx, fz };
+    }
+    if (at) {
+      const x0 = at.x, z0 = at.z, x1 = x0 + YW - 1, z1 = z0 + YD - 1, fx = at.fx, fz = at.fz;
+      c.yardCorner = `${fx}${fz}`;
+      // Local (u along x, v along z) to the world, with the fence sides (u = 0, v = 0) against the outside wall.
+      const wx = (u) => (fx ? x1 + 1 - u : x0 + u), wz = (v) => (fz ? z1 + 1 - v : z0 + v);
+      const cell = (u, v) => [Math.floor(wx(u + .5)), Math.floor(wz(v + .5))];
+      add('mechyard', x0, z0, x1, z1, 5, { fx, fz });
+      // It is open ground to walk about in (see OPEN); only the fence, the bench, the cot and the stacks get in anyone's way.
+      const solidCell = (u, v) => { const [a, b] = cell(u, v); block(a, b, a, b); };
+      for (let v = 0; v <= 5; v++) solidCell(0, v);
+      for (let u = 0; u <= 11; u++) solidCell(u, 0);
+      const solids = [[1, 1], [1, 2], [1, 3], [4, 1], [5, 1], [12, 1], [12, 2], [6, 4], [13, 5], [13, 8], [13, 9]];
+      for (let u = 7; u <= 10; u++) solids.push([u, 1]);
+      for (const [u, v] of solids) solidCell(u, v);
+      const ang = (du, dv) => Math.atan2(fx ? -du : du, fz ? -dv : dv);
+      const bikeYaw = Math.PI / 2;
+      const yard = {
+        x0, z0, x1, z1,
+        bikes: [{ x: wx(8.5), z: wz(5.5), yaw: bikeYaw }, { x: wx(8.5), z: wz(8.5), yaw: bikeYaw }],
+        // Down beside each one: facing the bike in pieces from the bench side, the other from between the two.
+        work: [{ x: wx(8.6), z: wz(3.9), yaw: ang(0, 1) }, { x: wx(8.6), z: wz(6.9), yaw: ang(0, 1) }],
+        bed: { x: wx(1.5), z: wz(2.5), yaw: ang(0, 1), kind: 'sleep' },
+      };
+      // The way round: bed to the near bike, out along the open side past the stands, and in to the far one. Never through a stand.
+      yard.chain = [yard.bed, yard.work[0], { x: wx(11.6), z: yard.work[0].z }, { x: wx(11.6), z: yard.work[1].z }, yard.work[1]];
+      c.mechYard = yard;
+      // Where the curious stand and talk bikes with whoever is working: by the open side, looking in.
+      const browse = [];
+      for (const [u, v] of [[12.2, 5.6], [12.4, 7.4], [11.2, 9.2]]) {
+        const p = { x: wx(u), z: wz(v), kind: 'browse', yaw: ang(-1, 0) };
+        browse.push(p);
+        c.pois.push(p);
+      }
+      c.vendors.push({ role: 'mechanic', x: yard.work[0].x, z: yard.work[0].z, yaw: yard.work[0].yaw, browse, yard });
+      light(Math.floor(wx(7)), Math.floor(wz(5)), 10);
+    }
+  }
+
+  // --- The doctor's tent: a field hospital in another corner ------------------------------------------
+  // A long white tent with a red cross on the end, open at the front: a row of cots along the back with people laid up in them, a bench of
+  // those waiting to be seen, shelves of whatever medicine there is, and the doctor's table by the way in. The doctor goes round them.
+  {
+    const CW2 = 16, CD = 12;
+    // As near the middle of the town as there is clear ground, before the houses fill in round it: nothing that matters is moved.
+    let at = null;
+    const s0 = placeNear(CW2, CD, px - (CW2 >> 1), pz - (CD >> 1), 1);
+    if (s0) {
+      // The way in faces the square; the red cross end faces whichever way it is away from the middle.
+      const tx = s0.x + CW2 / 2, tz = s0.z + CD / 2;
+      at = { ...s0, fx: tx < px ? 1 : 0, fz: tz > pz ? 1 : 0 };
+    }
+    if (at) {
+      const x0 = at.x, z0 = at.z, x1 = x0 + CW2 - 1, z1 = z0 + CD - 1, fx = at.fx, fz = at.fz;
+      const wx = (u) => (fx ? x1 + 1 - u : x0 + u), wz = (v) => (fz ? z1 + 1 - v : z0 + v);
+      const cell = (u, v) => [Math.floor(wx(u + .5)), Math.floor(wz(v + .5))];
+      add('clinic', x0, z0, x1, z1, 6, { fx, fz });
+      const solidCell = (u, v) => { const [a, b] = cell(u, v); block(a, b, a, b); };
+      for (let v = 0; v < CD; v++) { if (v < 4 || v > 5) solidCell(0, v); if (v < 9 || v > 10) solidCell(15, v); }
+      for (let u = 0; u < CW2; u++) { if (u < 13 || u > 14) solidCell(u, 0); if (u < 4 || u > 11) solidCell(u, 11); }
+      for (const u of [2, 4, 6, 8, 10, 12]) for (let v = 1; v <= 3; v++) solidCell(u, v);
+      for (let v = 5; v <= 8; v++) solidCell(14, v);
+      for (let v = 6; v <= 8; v++) solidCell(1, v);
+      for (const [u, v] of [[11, 9], [12, 9], [1, 9], [1, 10], [5, 1]]) solidCell(u, v);
+      const ang = (du, dv) => Math.atan2(fx ? -du : du, fz ? -dv : dv);
+      // The cots run back to front, the pillow end against the back wall.
+      const cots = [2, 4, 6, 8, 10, 12].map((u) => ({ x: wx(u + .5), z: wz(2.5), yaw: ang(0, 1), kind: 'sleep' }));
+      const clinic = {
+        x0, z0, x1, z1,
+        // Who is laid up (some of the cots), and who sits waiting on the bench.
+        lie: [cots[0], cots[1], cots[3], cots[5]],
+        sit: [{ x: wx(13.9), z: wz(5.5), yaw: ang(-1, 0) }, { x: wx(13.9), z: wz(7.5), yaw: ang(-1, 0) }],
+        // The doctor's rounds: the foot of each occupied cot, and the table.
+        desk: { x: wx(11.5), z: wz(8.1), yaw: ang(0, 1) },
+        stops: [2, 4, 8, 12].map((u) => ({ x: wx(u + .5), z: wz(4.4), yaw: ang(0, -1) })),
+      };
+      clinic.stops.push({ x: wx(12.6), z: wz(6.5), yaw: ang(1, 0) });
+      c.clinic = clinic;
+      const browse = [];
+      for (const [u, v] of [[7.5, 10.1], [8.6, 10.2]]) {
+        const p = { x: wx(u), z: wz(v), kind: 'browse', yaw: ang(0, -1) };
+        browse.push(p);
+        c.pois.push(p);
+      }
+      c.vendors.push({ role: 'medic', x: clinic.desk.x, z: clinic.desk.z, yaw: clinic.desk.yaw, browse, doctor: true, clinic });
+      light(Math.floor(wx(8)), Math.floor(wz(6)), 13);
+    }
+  }
+  // Nowhere for a tent: the doctor takes the first stall on the market, the way it used to be.
+  if (!c.clinic) { const v = c.vendors.find((q) => q.role !== 'mechanic'); if (v) { v.role = 'medic'; v.doctor = true; } }
 
   // --- The town itself: plot after plot, with alleys just wide enough to push through -------------------
   const shackMats = def.shackMats || [M.PLANK, M.RUST, M.CONT_O, M.BRICK_B, M.WOOD_D];
@@ -682,7 +786,7 @@ export function flagCells(p) {
   const out = [], pole = p.x0, z = p.z0, h = p.h;
   for (let b = z - 1; b <= z + 1; b++) for (let a = pole - 1; a <= pole + 1; a++) out.push([a, YB, b, M.CONCRETE]);
   for (let y = YB + 1; y <= YB + h; y++) out.push([pole, y, z, M.ALUM]);
-  for (let y = YB + h - 6; y <= YB + h - 1; y++) for (let k = 1; k <= 9; k++) out.push([pole + k, y, z, y >= YB + h - 3 ? p.c2 : p.c1]);
+  for (let y = YB + h - 6; y <= YB + h - 1; y++) for (let k = 1; k <= 9; k++) { const col = y >= YB + h - 3 ? p.c2 : p.c1; out.push([pole + k, y, z, CLOTH_OF[col] || col]); }
   return out;
 }
 
@@ -817,6 +921,82 @@ function stampPart(p, c, box, put, car, letterAt) {
     case 'bench':
       box(x0, YB, z0, x1, YB, z1, M.LOG);
       break;
+    case 'mechyard': {
+      // In the yard's own terms: u along x and v along z from the corner against the wall, mirrored to suit whichever corner it is in.
+      const U = (u) => (p.fx ? x1 - u : x0 + u), V = (v) => (p.fz ? z1 - v : z0 + v);
+      const T = (u, y, v, id) => put(U(u), YB + y, V(v), id);
+      const W2 = x1 - x0 + 1, D2 = z1 - z0 + 1;
+      // The ground is the town's own, the same as the streets round it.
+      // A plank fence, waist high, on posts: behind the cot and the bench only, so the yard is open to walk into from three sides.
+      for (let v = 0; v <= 5; v++) { const post = v % 3 === 0; T(0, 0, v, post ? M.WOOD_D : M.PLANK); T(0, 1, v, post ? M.WOOD_D : M.PLANK); }
+      for (let u = 1; u <= 11; u++) { const post = u % 3 === 0; T(u, 0, 0, post ? M.WOOD_D : M.PLANK); T(u, 1, 0, post ? M.WOOD_D : M.PLANK); }
+      // A small lean-to over the cot and the drums in the corner, on the fence posts and one more; everything else is open sky.
+      for (const [u, v] of [[0, 0], [0, 3], [3, 0], [6, 0]]) for (let y = 2; y < 4; y++) T(u, y, v, M.WOOD_D);
+      for (let y = 0; y < 4; y++) T(6, y, 4, M.WOOD_D);
+      for (let u = 0; u <= 6; u++) for (let v = 0; v <= 4; v++) T(u, 4, v, u === 4 ? M.ROOF_TIN : (u === 2 && v >= 1 && v <= 2) ? M.PLANK : M.RUST);
+      // The yellow sign on two posts over the bench, a black spanner painted across it.
+      for (const u of [7, 10]) T(u, 2, 0, M.WOOD_D);
+      for (let u = 7; u <= 10; u++) T(u, 3, 0, u === 8 || u === 9 ? M.PAINT_K : M.PAINT_Y);
+      // The bench: a plank top on iron legs, crates of parts under it, a vice at one end, a red toolbox, and a cylinder head being worked on.
+      T(7, 0, 1, M.IRON); T(10, 0, 1, M.IRON);
+      T(8, 0, 1, M.CRATE_OPEN);
+      for (let u = 7; u <= 10; u++) T(u, 1, 1, M.PLANK);
+      T(7, 2, 1, M.STEEL_D); T(9, 2, 1, M.CAR_R); T(10, 2, 1, M.ALUM);
+      // Oil drums, blue and red, under the lean-to, and tyres stacked by the fence.
+      T(4, 0, 1, M.CAR_B); T(4, 1, 1, M.CAR_B); T(5, 0, 1, M.CAR_R);
+      for (let y = 0; y < 3; y++) T(12, y, 1, M.TIRE);
+      T(12, 0, 2, M.TIRE);
+      // What piles up by the open corner: a few crates.
+      T(13, 0, 9, M.CRATE); T(13, 1, 9, M.CRATE); T(13, 0, 8, M.CRATE_OPEN);
+      // The cot, made up, in the corner against the fence.
+      T(1, 0, 1, M.PILLOW); T(1, 0, 2, M.MATTRESS); T(1, 0, 3, M.BLANKET_G);
+      // A lamp on a pole by the bikes, for working late.
+      for (let y = 0; y < 3; y++) T(13, y, 5, M.WOOD_D);
+      T(13, 3, 5, M.LAMP);
+      break;
+    }
+    case 'clinic': {
+      const U = (u) => (p.fx ? x1 - u : x0 + u), V = (v) => (p.fz ? z1 - v : z0 + v);
+      const T = (u, y, v, id) => put(U(u), YB + y, V(v), id);
+      const W2 = x1 - x0 + 1, D2 = z1 - z0 + 1;
+      // The tent's height along it: low at the back and front, up to a ridge down the middle.
+      const roofY = (v) => 4 + (v >= 2 && v <= 9 ? 1 : 0) + (v >= 4 && v <= 7 ? 1 : 0);
+      // Boards on the ground inside, to keep the mud off.
+      for (let u = 0; u < W2; u++) for (let v = 0; v < D2; v++) T(u, -1, v, M.PLANK);
+      // Weathered canvas, patched where it tore, mud splashed up the bottom.
+            const cv = (u, y, v) => { const k = ((u * 73856093) ^ (y * 19349663) ^ (v * 83492791) ^ x0) >>> 0; return y === 0 && k % 3 === 0 ? M.CANVAS : k % 13 === 0 ? M.CANVAS : M.TENT_W; };
+      // The canvas: the two ends up to the roof, the back wall, and the front, its way in wide open with the flaps tied back.
+      for (let v = 0; v < D2; v++) for (let y = 0; y < roofY(v); y++) {
+        // A door at each end as well, and one at the back: nobody has to go round.
+        if (!(v >= 4 && v <= 5 && y < 3)) T(0, y, v, cv(0, y, v));
+        if (!(v >= 9 && v <= 10 && y < 3)) T(15, y, v, cv(15, y, v));
+      }
+      for (let u = 1; u < W2 - 1; u++) for (let y = 0; y < 4; y++) { if (!(u >= 13 && u <= 14 && y < 3)) T(u, y, 0, cv(u, y, 0)); if (u < 4 || u > 11 || y === 3) T(u, y, 11, cv(u, y, 11)); }
+      for (let y = 0; y < 3; y++) { T(3, y, 11, M.CANVAS); T(12, y, 11, M.CANVAS); }
+      for (let u = 0; u < W2; u++) for (let v = 0; v < D2; v++) T(u, roofY(v), v, cv(u, 9, v));
+      // A red cross along the ridge, for anyone looking down from the wall.
+      for (let u = 6; u <= 9; u++) for (const v of [5, 6]) T(u, 6, v, M.AWN_R);
+      for (const u of [7, 8]) for (const v of [4, 7]) T(u, 6, v, M.AWN_R);
+      // A red cross on the end facing the town, and another over the way in.
+      for (let v = 4; v <= 7; v++) T(15, 3, v, M.AWN_R);
+      for (const v of [5, 6]) { T(15, 2, v, M.AWN_R); T(15, 4, v, M.AWN_R); }
+      T(7, 3, 11, M.AWN_R); T(8, 3, 11, M.AWN_R);
+      // The cots, made up, along the back: pillow, mattress, blanket.
+      const blankets = [M.BLANKET_G, M.BLANKET_B, M.BLANKET_C, M.BLANKET_G, M.BLANKET_R, M.BLANKET_B];
+      [2, 4, 6, 8, 10, 12].forEach((u, i) => { T(u, 0, 1, M.PILLOW); T(u, 0, 2, M.MATTRESS); T(u, 0, 3, blankets[i]); });
+      // A drip stand by one bed.
+      T(5, 0, 1, M.IRON); T(5, 1, 1, M.IRON); T(5, 2, 1, M.ALUM);
+      // The bench by the far wall, for those waiting.
+      for (let v = 5; v <= 8; v++) T(14, 0, v, M.PLANK);
+      // Shelves against the back end, white boxes and bottles on them, and medical crates by the door.
+      for (let v = 6; v <= 8; v++) { T(1, 0, v, M.SHELF); T(1, 1, v, v % 2 ? M.TENT_W : M.ALUM); T(1, 2, v, M.SHELF); }
+      T(1, 0, 9, M.CRATE_MED); T(1, 0, 10, M.CRATE_MED); T(1, 1, 9, M.CRATE_MED);
+      // The doctor's table: a plank top on trestles, with a lamp and a white case on it.
+      T(11, 0, 9, M.WOOD_D); T(12, 0, 9, M.WOOD_D); T(11, 1, 9, M.PLANK); T(12, 1, 9, M.PLANK); T(12, 2, 9, M.TENT_W);
+      // Lamps hung from the ridge.
+      T(4, 5, 5, M.LAMP); T(11, 5, 6, M.LAMP);
+      break;
+    }
     case 'flag': {
       for (const [a, y, b, id] of flagCells(p)) put(a, y, b, id);
       break;
@@ -1094,9 +1274,12 @@ function stampPart(p, c, box, put, car, letterAt) {
       break;
     }
     case 'well': {
-      box(x0, YB, z0, x1, YB, z1, M.STONE);
-      box(x0 + 1, YB, z0 + 1, x1 - 1, YB, z1 - 1, M.CAR_GLASS);
-      box(x0, YB, z0, x0, YB + 3, z0, M.WOOD_D); box(x1, YB, z1, x1, YB + 3, z1, M.WOOD_D);
+      // A stone curb round a shaft sunk two blocks below the street, lined in the same stone all the way down to the water; a plank
+      // roof over it on a post at every corner.
+      box(x0, YB - 3, z0, x1, YB, z1, M.STONE);
+      box(x0 + 1, YB - 2, z0 + 1, x1 - 1, YB, z1 - 1, 0);
+      box(x0 + 1, YB - 2, z0 + 1, x1 - 1, YB - 2, z1 - 1, M.CAR_GLASS);
+      for (const [a, b] of [[x0, z0], [x1, z0], [x0, z1], [x1, z1]]) box(a, YB, b, a, YB + 3, b, M.WOOD_D);
       box(x0, YB + 4, z0, x1, YB + 4, z1, M.PLANK);
       break;
     }
