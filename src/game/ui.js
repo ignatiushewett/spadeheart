@@ -650,10 +650,13 @@ export class UI {
     r *= lit; gg *= lit; b *= lit;
     mix([1, .95, .86], noonish * .8 * (1 - low));
     const col = `rgb(${Math.round(r * 255)},${Math.round(gg * 255)},${Math.round(b * 255)})`;
-    if (col !== this.gradeCol) { this.gradeCol = col; for (const el of document.querySelectorAll('.map-grade')) el.style.background = col; }
-    // And the rain itself, driving across both maps, as hard as it is coming down.
-    const ro = (rain > .03 ? Math.min(1, .25 + rain * .85) : 0).toFixed(2);
-    if (ro !== this.mapRainO) { this.mapRainO = ro; for (const el of document.querySelectorAll('.map-rain')) el.style.opacity = ro; }
+    if (col !== this.gradeCol) {
+      this.gradeCol = col;
+      $('mm-grade').style.background = col;
+      // The full map, which you sit and read, only takes half of it.
+      const half = (v) => Math.round(255 - (255 - v * 255) * .5);
+      $('bm-grade').style.background = `rgb(${half(r)},${half(gg)},${half(b)})`;
+    }
   }
 
   updateHUD(dt) {
