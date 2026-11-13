@@ -1254,11 +1254,13 @@ out vec3 vCol;
 out float vGlow;
 out float vMetal;
 out vec3 vLoc;          // where on its own little cube this is, for the drops of rain sat on it
+out vec3 vLocN;
 flat out float vBuilt;  // part of something built (a bike): it gets wet
 flat out float vSeed;
 void main(){
   float a=iCol.a, c=cos(a), s=sin(a);
-  vLoc=aPos; vSeed=fract(dot(iCol.rgb,vec3(12.9898,78.233,37.719)))*91.;
+  // A bike's voxel carries where on the bike it is in the last places of its size: a seed that goes where the bike goes.
+  vLoc=aPos; vLocN=aNormal; vSeed=fract(iPos.w*7919.37)*91.;
   // A glow below zero marks a part of something built (a vehicle): turned about the vertical, and leaned over sideways, not tumbling.
   // Its glow is -1 - that, with how metal it is (0 to 3) in fours on top, and its lean in sixteens on top of that (24 is upright,
   // each step a fortieth of a radian).
@@ -1287,6 +1289,7 @@ in vec3 vCol;
 in float vGlow;
 in float vMetal;
 in vec3 vLoc;
+in vec3 vLocN;
 flat in float vBuilt;
 flat in float vSeed;
 uniform sampler2D uRainMap;
@@ -1333,14 +1336,13 @@ void main(){
       c+=uSunCol*pow(max(dot(Rf,uSunDir),0.),90.)*sh*w*.9;
       if(uRainNow>.01){
         // Drops: each spot on the bike gets one now and then, holds it and loses it on its own clock; some run before they go.
-        vec3 wp=vWorld*40., cell=floor(wp);
+        // On the bike's own voxel, four spots to a side, not in the world: they ride along with it.
+        vec3 wp=vLoc*4.+.5, cell=floor(wp)+vec3(vSeed*.7,vSeed*1.3,vSeed*2.1);
         float seed=hash12(cell.xy*1.7+cell.z*3.1), ph=uTime*(.45+seed*.9)*.8+seed*9.;
         float life=fract(ph), gen=floor(ph);
-        vec3 q=wp;
-        if(hash12(cell.zx+gen*.37+3.)<.3*uRainNow) q.y+=life*life*2.;
-        vec3 rc=floor(q), f=fract(q)-.5;
-        float on=step(1.-.065*w*uRainNow,hash12(rc.xy+rc.z*7.1+gen*1.13))*smoothstep(0.,.12,life)*smoothstep(1.,.6,life);
-        float bead=on*smoothstep(.36,.0,length(f-N*dot(f,N)));
+        vec3 f=fract(wp)-.5, ln=normalize(vLocN);
+        float on=step(1.-.065*w*uRainNow*1.5,hash12(cell.xy+cell.z*7.1+gen*1.13))*smoothstep(0.,.12,life)*smoothstep(1.,.6,life);
+        float bead=on*smoothstep(.36,.0,length(f-ln*dot(f,ln)));
         // A bead takes some of the colour of what it sits on: water on dark paint, not a white fleck.
         c+=(L*.75+env*.25+vec3(.01))*mix(vec3(1.),.35+col*2.2,.45)*bead*w*.68;
       }

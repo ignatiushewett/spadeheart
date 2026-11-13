@@ -265,13 +265,18 @@ export class Bikes {
   deliver(npc) {
     const g = this.g, W = g.world, c = npc.camp >= 0 ? g.layout.camps[npc.camp] : null;
     if (c && c.mechYard) {
-      this.yardT = 0;
-      this.yards(0);
-      const b = this.list.find((o) => o.yard === c.id && o.forSale);
-      if (b) {
-        b.forSale = false; b.locked = false; b.yard = undefined; b.owned = true; b.fuel = 1;
-        return b;
+      // The very one standing in the yard, where it stands: keys handed over, tank filled. (The keys are already off the stock by now,
+      // so the yard is not refreshed first, or it would take the bike away as no longer for sale.) If it is not there, one put where it
+      // would have been.
+      let b = this.list.find((o) => o.yard === c.id && o.forSale);
+      if (!b) {
+        const s = c.mechYard.bikes[1];
+        b = new Bike(s.x, 0, s.z, s.yaw);
+        b.y = b.sy = this.ground(s.x, s.z, STREET_Y + 2);
+        this.list.push(b);
       }
+      b.forSale = false; b.locked = false; b.yard = undefined; b.owned = true; b.fuel = 1;
+      return b;
     }
     const v = c && c.vendors.find((q) => q.role === 'mechanic' && Math.hypot(q.x - npc.x, q.z - npc.z) < 8);
     const vx = v ? v.x : npc.x, vz = v ? v.z : npc.z;
@@ -877,13 +882,16 @@ export class Bikes {
         const lx = x * cl + (y - .5) * sl, ly = -x * sl + (y - .5) * cl;
         return [b.x + (rx * lx + fx * z) * VS, b.sy + .015 + b.lift + ly * VS, b.z + (rz * lx + fz * z) * VS];
       };
-      const vox = (x, y, z, col, metal, glow = 0) => { const p = at(x, y, z); add(p[0], p[1], p[2], VS * 1.001, col[0], col[1], col[2], metal, glow); };
+      // Each voxel's size carries a tag far too small to see, where on the bike it is, so the rain drops on it stay with the bike as it
+      // goes rather than sliding across it.
+      const tag = (x, y, z) => VS * 1.001 + (((x * 7 + y * 13 + z * 31) & 127) + 1) * 1.5e-6;
+      const vox = (x, y, z, col, metal, glow = 0) => { const p = at(x, y, z); add(p[0], p[1], p[2], tag(x, y, z), col[0], col[1], col[2], metal, glow); };
       const L = LOOKS[b.look || 0];
       for (const [x, y, z, r, g, bl, metal, glow, part] of MODEL) {
         if (L && part === 'B' && !L.bags) continue;
         const p = at(x, y, z);
         // The headlamp's glass: lit when it is on, a dull grey-yellow when it is not.
-        if (glow > 1.3 && !b.light) { add(p[0], p[1], p[2], VS * 1.001, .55, .53, .45, 3, 0); continue; }
+        if (glow > 1.3 && !b.light) { add(p[0], p[1], p[2], tag(x, y, z), .55, .53, .45, 3, 0); continue; }
         if (L && part) {
           // Painted, with the odd chip gone to rust; the seat in its leather; the forks in theirs.
           let c = null, m = metal;
@@ -891,9 +899,9 @@ export class Bikes {
           else if (part === 'S') c = L.seat;
           else if (part === 's') c = L.stitch;
           else if (part === 'F') c = L.fork;
-          if (c) { add(p[0], p[1], p[2], VS * 1.001, c[0], c[1], c[2], m, glow); continue; }
+          if (c) { add(p[0], p[1], p[2], tag(x, y, z), c[0], c[1], c[2], m, glow); continue; }
         }
-        add(p[0], p[1], p[2], VS * 1.001, r, g, bl, metal, glow);
+        add(p[0], p[1], p[2], tag(x, y, z), r, g, bl, metal, glow);
       }
       wheelCells(false, b.spin, vox);
       wheelCells(true, b.spin, vox);

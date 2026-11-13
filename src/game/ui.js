@@ -725,7 +725,13 @@ export class UI {
     const over = P.carryWeight() > P.carryCap();
     // The armour and status line under your health is off for now: the corner up top says what matters.
     if (false) $('armor-tag').textContent = [P.armor ? ITEMS[P.armor].name : '', P.infection > 0 ? `Infected ${Math.round(P.infection)}%` : '', over ? 'Overloaded' : '', P.stim > 0 ? 'Adrenaline' : '', eats && P.hunger <= 0 ? 'Starving' : eats && P.hunger <= 25 ? 'Hungry' : '', eats && P.rest <= 0 ? 'Exhausted' : eats && P.rest <= 35 ? 'Tired' : ''].filter(Boolean).join(' / ');
-    if (it) {
+    // On a motorbike, the corner where the ammunition goes shows the tank instead: there is nothing to shoot with both hands on the bars.
+    const riding = g.bikes && g.bikes.ride;
+    if (riding) {
+      const pc = Math.round(riding.fuel * 100), low = riding.fuel <= .1;
+      $('wname').textContent = riding.fuel <= 0 ? 'Out of petrol' : low ? 'Petrol low: a mechanic will fill it' : 'Petrol';
+      $('ammo').innerHTML = `<span style="color:${low ? 'var(--red)' : 'inherit'}">${pc}<small>%</small></span>`;
+    } else if (it) {
       $('wname').textContent = it.name;
       if (it.type === 'gun') {
         $('ammo').innerHTML = `${P.reloadT > 0 && !(it.perShell || it.cylinder) ? '<small>reloading</small>' : P.mags[P.weapon] ?? 0} <small>/ ${P.count(it.ammo)}</small>`;
@@ -766,7 +772,7 @@ export class UI {
     if (need.exhausted) status += `<div class="need"><b>Exhausted</b><span>Slower, shakier aim, and you tire fast. You are losing health. Find a bed.</span></div>`;
     else if (need.tired) status += `<div class="need"><b>Tired</b><span>A little slower, and your aim wanders. Find somewhere to sleep.</span></div>`;
     const ride = g.bikes && g.bikes.ride;
-    if (ride) status += `<div class="need"><b>${ride.fuel <= 0 ? 'Out of petrol' : ride.fuel <= .1 ? 'Low petrol' : 'Petrol'}</b><span>${Math.round(ride.fuel * 100)}% in the tank.${ride.fuel <= .1 ? ' A mechanic will fill it up.' : ''}</span></div>`;
+    // (Petrol shows where the ammunition count goes while riding, not up here.)
     if (P.carryWeight() > P.carryCap()) status += `<div class="need"><b>Overweight</b><span>${P.carryWeight().toFixed(1)} / ${P.carryCap()} kg. You are slowed down. Drop or stash something.</span></div>`;
     this.hudCamp = faction;
     $('status').innerHTML = status;
