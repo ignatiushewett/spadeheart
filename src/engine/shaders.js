@@ -866,6 +866,7 @@ uniform int uDepthOnly;
 out vec3 vWorld;
 out vec3 vNormal;
 out vec3 vLocal;
+out vec3 vLocalN;   // which way the face points on the body at rest, for the rain drops sat on it
 flat out int vVariant;
 flat out int vSlot;
 out float vDead;
@@ -1125,7 +1126,7 @@ void main(){
   vNormal=vec3(n.x*cy+n.z*sy,n.y,-n.x*sy+n.z*cy);
   vWorld=wp;
   // A touch inside the surface: right on it, floor() lands either side of a whole cell at random, and the pattern shimmers.
-  vLocal=aPos-aNormal*.05;
+  vLocal=aPos-aNormal*.05; vLocalN=aNormal;
   gl_Position=uViewProj*vec4(wp,1.);
   if(hide) gl_Position=vec4(2.,2.,2.,1.);
 }`;
@@ -1134,6 +1135,7 @@ export const ACTOR_FS = COMMON + FRAME_UNIFORMS + LIGHTING + /* glsl */`
 in vec3 vWorld;
 in vec3 vNormal;
 in vec3 vLocal;
+in vec3 vLocalN;
 flat in int vVariant;
 flat in int vSlot;
 in float vDead;
@@ -1190,14 +1192,29 @@ void main(){
   }
   vec3 c=shade(col,vWorld,n,1.,ao,dist);
   if(wetK>0.){
-    // And a sheen on it: whatever the sky and the lamps give, caught at the edges, with a few beads catching the light on the shoulders and the hat.
+    // And a sheen on it, the wetter they are and the harder it is coming down: whatever the sky and the lamps give, caught at the edges,
+    // and a hard glint of the sun off the wet.
     vec3 v=normalize(uCam-vWorld);
     float rim=pow(1.-max(dot(n,v),0.),3.);
     vec3 env=uSkyCol*.55+uHorizon*.25+cityLight(vWorld)*.5+dynLights(vWorld,n)*.15;
-    c+=env*rim*wetK*.55;
-    vec3 bq=floor(vLocal*20.);
-    float bead=step(.978,hash12(bq.xz+bq.y*3.7+float(vVariant)*1.3+floor(uTime*.6+hash12(bq.xy)*5.)))*step(.4,n.y);
-    c+=env*bead*smoothstep(.5,.9,wetK)*.22;
+    float shine=wetK*(.65+.35*uRainNow);
+    c+=env*(.04+rim*.75)*shine;
+    c+=uSunCol*pow(max(dot(reflect(-v,n),uSunDir),0.),40.)*sampleShadow(vWorld,n,dist)*shine*.35;
+    // Drops sat on them while the rain is landing, the same as on a gun or a bike: each spot gets one now and then, holds it and loses it on
+    // its own clock, and some run down before they go. They stay put on the body as it moves.
+    if(uRainNow>.01){
+      vec3 bp=vLocal*30., cell=floor(bp);
+      float seed=hash12(cell.xy*1.7+cell.z*3.1+float(vVariant)*.37), ph=uTime*(.45+seed*.9)*.8+seed*9.;
+      float life=fract(ph), gen=floor(ph);
+      vec3 q=bp;
+      if(hash12(cell.zx+gen*.37+3.)<.3*uRainNow) q.y+=life*life*2.;   // sampled higher as it goes: the drop itself slides down
+      vec3 rc=floor(q), f=fract(q)-.5, ln=normalize(vLocalN);
+      // More of them the harder it rains, from the first drops on, and more again once they are soaked through.
+      float on=step(1.-.08*uRainNow*(.45+.55*wetK),hash12(rc.xy+rc.z*7.1+gen*1.13+float(vVariant)))*smoothstep(0.,.12,life)*smoothstep(1.,.6,life);
+      float bead=on*smoothstep(.36,.0,length(f-ln*dot(f,ln)));
+      vec3 L=shade(vec3(1.),vWorld,n,1.,ao,dist);
+      c+=(L*.75+env*.25+vec3(.01))*mix(vec3(1.),.35+col*2.2,.45)*bead*(.5+.5*wetK)*.68;
+    }
   }
   // What a torch throws back off the ground and off whatever it lands on: just enough to make out who is holding it.
   if(vTorch>0){
@@ -1317,15 +1334,15 @@ void main(){
       if(uRainNow>.01){
         // Drops: each spot on the bike gets one now and then, holds it and loses it on its own clock; some run before they go.
         vec3 wp=vWorld*40., cell=floor(wp);
-        float seed=hash12(cell.xy*1.7+cell.z*3.1), ph=uTime*(.45+seed*.9)+seed*9.;
+        float seed=hash12(cell.xy*1.7+cell.z*3.1), ph=uTime*(.45+seed*.9)*.8+seed*9.;
         float life=fract(ph), gen=floor(ph);
         vec3 q=wp;
         if(hash12(cell.zx+gen*.37+3.)<.3*uRainNow) q.y+=life*life*2.;
         vec3 rc=floor(q), f=fract(q)-.5;
-        float on=step(1.-.09*w*uRainNow,hash12(rc.xy+rc.z*7.1+gen*1.13))*smoothstep(0.,.12,life)*smoothstep(1.,.6,life);
+        float on=step(1.-.065*w*uRainNow,hash12(rc.xy+rc.z*7.1+gen*1.13))*smoothstep(0.,.12,life)*smoothstep(1.,.6,life);
         float bead=on*smoothstep(.36,.0,length(f-N*dot(f,N)));
         // A bead takes some of the colour of what it sits on: water on dark paint, not a white fleck.
-        c+=(L*.75+env*.25+vec3(.01))*mix(vec3(1.),.35+col*2.2,.45)*bead*w*1.2;
+        c+=(L*.75+env*.25+vec3(.01))*mix(vec3(1.),.35+col*2.2,.45)*bead*w*.68;
       }
     }
   }
