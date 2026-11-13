@@ -1222,14 +1222,11 @@ void main(){
       vec3 q=bp;
       if(hash12(cell.zx+gen*.37+3.)<.3*uRainNow) q.y+=life*life*2.;   // sampled higher as it goes: the drop itself slides down
       vec3 rc=floor(q), f=fract(q)-.5, ln=normalize(vLocalN);
-      float hi;
       // More of them the harder it rains, from the first drops on, and more again once they are soaked through.
       float on=step(1.-.08*uRainNow*(.45+.55*wetK),hash12(rc.xy+rc.z*7.1+gen*1.13+float(vVariant)))*smoothstep(0.,.12,life)*smoothstep(1.,.6,life);
-      float bead=on*dropShape(f,ln,.3,hi);
+      float bead=on*smoothstep(.36,.0,length(f-ln*dot(f,ln)));
       vec3 L=shade(vec3(1.),vWorld,n,1.,ao,dist);
-      vec3 glint=(L*.75+env*.25+vec3(.01))*mix(vec3(1.),.35+col*2.2,.45);
-      c=mix(c,c*.8,bead*.5);
-      c+=glint*(on*hi*.9+bead*.18)*(.5+.5*wetK)*.68;
+      c+=(L*.75+env*.25+vec3(.01))*mix(vec3(1.),.35+col*2.2,.45)*bead*(.5+.5*wetK)*.68;
     }
   }
   // What a torch throws back off the ground and off whatever it lands on: just enough to make out who is holding it.
@@ -1367,11 +1364,9 @@ void main(){
         float life=fract(ph), gen=floor(ph);
         vec3 f=fract(wp)-.5;
         float on=step(1.-.065*w*uRainNow*1.5,hash12(cell.xy+cell.z*7.1+gen*1.13))*smoothstep(0.,.12,life)*smoothstep(1.,.6,life);
-        float hi, bead=on*dropShape(f,ln,.3,hi);
-        // Water on dark paint, a little darker where it sits, with a point of whatever light there is in it.
-        vec3 glint=(L*.75+env*.25+vec3(.01))*mix(vec3(1.),.35+col*2.2,.45);
-        c=mix(c,c*.8,bead*w*.5);
-        c+=glint*(on*hi*.9+bead*.18)*w*.68;
+        float bead=on*smoothstep(.36,.0,length(f-ln*dot(f,ln)));
+        // A bead takes some of the colour of what it sits on: water on dark paint, not a white fleck.
+        c+=(L*.75+env*.25+vec3(.01))*mix(vec3(1.),.35+col*2.2,.45)*bead*w*.68;
       }
     }
   }
@@ -1569,12 +1564,9 @@ void main(){
     if(runs) q.y+=life*life*2.;
     vec3 rc=floor(q);
     float on=step(1.-.1*w*uRainVM,bh(rc+gen*1.13))*smoothstep(0.,.12,life)*smoothstep(1.,.6,life);
-    // Round and crisp-edged however big a face it sits on and however close it is held, with a point of light in it.
-    float hi, bead=on*dropShape(fract(q)-.5,normalize(vModelN),.32,hi);
+    float bead=on*smoothstep(.35,.0,length(fract(q)-.5));
     // A bead takes some of the colour of what it sits on: water on dark metal, not a white fleck.
-    vec3 glint=(light*.6+uFlash*.3+vec3(.008))*mix(vec3(1.),.35+col*2.2,.45);
-    c=mix(c,c*.82,bead*w*.5);
-    c+=glint*(on*hi*1.1+bead*.35)*w*1.05;
+    c+=(light*.6+uFlash*.3+vec3(.008))*mix(vec3(1.),.35+col*2.2,.45)*bead*w*1.05;
   }
   // Down a long handle the rain gathers into runs: a drop slides down the wood towards your hand, leaving a wet line behind it, and
   // the next one starts at the top. Only on the handle itself (the shaft under the head), and only while rain is landing on it.
