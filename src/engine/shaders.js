@@ -1356,19 +1356,17 @@ void main(){
       c+=(env*(.03+.5*fres)+L*.35*fres)*w*.6;
       c+=uSunCol*pow(max(dot(Rf,uSunDir),0.),90.)*sh*w*.9;
       if(uRainNow>.01){
-        // Drops: each spot on the bike gets one now and then, holds it and loses it on its own clock. On the bike's own voxel, four
-        // spots to a side, not in the world, so they go where it goes; and with the bike moving, blown back along it and drawn out into
-        // streaks, the faster the further, coming off the back of each piece and new ones coming on at the front.
+        // Drops: each spot on the bike gets one now and then, holds it and loses it on its own clock, on the bike's own voxel (four spots
+        // to a side) so they go where it goes. Riding, they creep slowly back towards you over the tank and the guards. (A voxel's own
+        // +z is the bike's back.)
         vec3 ln=normalize(vLocN);
-        float mv=clamp(vSpeed/14.,0.,1.)*(1.-abs(ln.z));
         vec3 wp=vLoc*4.+.5;
-        wp.z+=uTime*vSpeed*.9*(1.-abs(ln.z));
+        wp.z-=uTime*min(vSpeed,18.)*.07*(1.-abs(ln.z));   // sampled further forward as time goes: the drops themselves move back
         vec3 cell=floor(wp)+vec3(vSeed*.7,vSeed*1.3,vSeed*2.1);
         float seed=hash12(cell.xy*1.7+cell.z*3.1), ph=uTime*(.45+seed*.9)*.8+seed*9.;
         float life=fract(ph), gen=floor(ph);
         vec3 f=fract(wp)-.5;
-        f.z*=mix(1.,.42,mv);
-        float on=step(1.-.065*w*uRainNow*1.5,hash12(cell.xy+cell.z*7.1+gen*1.13))*mix(smoothstep(0.,.12,life)*smoothstep(1.,.6,life),1.,mv);
+        float on=step(1.-.065*w*uRainNow*1.5,hash12(cell.xy+cell.z*7.1+gen*1.13))*smoothstep(0.,.12,life)*smoothstep(1.,.6,life);
         float hi, bead=on*dropShape(f,ln,.3,hi);
         // Water on dark paint, a little darker where it sits, with a point of whatever light there is in it.
         vec3 glint=(L*.75+env*.25+vec3(.01))*mix(vec3(1.),.35+col*2.2,.45);
