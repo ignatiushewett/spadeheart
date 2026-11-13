@@ -107,6 +107,10 @@ for (const k of ['PAINT_Y', 'PAINT_K', 'BARN_R', 'CONT_G', 'RUST', 'STAINED', 'C
   CLOTH_OF[src] = id;
 }
 
+// White canvas that has been out in the weather a while: patches and the splashed bottom edge of a white tent. Added last, so every
+// material before it keeps its number.
+m('TENT_W_DIRTY', 0x9c978a, 2, F_CLOTH);
+
 export const isGlass = (id) => (FLAGS[id] & F_GLASS) !== 0;
 // Glass around a hole: crazed right across, still in the frame, barely. Each pane colour has its broken self.
 export const CRACKED = new Uint8Array(256);

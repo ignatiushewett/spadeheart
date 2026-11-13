@@ -1298,23 +1298,35 @@ void main(){
     vec3 tint=mix(vec3(1.),col*1.6,.55);
     c=c*(1.-.45*k)+env*tint*(.25+.55*k)*(.6+.4*fres)+uSunCol*tint*sp*(.5+1.6*k);
   }
-  // Out in the rain, a bike gets wet the way a gun or a coat does: everything darker, a wet shine over paint and leather alike, a
-  // hard glint of what light there is, and drops sat on it that come and go while the rain is landing. Under cover it stays dry.
+  // Out in the rain, a bike gets wet the way a gun or a coat does: everything darker, a hard wet shine that gives back whatever light
+  // there is (the sky by day, the lamps and the headlamp by night), and drops of water on it, each with its own life: landing, sitting a
+  // while catching the light, and some of them running down before they go. Under cover it stays dry.
   if(vBuilt>.5&&(uWet>.01||uRainNow>.01)){
-    float w=clamp(max(uWet*1.3,uRainNow),0.,1.)*underSky(vWorld+vec3(0.,.6,0.),1.);
+    float w=clamp(max(uWet*1.4,uRainNow*1.2),0.,1.)*underSky(vWorld+vec3(0.,.6,0.),1.);
     if(w>.01){
       vec3 V=normalize(uCam-vWorld), Rf=reflect(-V,N);
+      // All the light falling here, whatever it comes from: the sky and sun, and at night the lamps round about.
+      vec3 L=shade(vec3(1.),vWorld,N,1.,.9,dist);
       vec3 env=Rf.y>0.?mix(uHorizon,uSkyCol,clamp(Rf.y*1.6,0.,1.)):uGroundCol*.5;
       float fres=pow(1.-max(dot(N,V),0.),3.);
       float sh=sampleShadow(vWorld,N,dist);
-      c=c*mix(1.,.72,w)+env*(.06+.32*fres)*w+uSunCol*pow(max(dot(Rf,uSunDir),0.),70.)*sh*w*.7;
-      // The drops: a few spots on each little cube, each with a drop on it now and then, and on its own clock.
-      vec3 q=vLoc*4.+.5, cell=floor(q);
-      float h=hash12(cell.xy*1.7+cell.z*3.1+vSeed), life=fract(uTime*(.3+h*.5)+h*7.);
-      float on=step(.95,hash12(cell.zx*2.3+floor(uTime*(.3+h*.5)+h*7.)+vSeed))*smoothstep(0.,.15,life)*smoothstep(1.,.6,life)*uRainNow;
-      vec3 f=fract(q)-.5;
-      float bead=on*smoothstep(.2,.04,length(f-N*dot(f,N)));
-      c+=(env*.35+uSunCol*.08+vec3(.004))*bead*w;
+      c*=mix(1.,.55,w);
+      // The shine is in the reflection, strongest at a glancing angle: looked straight down on, wet paint is just darker.
+      c+=(env*(.03+.5*fres)+L*.35*fres)*w*.6;
+      c+=uSunCol*pow(max(dot(Rf,uSunDir),0.),90.)*sh*w*.9;
+      if(uRainNow>.01){
+        // Drops: each spot on the bike gets one now and then, holds it and loses it on its own clock; some run before they go.
+        vec3 wp=vWorld*40., cell=floor(wp);
+        float seed=hash12(cell.xy*1.7+cell.z*3.1), ph=uTime*(.45+seed*.9)+seed*9.;
+        float life=fract(ph), gen=floor(ph);
+        vec3 q=wp;
+        if(hash12(cell.zx+gen*.37+3.)<.3*uRainNow) q.y+=life*life*2.;
+        vec3 rc=floor(q), f=fract(q)-.5;
+        float on=step(1.-.09*w*uRainNow,hash12(rc.xy+rc.z*7.1+gen*1.13))*smoothstep(0.,.12,life)*smoothstep(1.,.6,life);
+        float bead=on*smoothstep(.36,.0,length(f-N*dot(f,N)));
+        // A bead takes some of the colour of what it sits on: water on dark paint, not a white fleck.
+        c+=(L*.75+env*.25+vec3(.01))*mix(vec3(1.),.35+col*2.2,.45)*bead*w*1.2;
+      }
     }
   }
   outCol=vec4(applyFog(c,vWorld),1.);

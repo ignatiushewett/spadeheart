@@ -246,6 +246,10 @@ export class Bikes {
         const s = Y.bikes[slot], b = new Bike(s.x, 0, s.z, s.yaw);
         b.y = b.sy = this.ground(s.x, s.z, STREET_Y + 2);
         b.yard = c.id;
+        // The same two bikes every time you come by, never the same look as each other, and not the same in every town. The one for
+        // sale is a new one each day it is sold.
+        const base = (c.id * 7 + 3) % LOOKS.length;
+        b.look = sale ? (base + 1 + (g.day * 3 + c.id) % (LOOKS.length - 1)) % LOOKS.length : base;
         if (sale) { b.forSale = true; b.locked = true; } else { b.broken = true; b.inBits = true; }
         this.list.push(b);
       };

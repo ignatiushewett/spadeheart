@@ -972,11 +972,11 @@ function stampPart(p, c, box, put, car, letterAt) {
       // Boards on the ground inside, to keep the mud off.
       for (let u = 0; u < W2; u++) for (let v = 0; v < D2; v++) T(u, -1, v, M.PLANK);
       // Weathered canvas, patched where it tore, mud splashed up the bottom.
-            const cv = (u, y, v) => { const k = ((u * 73856093) ^ (y * 19349663) ^ (v * 83492791) ^ x0) >>> 0; return y === 0 && k % 3 === 0 ? M.CANVAS : k % 13 === 0 ? M.CANVAS : M.TENT_W; };
+            const cv = (u, y, v) => { const k = ((u * 73856093) ^ (y * 19349663) ^ (v * 83492791) ^ x0) >>> 0; return y === 0 && k % 3 === 0 ? M.TENT_W_DIRTY : k % 9 === 0 ? M.TENT_W_DIRTY : M.TENT_W; };
       // The canvas: the two ends up to the roof, the back wall, and the front, its way in wide open with the flaps tied back.
       for (let v = 0; v < D2; v++) for (let y = 0; y < roofY(v); y++) { T(0, y, v, cv(0, y, v)); T(15, y, v, cv(15, y, v)); }
       for (let u = 1; u < W2 - 1; u++) for (let y = 0; y < 4; y++) { if (!(u >= 13 && u <= 14 && y < 3)) T(u, y, 0, cv(u, y, 0)); if (u < 4 || u > 11 || y === 3) T(u, y, 11, cv(u, y, 11)); }
-      for (let y = 0; y < 3; y++) { T(3, y, 11, M.CANVAS); T(12, y, 11, M.CANVAS); }
+      for (let y = 0; y < 3; y++) { T(3, y, 11, M.TENT_W_DIRTY); T(12, y, 11, M.TENT_W_DIRTY); }
       for (let u = 0; u < W2; u++) for (let v = 0; v < D2; v++) T(u, roofY(v), v, cv(u, 9, v));
       // A red cross along the ridge, for anyone looking down from the wall.
       for (let u = 6; u <= 9; u++) for (const v of [5, 6]) T(u, 6, v, M.AWN_R);
