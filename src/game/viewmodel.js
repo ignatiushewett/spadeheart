@@ -622,6 +622,8 @@ export class ViewModel {
     if (u.uWetVM) gl.uniform1f(u.uWetVM, this.wet);
     if (u.uRainVM) gl.uniform1f(u.uRainVM, this.rainOn ?? 0);
     if (u.uVMTime) gl.uniform1f(u.uVMTime, this.t % 1000);
+    // A gun sits close under your eye; a tool is held further out, where drops that size would be too small to see.
+    if (u.uDropScale) gl.uniform1f(u.uDropScale, pose.melee ? 100 * Math.min(1, .48 / Math.max(.3, -pose.pos[2])) : 100);
     const split = this.split[id];
     if (split) {
       gl.bindVertexArray(split.frame.vao);

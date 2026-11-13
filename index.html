@@ -486,13 +486,14 @@ body.talking #hud > *:not(#caption) { visibility: hidden; }
   </div>
   <div id="prompt"></div>
   <div id="caption"></div>
-  <div id="sleep-veil"></div>
   <div id="toasts"></div>
   <div id="right-col"><div id="tracker"></div><div id="battle-report"></div></div>
   <div id="banner"><h2></h2><p></p></div>
   <div id="markers"></div>
   <div id="overhead"></div>
 </div>
+<!-- Outside the HUD, so the interface opacity setting never thins the fade to black when you sleep. -->
+<div id="sleep-veil"></div>
 <div id="fps"></div>
 <div id="devmenu">
   <div class="dev-head">Dev <span>F4</span></div>

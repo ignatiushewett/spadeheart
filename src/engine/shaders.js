@@ -1415,6 +1415,7 @@ uniform float uVM;      // 1 for what you are holding: marks its pixels so the s
 uniform float uWetVM;   // rain on it
 uniform float uRainVM;  // rain landing on it now (0 under cover: no new drops, nothing runs)
 uniform float uVMTime;  // a clock for the drops on it
+uniform float uDropScale; // drops to the metre on it: fewer and bigger on a tool held out at arm's length, so they still show
 uniform float uAdd;     // the muzzle flash: light only, added on
 in vec3 vModel;
 layout(location=0) out vec4 outCol;
@@ -1438,11 +1439,11 @@ void main(){
   if(w>.01&&uRainVM>.01){
     // Drops, not a pattern: each spot gets a drop now and then, holds it a moment and loses it, every spot on its own clock.
     // Some of them run: down the gun a little way before they go. The rain keeps them coming.
-    vec3 cell=floor(vModel*100.);
+    vec3 cell=floor(vModel*uDropScale);
     float seed=bh(cell+17.), rate=.45+seed*.9, ph=uVMTime*rate+seed*9.;
     float life=fract(ph), gen=floor(ph);
     bool runs=bh(cell+gen*.37+3.)<.3*uRainVM;
-    vec3 q=vModel*100.;
+    vec3 q=vModel*uDropScale;
     if(runs) q.y+=life*life*2.;
     vec3 rc=floor(q);
     float on=step(1.-.1*w*uRainVM,bh(rc+gen*1.13))*smoothstep(0.,.12,life)*smoothstep(1.,.6,life);
