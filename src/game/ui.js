@@ -642,13 +642,18 @@ export class UI {
     // The hue is the game's own: the colour the haze is right now (orange at sunset, blue-black at night, grey in rain), brought to full
     // brightness and taken a good way back towards white, so the map has the same cast as the view without losing its colours.
     const fog = sky.fog || [1, 1, 1], f = [Math.sqrt(Math.max(0, fog[0])), Math.sqrt(Math.max(0, fog[1])), Math.sqrt(Math.max(0, fog[2]))], top = Math.max(f[0], f[1], f[2], 1e-4);
-    mix([f[0] / top, f[1] / top, f[2] / top], .5);
-    // How light it is: dimmer at night, and a touch in rain and with the sun low, but never so dark it stops being a map.
-    const lit = Math.max(.58, 1 - night * .4 - rain * .1 - low * .06);
+    mix([f[0] / top, f[1] / top, f[2] / top], .9);
+    // Rain lays a cold grey-blue over all of it, on top of whatever the hour is doing.
+    mix([.72, .8, .92], rain * .8);
+    // How light it is: much dimmer at night, darker under rain and with the sun low, but never so dark it stops being a map.
+    const lit = Math.max(.5, 1 - night * .5 - rain * .18 - low * .1);
     r *= lit; gg *= lit; b *= lit;
-    mix([1, .97, .92], noonish * .5 * (1 - low));
+    mix([1, .95, .86], noonish * .8 * (1 - low));
     const col = `rgb(${Math.round(r * 255)},${Math.round(gg * 255)},${Math.round(b * 255)})`;
     if (col !== this.gradeCol) { this.gradeCol = col; for (const el of document.querySelectorAll('.map-grade')) el.style.background = col; }
+    // And the rain itself, driving across both maps, as hard as it is coming down.
+    const ro = (rain > .03 ? Math.min(1, .25 + rain * .85) : 0).toFixed(2);
+    if (ro !== this.mapRainO) { this.mapRainO = ro; for (const el of document.querySelectorAll('.map-rain')) el.style.opacity = ro; }
   }
 
   updateHUD(dt) {
