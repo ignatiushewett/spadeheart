@@ -1416,6 +1416,7 @@ uniform float uWetVM;   // rain on it
 uniform float uRainVM;  // rain landing on it now (0 under cover: no new drops, nothing runs)
 uniform float uVMTime;  // a clock for the drops on it
 uniform float uDropScale; // drops to the metre on it: fewer and bigger on a tool held out at arm's length, so they still show
+uniform float uRunVM;   // 1 on a long wooden handle: water gathers and runs down it
 uniform float uAdd;     // the muzzle flash: light only, added on
 in vec3 vModel;
 layout(location=0) out vec4 outCol;
@@ -1450,6 +1451,24 @@ void main(){
     float bead=on*smoothstep(.35,.0,length(fract(q)-.5));
     // A bead takes some of the colour of what it sits on: water on dark metal, not a white fleck.
     c+=(light*.6+uFlash*.3+vec3(.008))*mix(vec3(1.),.35+col*2.2,.45)*bead*w*1.05;
+  }
+  // Down a long handle the rain gathers into runs: a drop slides down the wood towards your hand, leaving a wet line behind it, and
+  // the next one starts at the top. Only on the handle itself (the shaft under the head), and only while rain is landing on it.
+  if(uRunVM>.01&&w>.01&&uRainVM>.01&&abs(vModel.x)<.03&&abs(vModel.z)<.03&&vModel.y<.68&&vModel.y>-.02){
+    float S=uDropScale*.75, u=(vModel.x+vModel.z)*S+(abs(n.x)>abs(n.z)?.5:0.);
+    float lane=floor(u), sd=bh(vec3(lane,7.,3.)+floor(abs(n.x)*2.)*13.);
+    if(sd<.75){
+      float speed=.07+sd*.12, span=.72;
+      float k=fract(uVMTime*speed/span+sd*9.);
+      float y0=.66-k*span*k*(.6+.4*k);
+      float dy=vModel.y-y0, across=abs(fract(u)-.5);
+      float inLane=smoothstep(.34,.12,across);
+      float drop=smoothstep(.017,.005,abs(dy))*inLane;
+      float trail=step(0.,dy)*smoothstep(.2,0.,dy)*smoothstep(.24,.08,across);
+      c=mix(c,c*.55,trail*w*.6);
+      c+=(light*.5+vec3(.006))*trail*w*.25;
+      c+=(light*.9+uFlash*.3+vec3(.014))*mix(vec3(1.),.35+col*2.2,.35)*drop*w*uRainVM*1.7;
+    }
   }
   outCol=vec4(c,1.-uVM);
 }`;

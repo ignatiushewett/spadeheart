@@ -124,7 +124,6 @@ select { background: #1c1b18; color: var(--ink); border: 1px solid var(--line); 
 
 /* HUD */
 #hud { zoom: var(--ui-scale, 1); opacity: var(--ui-alpha, 1); }
-#scope { zoom: calc(1 / var(--ui-scale, 1)); }
 #hud { display: none; }
 #hud.on { display: block; }
 #crosshair { position: absolute; left: 50%; top: 50%; width: 0; height: 0; }
@@ -134,7 +133,8 @@ select { background: #1c1b18; color: var(--ink); border: 1px solid var(--line); 
 #hitmark { position: absolute; left: 50%; top: 50%; width: 22px; height: 22px; margin: -11px; opacity: 0; }
 #hitmark::before, #hitmark::after { content: ""; position: absolute; left: 10px; top: -2px; width: 2px; height: 26px; background: #fff; transform: rotate(45deg); }
 #hitmark::after { transform: rotate(-45deg); }
-#scope { position: absolute; inset: 0; display: none; background: radial-gradient(circle at center, rgba(0,0,0,0) 0, rgba(0,0,0,0) 32vh, #000 33vh); }
+/* Outside the HUD: what you see down a scope is not interface, so the interface opacity setting leaves its black surround alone. */
+#scope { position: fixed; inset: 0; pointer-events: none; display: none; background: radial-gradient(circle at center, rgba(0,0,0,0) 0, rgba(0,0,0,0) 32vh, #000 33vh); }
 #scope::before { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: rgba(0,0,0,.8); }
 #scope::after { content: ""; position: absolute; top: 50%; left: 0; right: 0; height: 1px; background: rgba(0,0,0,.8); }
 #vitals { position: absolute; left: 26px; bottom: 24px; width: 268px; text-shadow: 0 1px 2px #000; }
@@ -463,9 +463,9 @@ body.talking #hud > *:not(#caption) { visibility: hidden; }
 <body>
 <canvas id="gl"></canvas>
 
+<div id="scope"></div>
 <div id="hud" class="layer">
   <div id="shot-fx"></div>
-  <div id="scope"></div>
   <div id="crosshair"></div>
   <div id="hitmark"></div>
   <div id="dmg"></div>

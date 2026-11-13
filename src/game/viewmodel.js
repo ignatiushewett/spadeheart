@@ -353,6 +353,8 @@ export class ViewModel {
     this.lmgCover = buildVAO(gl, LMG_COVER);
     this.bolt = buildVAO(gl, BOLT);
     this.lmgBox = buildVAO(gl, LMG_BOX);
+    // A drop of water, for the ones that gather on the end of a handle and fall off it.
+    this.dripVao = buildVAO(gl, [[0, 0, 0, .009, .013, .009, 0x9fb4c0, .45]]);
     this.roundVao = buildVAO(gl, [[0, 0, .006, .0105, .0105, .026, 0xb8893a], [0, 0, .02, .0125, .0125, .003, 0xa07a34], [0, 0, -.011, .0085, .0085, .009, 0x8d8f94]]);
     // The gun on springs: where the last shot threw it, and how fast it is coming back. A stiff spring, lightly damped, so it snaps back
     // with a little overshoot rather than sliding home.
@@ -424,6 +426,32 @@ export class ViewModel {
       gl.drawArrays(gl.TRIANGLES, 0, box.count);
     }
     if (bound) gl.bindVertexArray(null);
+  }
+
+  // Water off the sledge in the rain: a drop gathers under an end of the head, swells, lets go and falls, and the next one starts to
+  // gather somewhere along it. Faster in a downpour. mv is the sledge's own placing; the drop falls straight down in the world.
+  drip(gl, u, mv, r, dt) {
+    const d = this.dripS || (this.dripS = { t: 0, hang: .8, x: .045, z: -.12 });
+    const rain = this.rainOn || 0;
+    if (!(this.wet > .25 && rain > .3)) { d.t = 0; return; }
+    d.t += Math.min(dt, 1 / 30);
+    const fall = d.t - d.hang;
+    if (fall > .4) {
+      d.t = 0; d.hang = (.4 + Math.random() * .7) / Math.max(.5, rain);
+      // Under one end of the head or the other, towards one side.
+      d.x = (Math.random() < .5 ? -1 : 1) * (.02 + Math.random() * .035); d.z = Math.random() < .5 ? -.125 + Math.random() * .03 : .105 - Math.random() * .03;
+      return;
+    }
+    const sc = fall < 0 ? .35 + .65 * Math.min(1, d.t / d.hang) : 1;
+    const ex = d.x, ey = .689 - .0065 * sc, ez = d.z;
+    let x = mv[0] * ex + mv[4] * ey + mv[8] * ez + mv[12], y = mv[1] * ex + mv[5] * ey + mv[9] * ez + mv[13], z = mv[2] * ex + mv[6] * ey + mv[10] * ez + mv[14];
+    if (fall > 0) { const v = r.view, h = 4.9 * fall * fall; x -= v[4] * h; y -= v[5] * h; z -= v[6] * h; }
+    const L = this.local;
+    L.fill(0); L[0] = L[5] = L[10] = sc; L[15] = 1; L[12] = x; L[13] = y; L[14] = z;
+    gl.uniformMatrix4fv(u.uModelView, false, L);
+    gl.bindVertexArray(this.dripVao.vao);
+    gl.drawArrays(gl.TRIANGLES, 0, this.dripVao.count);
+    gl.uniformMatrix4fv(u.uModelView, false, mv);
   }
 
   draw(gl, r, player, dt) {
@@ -623,6 +651,7 @@ export class ViewModel {
     if (u.uRainVM) gl.uniform1f(u.uRainVM, this.rainOn ?? 0);
     if (u.uVMTime) gl.uniform1f(u.uVMTime, this.t % 1000);
     // A gun sits close under your eye; a tool is held further out, where drops that size would be too small to see.
+    if (u.uRunVM) gl.uniform1f(u.uRunVM, id === 'sledge' ? 1 : 0);
     if (u.uDropScale) gl.uniform1f(u.uDropScale, pose.melee ? 100 * Math.min(1, .48 / Math.max(.3, -pose.pos[2])) : 100);
     const split = this.split[id];
     if (split) {
@@ -640,6 +669,8 @@ export class ViewModel {
     } else {
       gl.bindVertexArray(m.vao);
       gl.drawArrays(gl.TRIANGLES, 0, m.count);
+      if (u.uRunVM) gl.uniform1f(u.uRunVM, 0);
+      if (id === 'sledge') this.drip(gl, u, mv, r, dt);
       if (id === 'deer' || id === 'hunting') {
         // The bolt: lifted (turned about the bore), drawn back, run forward, turned down, over most of the time between shots.
         const D = (id === 'deer' ? .8 : 1.05) * .85;

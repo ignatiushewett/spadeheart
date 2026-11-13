@@ -220,7 +220,7 @@ export class UI {
     this.prevModal.length = 0;
   }
 
-  showHUD(on) { $('hud').classList.toggle('on', on); if (!on) $('hud').classList.remove('hud-off'); }
+  showHUD(on) { $('hud').classList.toggle('on', on); if (!on) { $('hud').classList.remove('hud-off'); $('scope').style.display = 'none'; } }
 
   loading(title, pct, sub = '', soft = false, boot = false) {
     if (this.modal !== 'loading') this.open('loading', false);
