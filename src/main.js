@@ -2723,15 +2723,14 @@ class Game {
     const R = this.menuPath, k = this.menuFlight * this.menuFlight * (3 - 2 * this.menuFlight), q = 1 - k;
     const look = k;
     const px = q * q * R.from.x + 2 * q * k * R.bend.x + k * k * R.to.x, pz = q * q * R.from.z + 2 * q * k * R.bend.z + k * k * R.to.z;
-    // At the end of it, a boat's worth of movement and no more.
-    const drift = Math.sin(t * .5) * 3.5 * k;
-    cam.x = px + C.uz * drift;
-    cam.z = pz - C.ux * drift;
-    cam.y = STREET_Y + MENU_SHOT.startHeight + (MENU_SHOT.height - MENU_SHOT.startHeight) * k + Math.sin(this.menuT * .7) * .4 + Math.sin(this.menuT * .29) * .5;
+    // At the end of it, the camera holds still on the view.
+    cam.x = px;
+    cam.z = pz;
+    cam.y = STREET_Y + MENU_SHOT.startHeight + (MENU_SHOT.height - MENU_SHOT.startHeight) * k;
     // Looking at the camp to begin with, then turning steadily left as it backs away, so she comes into view on the right.
-    cam.yaw = R.yawFrom + (R.yawTo - R.yawFrom) * look + Math.sin(t * .41) * .012;
-    cam.pitch = MENU_SHOT.startPitch + (MENU_SHOT.pitch - MENU_SHOT.startPitch) * look + Math.sin(this.menuT * .43) * .006;
-    cam.roll = Math.sin(this.menuT * .37) * .007 + Math.sin(k * Math.PI) * .012;
+    cam.yaw = R.yawFrom + (R.yawTo - R.yawFrom) * look;
+    cam.pitch = MENU_SHOT.startPitch + (MENU_SHOT.pitch - MENU_SHOT.startPitch) * look;
+    cam.roll = Math.sin(k * Math.PI) * .012;
     this.menuFocus = Math.hypot(C.bx - cam.x, C.bz - cam.z) * (1 - look) + MENU_SHOT.dist * look;
     cam.fov = MENU_SHOT.fov;
     // What is loaded in full follows the flight: the camp while it is close, and her by the time it gets to her.

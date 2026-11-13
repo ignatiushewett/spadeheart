@@ -1455,16 +1455,16 @@ void main(){
   // Down a long handle the rain gathers into runs: a drop slides down the wood towards your hand, leaving a wet line behind it, and
   // the next one starts at the top. Only on the handle itself (the shaft under the head), and only while rain is landing on it.
   if(uRunVM>.01&&w>.01&&uRainVM>.01&&abs(vModel.x)<.03&&abs(vModel.z)<.03&&vModel.y<.68&&vModel.y>-.02){
-    float S=uDropScale*.75, u=(vModel.x+vModel.z)*S+(abs(n.x)>abs(n.z)?.5:0.);
+    float S=uDropScale*1.6, u=(vModel.x+vModel.z)*S+(abs(n.x)>abs(n.z)?.5:0.);
     float lane=floor(u), sd=bh(vec3(lane,7.,3.)+floor(abs(n.x)*2.)*13.);
     if(sd<.75){
       float speed=.07+sd*.12, span=.72;
       float k=fract(uVMTime*speed/span+sd*9.);
       float y0=.66-k*span*k*(.6+.4*k);
       float dy=vModel.y-y0, across=abs(fract(u)-.5);
-      float inLane=smoothstep(.34,.12,across);
-      float drop=smoothstep(.017,.005,abs(dy))*inLane;
-      float trail=step(0.,dy)*smoothstep(.2,0.,dy)*smoothstep(.24,.08,across);
+      float inLane=smoothstep(.3,.08,across);
+      float drop=smoothstep(.0075,.002,abs(dy))*inLane;
+      float trail=step(0.,dy)*smoothstep(.16,0.,dy)*smoothstep(.2,.05,across);
       c=mix(c,c*.55,trail*w*.6);
       c+=(light*.5+vec3(.006))*trail*w*.25;
       c+=(light*.9+uFlash*.3+vec3(.014))*mix(vec3(1.),.35+col*2.2,.35)*drop*w*uRainVM*1.7;
