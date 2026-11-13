@@ -189,6 +189,8 @@ export class Player {
     this.weapon = id;
     this.swapT = .3;
     this.reloadT = 0;
+    this.reloadQ = 0;
+    this.reloadPhase = null;
     this.cook = 0;
     this.g.audio.simple('click');
     this.g.ui.hudDirty = true;
@@ -619,7 +621,10 @@ export class Player {
     this.aiming = false;
     if (it.type === 'gun') {
       if (input.toggleAim) { if (rPressed) this.aimOn = !this.aimOn; if (this.sprinting) this.aimOn = false; } else this.aimOn = false;
-      this.aiming = !!(input.toggleAim ? this.aimOn : rmb) && this.reloadT <= 0 && !this.sprinting;
+      // A scoped bolt gun comes down off the eye to work the bolt, and goes back up once it is done.
+      this.aiming = !!(input.toggleAim ? this.aimOn : rmb) && this.reloadT <= 0 && !this.sprinting && !(it.scope && this.fireCd > it.rate * .2);
+      // A revolver held open between rounds: a pull of the trigger snaps it shut, ready to fire.
+      if (this.reloadPhase === 'wait' && pressed && it.cylinder) { this.reloadPhase = 'close'; this.reloadT = it.cylinder.close; this.reloadQ = 0; }
       if (this.reloadT > 0) {
         this.reloadT -= dt;
         if (this.reloadT <= 0) this.finishReload(it, id);
@@ -647,13 +652,24 @@ export class Player {
   }
 
   startReload(it, id) {
-    if (this.reloadT > 0 || !it.ammo) return;
-    if ((this.mags[id] || 0) >= it.mag || !this.count(it.ammo)) {
-      if (!this.count(it.ammo) && (this.mags[id] || 0) === 0) this.g.ui.toast(`No ${ITEMS[it.ammo].name}`);
+    if (!it.ammo) return;
+    const m = this.mags[id] || 0, byHand = it.perShell || it.cylinder;
+    if (m >= it.mag || !this.count(it.ammo)) {
+      if (!this.count(it.ammo) && m === 0) this.g.ui.toast(`No ${ITEMS[it.ammo].name}`);
       return;
     }
-    // A revolver is swung open and the empties shaken out first, then loaded a round at a time, then snapped shut.
-    if (it.cylinder) { this.reloadPhase = 'open'; this.reloadT = it.cylinder.open; this.g.audio.simple('reload'); return; }
+    // Loaded by hand, a round at a time: every tap of R is one more round. Tap it a few times and they go in one after another.
+    if (byHand) {
+      this.reloadQ = Math.min(it.mag - m, (this.reloadQ || 0) + 1);
+      // A revolver held open, waiting for the next round: straight on with it.
+      if (it.cylinder && this.reloadPhase === 'wait') { this.reloadPhase = 'load'; this.reloadT = it.cylinder.each; return; }
+      if (this.reloadT > 0) return;
+      // A revolver is swung open and the empties shaken out first.
+      if (it.cylinder) { this.reloadPhase = 'open'; this.reloadT = it.cylinder.open; this.g.audio.simple('reload'); return; }
+      this.reloadT = it.reload;
+      return;
+    }
+    if (this.reloadT > 0) return;
     this.reloadT = it.reload;
     this.g.audio.simple('reload');
   }
@@ -663,11 +679,15 @@ export class Player {
     if (it.cylinder) {
       const C = it.cylinder;
       if (this.reloadPhase === 'open' || this.reloadPhase === 'load') {
-        if (this.reloadPhase === 'load' && m < it.mag && this.count(it.ammo)) { this.remove(it.ammo, 1); this.mags[id] = m + 1; }
-        if ((this.mags[id] || 0) < it.mag && this.count(it.ammo)) { this.reloadPhase = 'load'; this.reloadT = C.each; if (this.mags[id] > m) this.g.audio.simple('click'); }
-        else { this.reloadPhase = 'close'; this.reloadT = C.close; }
+        if (this.reloadPhase === 'load' && m < it.mag && this.count(it.ammo)) { this.remove(it.ammo, 1); this.mags[id] = m + 1; this.reloadQ = Math.max(0, (this.reloadQ || 0) - 1); this.g.audio.simple('click'); }
+        const room = (this.mags[id] || 0) < it.mag && this.count(it.ammo);
+        if (room && this.reloadQ > 0) { this.reloadPhase = 'load'; this.reloadT = C.each; }
+        // Nothing more asked for yet: held open a moment for the next tap of R, then snapped shut.
+        else if (room) { this.reloadPhase = 'wait'; this.reloadT = 1.4; }
+        else { this.reloadPhase = 'close'; this.reloadT = C.close; this.reloadQ = 0; }
         return;
       }
+      if (this.reloadPhase === 'wait') { this.reloadPhase = 'close'; this.reloadT = C.close; this.reloadQ = 0; return; }
       this.reloadPhase = null;
       this.g.audio.simple('reload');
       return;
@@ -676,9 +696,11 @@ export class Player {
       if (m < it.mag && this.count(it.ammo)) {
         this.remove(it.ammo, 1);
         this.mags[id] = m + 1;
+        this.reloadQ = Math.max(0, (this.reloadQ || 0) - 1);
         this.g.audio.simple('reload');
-        if (this.mags[id] < it.mag && this.count(it.ammo)) this.reloadT = it.reload;
-      }
+        // Only as many as were asked for: one shell a tap.
+        if (this.reloadQ > 0 && this.mags[id] < it.mag && this.count(it.ammo)) this.reloadT = it.reload;
+      } else this.reloadQ = 0;
     } else {
       const take = this.remove(it.ammo, it.mag - m);
       this.mags[id] = m + take;

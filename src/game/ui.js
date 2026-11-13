@@ -646,7 +646,7 @@ export class UI {
     // Rain lays a cold grey-blue over all of it, on top of whatever the hour is doing.
     mix([.72, .8, .92], rain * .8);
     // How light it is: much dimmer at night, darker under rain and with the sun low, but never so dark it stops being a map.
-    const lit = Math.max(.5, 1 - night * .5 - rain * .18 - low * .1);
+    const lit = Math.max(.42, 1 - night * .6 - rain * .18 - low * .1);
     r *= lit; gg *= lit; b *= lit;
     mix([1, .95, .86], noonish * .8 * (1 - low));
     const col = `rgb(${Math.round(r * 255)},${Math.round(gg * 255)},${Math.round(b * 255)})`;
@@ -654,7 +654,7 @@ export class UI {
       this.gradeCol = col;
       $('mm-grade').style.background = col;
       // The full map, which you sit and read, only takes half of it.
-      const half = (v) => Math.round(255 - (255 - v * 255) * .5);
+      const half = (v) => Math.round(255 - (255 - v * 255) * .62);
       $('bm-grade').style.background = `rgb(${half(r)},${half(gg)},${half(b)})`;
     }
   }
@@ -961,9 +961,49 @@ export class UI {
     x.fillRect(W / 2 - 1, H - 20, 2, 18);
   }
 
+  // At night, the lights of the place laid over a map, on top of the darkening: settlements, fires and lamps glow where they are, as
+  // bright as they are in the world. place(ctx) sets the same view the map was drawn with.
+  mapLights(id, w, h, place) {
+    const g = this.g, el = $(id), lc = g.renderer.lightCanvas, night = Math.min(1, g.renderer.sky.night || 0);
+    if (!el) return;
+    const o = lc && night > .05 ? Math.min(.85, night * .9).toFixed(2) : '0';
+    if (el.style.opacity !== o) el.style.opacity = o;
+    if (o === '0') return;
+    if (el.width !== w || el.height !== h) { el.width = w; el.height = h; }
+    const x = el.getContext('2d');
+    x.save();
+    x.clearRect(0, 0, w, h);
+    place(x);
+    x.imageSmoothingEnabled = true;
+    x.globalCompositeOperation = 'lighter';
+    x.globalAlpha = .42;
+    x.drawImage(lc, 0, 0, WX, WZ);
+    x.globalAlpha = 1;
+    // And the beams that move: a camp's floodlights sweeping the approach, your torch, and a bike's headlamp, each a cone of light
+    // on the ground the way it falls in the world.
+    const cone = (ox, oz, ux, uz, len, half, r, gg, b, a) => {
+      const ang = Math.atan2(uz, ux), grd = x.createRadialGradient(ox, oz, 0, ox, oz, len);
+      grd.addColorStop(0, `rgba(${r},${gg},${b},${a})`); grd.addColorStop(.6, `rgba(${r},${gg},${b},${a * .45})`); grd.addColorStop(1, `rgba(${r},${gg},${b},0)`);
+      x.fillStyle = grd;
+      x.beginPath(); x.moveTo(ox, oz); x.arc(ox, oz, len, ang - half, ang + half); x.closePath(); x.fill();
+    };
+    const P = g.player, now = g.time;
+    for (const c of g.layout.camps) {
+      if (g.campSim.state[c.id].status !== 'holding' || Math.hypot(c.cx - P.x, c.cz - P.z) > 700) continue;
+      for (const l of c.floods) {
+        const sw = Math.sin(now * .35 + l.x) * .5, ux = l.dx * Math.cos(sw) - l.dz * Math.sin(sw), uz = l.dz * Math.cos(sw) + l.dx * Math.sin(sw);
+        cone(l.x, l.z, ux, uz, 34, .32, 255, 246, 220, .3);
+      }
+    }
+    if (P.flashlight && P.alive) cone(P.x, P.z, Math.sin(P.yaw), -Math.cos(P.yaw), 30, .3, 255, 240, 210, .32);
+    for (const b of g.bikes.list) if (b.light && Math.hypot(b.x - P.x, b.z - P.z) < 400) cone(b.x, b.z, Math.sin(b.yaw), -Math.cos(b.yaw), Math.min(80, b.len || 60), .24, 255, 245, 225, .36);
+    x.restore();
+  }
+
   drawMinimap() {
     const g = this.g, P = g.player, c = $('minimap'), x = c.getContext('2d');
     const W = c.width, cx = W / 2;
+    this.mapLights('mm-lights', W, W, (q) => { q.translate(cx, cx); q.rotate(-P.yaw); q.scale(2.4, 2.4); q.translate(-P.x, -P.z); });
     x.save();
     x.clearRect(0, 0, W, W);
     x.fillStyle = OCEAN;
@@ -1009,6 +1049,15 @@ export class UI {
       const k = d > rim * .95 ? rim * .95 / d : 1;
       x.fillStyle = '#6ec6ff';
       x.fillRect(dx * k - 3 * px, dz * k - 3 * px, 6 * px, 6 * px);
+    }
+    // Your own motorbike: a round mark where you left it, held at the rim when it is further off, and gone while you are on it.
+    for (const b of g.bikes.list) {
+      if (!b.owned || b === g.bikes.ride) continue;
+      const dx = b.x - P.x, dz = b.z - P.z, d = Math.hypot(dx, dz), k = d > rim * .93 ? rim * .93 / d : 1;
+      x.beginPath(); x.arc(dx * k, dz * k, 4.2 * px, 0, 6.2832);
+      x.fillStyle = 'rgba(12,12,12,.85)'; x.fill();
+      x.lineWidth = 1.4 * px; x.strokeStyle = '#9fd4ff'; x.stroke();
+      x.beginPath(); x.arc(dx * k, dz * k, 1.6 * px, 0, 6.2832); x.fillStyle = '#9fd4ff'; x.fill();
     }
     x.restore();
     x.fillStyle = '#e8b04a';
@@ -1959,6 +2008,7 @@ export class UI {
     x.setTransform(1, 0, 0, 1, 0, 0);
     const P = g.player;
     const tx = (px) => c.width / 2 + (px - v.x) * s, tz = (pz) => c.height / 2 + (pz - v.z) * s;
+    this.mapLights('bm-lights', c.width, c.height, (q) => { q.translate(c.width / 2 - v.x * s, c.height / 2 - v.z * s); q.scale(s, s); });
     // The chunk grid: every chunk close in, every second, fourth and so on further out, so the lines never crowd.
     {
       let step = CS;
@@ -2062,6 +2112,16 @@ export class UI {
     }
     x.globalAlpha = 1;
     drawCity();
+    // Your own motorbike, at any zoom: a round mark with a B in it, where you left it.
+    for (const b of g.bikes.list) {
+      if (!b.owned || b === g.bikes.ride) continue;
+      const bx = tx(b.x), bz = tz(b.z);
+      x.beginPath(); x.arc(bx, bz, 8, 0, 6.2832);
+      x.fillStyle = 'rgba(12,12,12,.85)'; x.fill();
+      x.lineWidth = 1.5; x.strokeStyle = '#9fd4ff'; x.stroke();
+      x.fillStyle = '#9fd4ff'; x.font = '700 11px Quantico, Bahnschrift, Segoe UI, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
+      x.fillText('B', bx, bz + .5);
+    }
     const ax = tx(P.x), az = tz(P.z);
     x.save();
     x.translate(ax, az);
@@ -2108,7 +2168,6 @@ export class UI {
         const lead = LORE[c2.key].cast.find((m) => m.role === 'leader');
         if (lead && lead.favours && !g.campSim.dead[lead.id] && Object.keys(lead.favours).some((k) => !P.dlg.flags[`${k}_paid`])) pin(c2.boss.x + .5, c2.boss.z + .5, '!', '#6ec6ff', lead.name);
       }
-      for (const b of g.bikes.list) if (b.owned) pin(b.x, b.z, 'B', '#9fd4ff', 'Your motorbike');
       for (const q of pins) drawPin(q);
       // Then the names, on top of the pins, and only where one fits without covering another pin or name. The pin is there either way.
       if (sc >= 2) {

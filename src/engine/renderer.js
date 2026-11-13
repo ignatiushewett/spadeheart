@@ -359,6 +359,12 @@ export class Renderer {
     gl.bindTexture(gl.TEXTURE_2D, this.texLights);
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
     gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, W, H, gl.RGBA, gl.UNSIGNED_BYTE, d);
+    // The same lights as a picture the maps can lay over themselves at night, so the lit places show where they really are.
+    const lc = this.lightCanvas || (this.lightCanvas = document.createElement('canvas'));
+    lc.width = W; lc.height = H;
+    const img = new ImageData(W, H), p = img.data;
+    for (let i = 0; i < d.length; i += 4) { p[i] = d[i]; p[i + 1] = d[i + 1]; p[i + 2] = d[i + 2]; p[i + 3] = Math.max(d[i], d[i + 1], d[i + 2]); }
+    lc.getContext('2d').putImageData(img, 0, 0);
   }
 
   // How much fixed light is falling on a point, for things that are not drawn with the map.

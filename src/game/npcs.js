@@ -3411,7 +3411,10 @@ export class NPCs {
     // On a motorbike: sat on it, going where it goes. The bike does the moving.
     if (n.onBike) {
       const b = n.onBike, fx = Math.sin(b.yaw), fz = -Math.cos(b.yaw);
-      n.x = b.x - fx * .55; n.z = b.z - fz * .55; n.y = b.sy + .9; n.yaw = n.ys = Math.atan2(fx, fz);
+      // Leaning with the bike: a person cannot be drawn tipped over, so they are drawn shifted that way and a little lower, which
+      // reads the same from any distance.
+      const lean = b.lean || 0, rx = Math.cos(b.yaw), rz = Math.sin(b.yaw), side = Math.sin(lean) * 1.15;
+      n.x = b.x - fx * .65 + rx * side; n.z = b.z - fz * .65 + rz * side; n.y = b.sy + .85 - (1 - Math.cos(lean)) * 1.2; n.yaw = n.ys = Math.atan2(fx, fz);
       n.state = 5; n.aim = 0;
       return;
     }

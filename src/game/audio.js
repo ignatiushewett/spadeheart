@@ -131,6 +131,45 @@ export class Audio2 {
     this.noiseBurst(this.out(s.gain * .5, s.pan), .35, 'lowpass', 300, 120, 1, .5, .01);
   }
 
+  // Somebody else's motorbike going by: a smaller version of your own engine, out where the bike is, louder as it nears. Each is
+  // started the first time it is asked for and kept going while it is asked for every frame.
+  bikeHum(key, x, y, z, rev) {
+    if (!this.ctx) return;
+    const H = this.hums || (this.hums = new Map()), ctx = this.ctx, t = ctx.currentTime;
+    let h = H.get(key);
+    if (!h) {
+      const o1 = ctx.createOscillator(), o2 = ctx.createOscillator();
+      o1.type = 'sawtooth'; o2.type = 'square';
+      const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.Q.value = 2; f.frequency.value = 700;
+      const g2 = ctx.createGain(); g2.gain.value = .4;
+      const lvl = ctx.createGain(); lvl.gain.value = 0;
+      const pan = ctx.createStereoPanner(), out = ctx.createGain();
+      out.gain.value = 1;
+      o1.connect(f); o2.connect(g2); g2.connect(f); f.connect(lvl); lvl.connect(pan); pan.connect(out); out.connect(this.master);
+      o1.start(); o2.start();
+      h = { o1, o2, f, lvl, out, pan };
+      H.set(key, h);
+    }
+    const s = this.spatial(x, y, z, 26), fr = 34 + rev * 140;
+    h.o1.frequency.setTargetAtTime(fr, t, .05);
+    h.o2.frequency.setTargetAtTime(fr * .502, t, .05);
+    h.f.frequency.setTargetAtTime(420 + rev * 1300, t, .08);
+    h.lvl.gain.setTargetAtTime(Math.min(.32, s.gain * .38), t, .08);
+    h.pan.pan.setTargetAtTime(s.pan, t, .05);
+  }
+
+  // The ones not asked for this frame die away.
+  bikeHumsKeep(keys) {
+    if (!this.ctx || !this.hums) return;
+    const t = this.ctx.currentTime;
+    for (const [k, h] of this.hums) {
+      if (keys.has(k)) continue;
+      this.hums.delete(k);
+      h.lvl.gain.setTargetAtTime(0, t, .2);
+      setTimeout(() => { try { h.o1.stop(); h.o2.stop(); } catch (_) { /* already stopped */ } h.out.disconnect(); }, 1200);
+    }
+  }
+
   engineSet(rev, load, x, y, z) {
     const e = this.eng;
     if (!e) return;

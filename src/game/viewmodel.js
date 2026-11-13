@@ -6,6 +6,8 @@ const STEEL = 0x24262b, DARK = 0x16171a, MID = 0x3a3d43, WOOD = 0x5f4328, WOOD_D
 const M4A = 0x1d1e21, M4B = 0x28292d, M4M = 0x303236;
 
 // The M249's feed cover, hinged at its front edge (LMG_HINGE), and its soft ammunition pouch with the belt running up into the gun.
+// A bolt-action's bolt handle, out to the right of the receiver: its own piece, so it can be worked after every shot.
+const BOLT = [[.026, .036, .06, .022, .01, .01, STEEL], [.04, .036, .06, .014, .014, .014, STEEL], [0, .036, .075, .03, .02, .03, STEEL]];
 export const LMG_COVER = [[0, .06, -.075, .074, .024, .19, 0x26282b], [0, .075, -.075, .05, .008, .16, 0x202225], [0, .064, .02, .05, .02, .014, STEEL]];
 const LMG_HINGE = [.048, -.17];
 export const LMG_BOX = [
@@ -68,15 +70,14 @@ export const MODELS = {
   // Bolt-action with a scope: walnut stock, a steel receiver along the top of it, the barrel out of the front, and the scope sat on a
   // rail and two ring mounts right down on the receiver, so there is no daylight anywhere between the glass and the gun.
   // The same kind of bolt-action without the glass: open sights, a notch over the bolt and a post at the muzzle.
-  // Walnut, and lots of it: the forend runs out almost to the muzzle under a brass band, with a sling swivel under it.
+  // Walnut, and lots of it: the forend runs out almost to the muzzle, with a sling swivel under it.
   deer: [
-    [0, 0, -.2, .044, .05, .5, WOOD], [0, .004, -.46, .04, .042, .04, WOOD_D], [0, .03, -.48, .048, .046, .012, 0xb08a3c],
+    [0, 0, -.2, .044, .05, .5, WOOD], [0, .004, -.46, .04, .042, .04, WOOD_D], 
     [0, .036, -.02, .032, .026, .2, STEEL], [0, .03, -.4, .02, .02, .58, STEEL], [0, .03, -.675, .026, .026, .03, DARK],
     [0, -.034, .1, .042, .072, .1, WOOD], [0, -.03, .25, .05, .1, .2, WOOD], [0, -.03, .354, .052, .104, .012, 0x3a2414],
     [0, -.03, -.42, .008, .016, .012, STEEL],
     [-.008, .052, .045, .006, .01, .012, DARK], [.008, .052, .045, .006, .01, .012, DARK], [0, .046, .045, .022, .004, .012, DARK],
     [0, .044, -.655, .02, .006, .02, DARK], [0, .05, -.655, .005, .012, .006, DARK],
-    [.026, .036, .06, .022, .01, .01, STEEL], [.04, .036, .06, .014, .014, .014, STEEL],
     [0, -.035, .03, .006, .024, .05, STEEL], [0, -.05, -.06, .03, .03, .1, WOOD_D],
   ],
   // Dark grey synthetic, a raised cheek rest, a heavy barrel with a muzzle brake, and a bipod folded up under the forend.
@@ -90,7 +91,6 @@ export const MODELS = {
     [0, .085, -.06, .03, .03, .3, DARK], [0, .085, -.13, .036, .036, .018, DARK], [0, .085, .02, .036, .036, .018, DARK],
     [0, .085, -.245, .046, .046, .07, DARK], [0, .085, .115, .04, .04, .05, DARK],
     [0, .104, -.06, .014, .012, .016, MID], [.021, .085, -.06, .012, .014, .016, MID],
-    [.026, .036, .06, .022, .01, .01, STEEL], [.04, .036, .06, .014, .014, .014, STEEL],
     [0, -.035, .03, .006, .024, .05, STEEL], [0, -.05, -.06, .03, .03, .1, WOOD_D],
   ],
   // M249: square receiver, carry handle and heat shield over a long barrel, gas tube and folded bipod under it, polymer stock. The feed
@@ -388,6 +388,7 @@ export class ViewModel {
     this.flash = buildVAO(gl, FLASH);
     // A .357 round: brass case, rim at the back, the lead nose in front.
     this.lmgCover = buildVAO(gl, LMG_COVER);
+    this.bolt = buildVAO(gl, BOLT);
     this.lmgBox = buildVAO(gl, LMG_BOX);
     this.roundVao = buildVAO(gl, [[0, 0, .006, .0105, .0105, .026, 0xb8893a], [0, 0, .02, .0125, .0125, .003, 0xa07a34], [0, 0, -.011, .0085, .0085, .009, 0x8d8f94]]);
     // The gun on springs: where the last shot threw it, and how fast it is coming back. A stiff spring, lightly damped, so it snaps back
@@ -492,6 +493,8 @@ export class ViewModel {
         this.sp.vrz += (Math.random() - .3) * 7 * flip;
         this.slide = 1;
       }
+      // A bolt gun has to be worked before the next round: up, back, forward and down, a beat after the kick.
+      if (player.weapon === 'deer' || player.weapon === 'hunting') this.boltT = 0;
       this.flashRoll = Math.random() * 6.283;
     }
     // The rest of handling the gun has some weight to it too: the magazine slapped home at the end of a reload, the tip forward as
@@ -661,6 +664,21 @@ export class ViewModel {
     } else {
       gl.bindVertexArray(m.vao);
       gl.drawArrays(gl.TRIANGLES, 0, m.count);
+      if (id === 'deer' || id === 'hunting') {
+        // The bolt: lifted (turned about the bore), drawn back, run forward, turned down, over most of the time between shots.
+        const D = (id === 'deer' ? .8 : 1.05) * .85, bu = this.boltT === undefined ? 1 : Math.min(1, (this.boltT += Math.min(dt, 1 / 30)) / D);
+        const ease = (a, b) => Math.max(0, Math.min(1, (bu - a) / (b - a)));
+        const lift = bu < .15 ? 0 : bu < .32 ? ease(.15, .32) : bu < .75 ? 1 : 1 - ease(.75, .9);
+        const back = bu < .32 ? 0 : bu < .55 ? ease(.32, .55) : 1 - ease(.55, .75);
+        const a = lift * 1.15, c = Math.cos(a), sn = Math.sin(a), py = .036, L7 = this.local;
+        L7.fill(0); L7[0] = c; L7[1] = sn; L7[4] = -sn; L7[5] = c; L7[10] = 1; L7[15] = 1;
+        L7[12] = sn * py; L7[13] = py * (1 - c); L7[14] = back * .075;
+        multiply(this.fmv, mv, L7);
+        gl.uniformMatrix4fv(u.uModelView, false, this.fmv);
+        gl.bindVertexArray(this.bolt.vao);
+        gl.drawArrays(gl.TRIANGLES, 0, this.bolt.count);
+        gl.uniformMatrix4fv(u.uModelView, false, mv);
+      }
       if (id === 'lmg') {
         // The feed cover on its hinge, and the box where the reload has it.
         const k = this.rl || 0, p = player.reloadT > 0 ? Math.max(0, Math.min(1, 1 - player.reloadT / (this.reloadTotal || 1))) : 1;

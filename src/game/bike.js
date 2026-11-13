@@ -641,6 +641,15 @@ export class Bikes {
       }
       this.drive(b, dt, this.steerAI(b, dt));
     }
+    // Their engines, the nearest few, heard from where they are.
+    const near = this.list.filter((b) => b.npc && Math.hypot(b.x - P.x, b.z - P.z) < 110).sort((a, b) => Math.hypot(a.x - P.x, a.z - P.z) - Math.hypot(b.x - P.x, b.z - P.z)).slice(0, 3);
+    const on = new Set(near);
+    for (const b of near) {
+      const sp = Math.abs(b.v || 0), gear = MAX / 4.2;
+      b.rev = sp < .3 ? .1 : ((sp % gear) / gear) * .75 + .25;
+      g.audio.bikeHum(b, b.x, b.y + .8, b.z, b.rev);
+    }
+    g.audio.bikeHumsKeep(on);
   }
 
   // A road cell somewhere out of the way, a ride away from you, and the way the road runs there.
@@ -711,19 +720,25 @@ export class Bikes {
       }
       want = Math.atan2(tx - b.x, -(tz - b.z));
       const gap = Math.hypot(lead.x - b.x, lead.z - b.z);
-      ai.target = Math.max(0, Math.min(18, lead.v + (gap - back) * .8));
+      ai.target = Math.max(0, Math.min(23, lead.v + (gap - back) * .8));
     } else {
       if ((ai.biasT -= dt) <= 0) { ai.bias = [-1, 0, 0, 1][Math.floor(Math.random() * 4)]; ai.biasT = 4 + Math.random() * 6; }
       let best = -1e9, ba = 0;
       for (let a = -1.4; a <= 1.41; a += .175) {
         const h = b.yaw + a;
         let s = 0;
-        for (const d of [4, 8, 13, 19, 26]) {
-          const x = Math.floor(b.x + Math.sin(h) * d), z = Math.floor(b.z - Math.cos(h) * d);
+        for (const d of [3, 6, 10, 15, 21, 28]) {
+          const cx = b.x + Math.sin(h) * d, cz = b.z - Math.cos(h) * d, x = Math.floor(cx), z = Math.floor(cz);
           if (x < 2 || z < 2 || x >= WX - 2 || z >= WZ - 2) { s -= 4; continue; }
           const gr = L.ground[z * WX + x];
           s += gr === G.ROAD ? 2 : gr === G.WALK || gr === G.PLAZA ? .2 : -1.2;
-          if (W.solid(x, Math.floor(b.y) + 1, z)) s -= 6;
+          // Anything standing in the road (a wreck, a bus, a barricade): the whole width of the bike has to clear it, and the
+          // nearer it is the more it matters.
+          const y = Math.floor(b.y), rxh = Math.cos(h), rzh = Math.sin(h);
+          for (const w of [-1.1, 0, 1.1]) {
+            const px = Math.floor(cx + rxh * w), pz = Math.floor(cz + rzh * w);
+            if (W.solid(px, y, pz) || W.solid(px, y + 1, pz)) { s -= d < 12 ? 9 : 5; break; }
+          }
         }
         s -= Math.abs(a) * 1.1;
         s += a * ai.bias * .8;
@@ -732,7 +747,7 @@ export class Bikes {
       // Nowhere ahead worth riding: round, and back the way it came.
       want = best < 0 ? b.yaw + Math.PI * .9 * (ai.bias || 1) : b.yaw + ba;
       const sharp = Math.abs(ba);
-      ai.target = (n.kind === 'raider' ? 15 : 13) - sharp * 7;
+      ai.target = (n.kind === 'raider' ? 20 : 17.5) - sharp * 9;
       if (best < 0) ai.target = 4;
       // The leader leaves a line for the others to follow.
       const last = ai.trail[ai.trail.length - 1];
