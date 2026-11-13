@@ -279,7 +279,7 @@ function buildHands(tone) {
     hunting: gunHands('hunting', { x: 0, y: -.048, z: .1, w: .05, d: .06 }, { x: 0, y: 0, z: -.17, w: .046, h: .056, len: .11 }),
     lmg: gunHands('lmg', { x: 0, y: -.082, z: .075, w: .034, d: .045 }, { x: 0, y: -.03, z: -.28, w: .058, h: .04, len: .12 }),
     rocket: gunHands('rocket', { x: 0, y: -.05, z: -.02, w: .036, d: .06 }, { x: 0, y: .05, z: -.3, w: .08, h: .08, len: .11 }),
-    grenade: cornerHand('grenade', { x: -.026, y: -.03, z: .012, size: .05 }),
+    grenade: cornerHand('grenade', { x: .026, y: -.03, z: .012, size: .05 }),
     dynamite: bothHands('dynamite', .045, .01, -.02, .05, .08),
     block_wood: bothHands('block_wood', .07, 0, 0, .07, .2, .12),
     block_conc: bothHands('block_conc', .07, 0, 0, .07, .2, .12),

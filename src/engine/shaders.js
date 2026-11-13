@@ -1358,7 +1358,6 @@ void main(){
         // +z is the bike's back.)
         vec3 ln=normalize(vLocN);
         vec3 wp=vLoc*4.+.5;
-        wp.z-=uTime*min(vSpeed,18.)*.07*(1.-abs(ln.z));   // sampled further forward as time goes: the drops themselves move back
         vec3 cell=floor(wp)+vec3(vSeed*.7,vSeed*1.3,vSeed*2.1);
         float seed=hash12(cell.xy*1.7+cell.z*3.1), ph=uTime*(.45+seed*.9)*.8+seed*9.;
         float life=fract(ph), gen=floor(ph);
