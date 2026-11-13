@@ -966,7 +966,7 @@ export class UI {
   mapLights(id, w, h, place) {
     const g = this.g, el = $(id), lc = g.renderer.lightCanvas, night = Math.min(1, g.renderer.sky.night || 0);
     if (!el) return;
-    const o = lc && night > .05 ? Math.min(.95, night * 1.05).toFixed(2) : '0';
+    const o = lc && night > .05 ? Math.min(.9, night).toFixed(2) : '0';
     if (el.style.opacity !== o) el.style.opacity = o;
     if (o === '0') return;
     if (el.width !== w || el.height !== h) { el.width = w; el.height = h; }
@@ -978,7 +978,7 @@ export class UI {
     x.globalCompositeOperation = 'lighter';
     // Laid on more than once: a settlement at night is the brightest thing on the map.
     x.drawImage(lc, 0, 0, WX, WZ);
-    x.globalAlpha = .7;
+    x.globalAlpha = .3;
     x.drawImage(lc, 0, 0, WX, WZ);
     x.globalAlpha = 1;
     // And the beams that move: a camp's floodlights sweeping the approach, your torch, and a bike's headlamp, each a cone of light
