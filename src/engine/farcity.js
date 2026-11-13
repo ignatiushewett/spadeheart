@@ -134,7 +134,10 @@ export class FarCity {
       const skirtH = (x, z) => {
         const cx = Math.max(0, Math.min(WX - 1, x)), cz = Math.max(0, Math.min(WZ - 1, z)), d = Math.hypot(x - cx, z - cz);
         const edgeH = Math.max(0, terr[cz * WX + cx]), k = Math.min(1, d / 500);
-        return edgeH * (1 - k * k * (3 - 2 * k)) + (14 + 46 * vn(x / 700, z / 700) + 14 * vn(x / 180 + 3, z / 180)) * k * k * (3 - 2 * k) + 8;
+        // Right at the edge it starts a little below the ground there, so the country past it never stands up over the map and shows a
+        // gap under it; it rises to the height of the trees over the first stretch out.
+        const canopy = 8 * Math.min(1, d / 90), lift = canopy - 1.5 * (1 - Math.min(1, d / 90));
+        return edgeH * (1 - k * k * (3 - 2 * k)) + (14 + 46 * vn(x / 700, z / 700) + 14 * vn(x / 180 + 3, z / 180)) * k * k * (3 - 2 * k) + lift;
       };
       const woodC = [srgb(M.LEAF, .75), srgb(M.LEAF2, .75), srgb(M.LEAF, .65)];
       const land = (x, z) => (x < 0 ? true : z < 0 ? x < topC : z >= WZ ? x < botC : false);
