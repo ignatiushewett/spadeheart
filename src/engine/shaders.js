@@ -913,10 +913,11 @@ void main(){
   if(!dog){
   float seed=float(variant)*.37;
   float swing=sin(phase);
-  // States: 0 idle, .7 walk, 1 chase, 2 attack, 3 aim, 4 talk, 5 sit, 6 work, 7 asleep, 8 falling, 10+ dead.
+  // States: 0 idle, .7 walk, 1 chase, 2 attack, 3 aim, 4 talk, 5 sit, 6 work, 6.5 work kneeling, 7 asleep, 8 falling, 10+ dead.
   float dead=state>=10.?min((state-10.)*1.9,1.):0.;
   vDead=dead;
   bool sitting=state==5.;
+  bool kneel=human&&abs(state-6.5)<.01;
   bool asleep=state==7.;
   bool falling=state==8.&&!human;
   bool walking=abs(state-.7)<.01;
@@ -949,6 +950,8 @@ void main(){
       // Legs trailing and kicking at nothing, each at its own speed.
       else if(falling){ B=rotX(.3+sin(uTime*(limb==4?6.3:7.9)+seed)*.42)*rotZ(limb==4?.2:-.2); joint=.5+sin(uTime*6.+seed+float(limb))*.28; }
       else if(asleep){ B=rotX(limb==4?.08:-.08); joint=limb==4?.2:.34; }
+      // Down on one knee: the other foot planted in front, its thigh out level, the kneeling shin flat along the ground behind.
+      else if(kneel){ if(limb==4){ B=rotX(-1.45); joint=1.5; } else { B=rotX(.12); joint=1.6; } }
       else {
         float amp=human?(walking?.62:0.):(state>=.5?.78:.42);
         B=rotX(s*amp);
@@ -965,7 +968,7 @@ void main(){
         else if(sitting) raise=-.55;
         else if(state==3.||(aiming&&weapon>0&&weapon<8)) raise=-1.5;
         else if(state==4.&&limb==2) raise=-.7+sin(uTime*2.6+seed)*.36;
-        else if(state==6.&&limb==3) raise=-1.05+sin(uTime*6.+seed)*.5;
+        else if((state==6.||kneel)&&limb==3) raise=(kneel?-.75:-1.05)+sin(uTime*6.+seed)*.5;
         else if(limb==3) raise=weapon>0?(twoHand?-.62:-.3):-.1;
         else raise=twoHand?-.48:-.1;
       } else {
@@ -992,7 +995,7 @@ void main(){
         else if(asleep) joint=.1;
         else if(sitting) joint=.75;
         else if(state==4.) joint=limb==2?.95+sin(uTime*3.3+seed)*.3:.22;
-        else if(state==6.) joint=limb==3?.7+sin(uTime*6.+seed)*.55:.5+sin(uTime*2.+seed)*.2;
+        else if(state==6.||kneel) joint=limb==3?.7+sin(uTime*6.+seed)*.55:.5+sin(uTime*2.+seed)*.2;
         else if(walking) joint=.34;
         else if(twoHand&&limb==2) joint=.32;
         else joint=.16+sin(uTime*.7+seed)*.03;
@@ -1069,6 +1072,8 @@ void main(){
   p.y+=state<10.?abs(sin(phase))*.05:0.;
   // A seated hip rests on top of a one-voxel bench.
   if(sitting) p.y-=.08;
+  // Kneeling, the hips come down by the length of a shin.
+  if(kneel) p.y-=.52;
   if(asleep){
     mat3 F=rotX(-1.53);
     p=F*p; n=F*n;
@@ -1231,8 +1236,12 @@ out vec3 vNormal;
 out vec3 vCol;
 out float vGlow;
 out float vMetal;
+out vec3 vLoc;          // where on its own little cube this is, for the drops of rain sat on it
+flat out float vBuilt;  // part of something built (a bike): it gets wet
+flat out float vSeed;
 void main(){
   float a=iCol.a, c=cos(a), s=sin(a);
+  vLoc=aPos; vSeed=fract(dot(iCol.rgb,vec3(12.9898,78.233,37.719)))*91.;
   // A glow below zero marks a part of something built (a vehicle): turned about the vertical, and leaned over sideways, not tumbling.
   // Its glow is -1 - that, with how metal it is (0 to 3) in fours on top, and its lean in sixteens on top of that (24 is upright,
   // each step a fortieth of a radian).
@@ -1250,7 +1259,7 @@ void main(){
     bg=0.; bm=0.;
   }
   vec3 p=R*(aPos*sc)+iPos.xyz;
-  vWorld=p; vNormal=R*aNormal; vCol=iCol.rgb; vGlow=built?bg-bm*4.:iGlow; vMetal=built?bm:0.;
+  vWorld=p; vNormal=R*aNormal; vCol=iCol.rgb; vGlow=built?bg-bm*4.:iGlow; vMetal=built?bm:0.; vBuilt=built&&iGlow>-999.?1.:0.;
   gl_Position=uViewProj*vec4(p,1.);
 }`;
 
@@ -1260,7 +1269,19 @@ in vec3 vNormal;
 in vec3 vCol;
 in float vGlow;
 in float vMetal;
+in vec3 vLoc;
+flat in float vBuilt;
+flat in float vSeed;
+uniform sampler2D uRainMap;
+uniform vec3 uRainMapO;
 layout(location=0) out vec4 outCol;
+// Out under the sky, or under a roof? The rain map knows, near the camera; further off, out in it.
+float underSky(vec3 p,float fallback){
+  if(uRainMapO.z<=0.) return fallback;
+  vec2 m=(p.xz-uRainMapO.xy)/uRainMapO.z;
+  if(any(lessThan(m,vec2(0.)))||any(greaterThanEqual(m,vec2(1.)))) return fallback;
+  return p.y>=textureLod(uRainMap,m,0.).r*255.+1.?1.:0.;
+}
 void main(){
   vec3 col=pow(vCol,vec3(2.2));
   float dist=length(vWorld-uCam);
@@ -1276,6 +1297,25 @@ void main(){
     float sp=pow(max(dot(Rf,uSunDir),0.),24.+40.*k)*sh;
     vec3 tint=mix(vec3(1.),col*1.6,.55);
     c=c*(1.-.45*k)+env*tint*(.25+.55*k)*(.6+.4*fres)+uSunCol*tint*sp*(.5+1.6*k);
+  }
+  // Out in the rain, a bike gets wet the way a gun or a coat does: everything darker, a wet shine over paint and leather alike, a
+  // hard glint of what light there is, and drops sat on it that come and go while the rain is landing. Under cover it stays dry.
+  if(vBuilt>.5&&(uWet>.01||uRainNow>.01)){
+    float w=clamp(max(uWet*1.3,uRainNow),0.,1.)*underSky(vWorld+vec3(0.,.6,0.),1.);
+    if(w>.01){
+      vec3 V=normalize(uCam-vWorld), Rf=reflect(-V,N);
+      vec3 env=Rf.y>0.?mix(uHorizon,uSkyCol,clamp(Rf.y*1.6,0.,1.)):uGroundCol*.5;
+      float fres=pow(1.-max(dot(N,V),0.),3.);
+      float sh=sampleShadow(vWorld,N,dist);
+      c=c*mix(1.,.72,w)+env*(.06+.32*fres)*w+uSunCol*pow(max(dot(Rf,uSunDir),0.),70.)*sh*w*.7;
+      // The drops: a few spots on each little cube, each with a drop on it now and then, and on its own clock.
+      vec3 q=vLoc*4.+.5, cell=floor(q);
+      float h=hash12(cell.xy*1.7+cell.z*3.1+vSeed), life=fract(uTime*(.3+h*.5)+h*7.);
+      float on=step(.95,hash12(cell.zx*2.3+floor(uTime*(.3+h*.5)+h*7.)+vSeed))*smoothstep(0.,.15,life)*smoothstep(1.,.6,life)*uRainNow;
+      vec3 f=fract(q)-.5;
+      float bead=on*smoothstep(.2,.04,length(f-N*dot(f,N)));
+      c+=(env*.35+uSunCol*.08+vec3(.004))*bead*w;
+    }
   }
   outCol=vec4(applyFog(c,vWorld),1.);
 }`;

@@ -311,6 +311,9 @@ export class Particles {
     gl.bufferSubData(gl.ARRAY_BUFFER, 0, o, 0, total * CUBE_STRIDE);
     const p = renderer.pCube.use();
     renderer.frameUniforms(p);
+    // Where the rain reaches, so a bike under a roof stays dry.
+    renderer.bindRainMap(p);
+    gl.activeTexture(gl.TEXTURE0);
     gl.bindVertexArray(this.cubeVAO);
     gl.drawArraysInstanced(gl.TRIANGLES, 0, 36, total);
     renderer.stats.draws++;

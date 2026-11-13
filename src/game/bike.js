@@ -26,7 +26,8 @@ const hash = (x, y, z) => { const s = Math.sin(x * 12.9898 + y * 78.233 + z * 37
 // The fixed parts, in voxels: x across (right), y up from the ground, z forward. Each [x, y, z, r, g, b, metal, glow].
 const MODEL = (() => {
   const cells = new Map();
-  const put = (x, y, z, c, metal = 0, glow = 0) => cells.set(`${x},${y},${z}`, [x, y, z, c[0], c[1], c[2], metal, glow]);
+  // part: what the cell belongs to, for bikes that are not all alike (see LOOKS): T tank, G mudguard, S seat, B bags, F forks.
+  const put = (x, y, z, c, metal = 0, glow = 0, part = '') => cells.set(`${x},${y},${z}`, [x, y, z, c[0], c[1], c[2], metal, glow, part]);
   const line = (x, y0, z0, y1, z1, c, metal = 0) => {
     const n = Math.max(Math.abs(y1 - y0), Math.abs(z1 - z0), 1);
     for (let i = 0; i <= n; i++) put(x, Math.round(y0 + (y1 - y0) * i / n), Math.round(z0 + (z1 - z0) * i / n), c, metal);
@@ -69,17 +70,17 @@ const MODEL = (() => {
     if (ax === 2 && (y === 11 || y === 15 || z === -3 || z === 5)) continue;
     if (y === 15 && (z < -1 || z > 4 || ax > 1)) continue;
     if (z === -3 && y > 13) continue;
-    put(x, y, z, rusty(x, y, z), 2);
+    put(x, y, z, rusty(x, y, z), 2, 0, 'T');
   }
   for (let x = -1; x <= 1; x++) put(x, 11, -4, FRAME, 1);
   put(0, 16, 2, SILVER, 3);
   // The seat: long and flat, brown leather quilted across, its back end capped.
   for (let z = -15; z <= -4; z++) for (let x = -2; x <= 2; x++) {
-    put(x, 12, z, Math.abs(x) === 2 ? STITCH : LEATHER, 0);
-    if (z >= -14 && z <= -4) put(x, 13, z, Math.abs(x) === 2 || z % 3 === 0 ? STITCH : LEATHER, 0);
+    put(x, 12, z, Math.abs(x) === 2 ? STITCH : LEATHER, 0, 0, Math.abs(x) === 2 ? 's' : 'S');
+    if (z >= -14 && z <= -4) put(x, 13, z, Math.abs(x) === 2 || z % 3 === 0 ? STITCH : LEATHER, 0, 0, Math.abs(x) === 2 || z % 3 === 0 ? 's' : 'S');
   }
   // Rear mudguard, a little rack with a wooden block on it, and the tail light.
-  for (let z = -15; z <= -11; z++) for (let x = -1; x <= 1; x++) put(x, 11, z, rusty(x, 11, z), 2);
+  for (let z = -15; z <= -11; z++) for (let x = -1; x <= 1; x++) put(x, 11, z, rusty(x, 11, z), 2, 0, 'G');
   for (let z = -18; z <= -16; z++) for (const x of [-2, 2]) put(x, 12, z, SILVER, 3);
   for (let x = -2; x <= 2; x++) put(x, 12, -18, SILVER, 3);
   for (let x = -1; x <= 1; x++) for (let z = -18; z <= -17; z++) put(x, 13, z, [.42, .28, .16], 0);
@@ -88,9 +89,9 @@ const MODEL = (() => {
   put(-1, 11, -17, [.95, .55, .05], 1, .5);
   // Canvas bags hung either side under the seat, flaps and a strap.
   for (const x of [-3, 3]) for (let y = 7; y <= 10; y++) for (let z = -12; z <= -7; z++) {
-    put(x, y, z, z === -10 && y >= 8 ? LEATHER : y === 10 ? CANVAS_D : CANVAS, 0);
+    put(x, y, z, z === -10 && y >= 8 ? LEATHER : y === 10 ? CANVAS_D : CANVAS, 0, 0, 'B');
   }
-  for (const x of [-3, 3]) put(x, 8, -10, SILVER, 3);
+  for (const x of [-3, 3]) put(x, 8, -10, SILVER, 3, 0, 'B');
   // The exhaust: wrapped headers out of the front of the engine, down and back under it, out to the right into a chrome can that
   // rises along under the bag.
   for (const x of [1, 2]) { line(x, 8, 5, 8, 6, WRAP); line(x, 8, 6, 2, 7, WRAP); line(x, 2, 7, 2, -1, WRAP); }
@@ -105,13 +106,13 @@ const MODEL = (() => {
   for (const x of [-3, 3]) for (let z = -5; z <= -4; z++) put(x, 4, z, RUBBER, 0);
   // The forks: gold up top, black sliders down to the front hub, raked back. Clamps across them in polished steel.
   const forkZ = (y) => Math.round(10 - (y - HUB_Y) * .33);
-  for (const x of [-2, 2]) for (let y = 4; y <= 17; y++) put(x, y, forkZ(y), y <= 9 ? SLIDER : GOLD, y <= 9 ? 2 : 3);
+  for (const x of [-2, 2]) for (let y = 4; y <= 17; y++) put(x, y, forkZ(y), y <= 9 ? SLIDER : GOLD, y <= 9 ? 2 : 3, 0, y <= 9 ? '' : 'F');
   for (const y of [14, 17]) for (let x = -2; x <= 2; x++) put(x, y, forkZ(y), SILVER, 3);
   for (let y = 12; y <= 16; y++) put(0, y, forkZ(y), FRAME, 1);
   // The brake caliper on the left, in gold.
-  for (let y = 6; y <= 7; y++) put(-2, y, 12, GOLD, 3);
+  for (let y = 6; y <= 7; y++) put(-2, y, 12, GOLD, 3, 0, 'F');
   // Front mudguard, short and rusty.
-  for (let z = 7; z <= 13; z++) for (let x = -1; x <= 1; x++) put(x, z >= 12 ? 10 : 11, z, rusty(x, 11, z), 2);
+  for (let z = 7; z <= 13; z++) for (let x = -1; x <= 1; x++) put(x, z >= 12 ? 10 : 11, z, rusty(x, 11, z), 2, 0, 'G');
   // The headlamp: a black bucket on the front of the forks, its glass lit.
   for (let x = -2; x <= 2; x++) for (let y = 13; y <= 17; y++) for (let z = 9; z <= 10; z++) {
     if (Math.abs(x) === 2 && (y === 13 || y === 17)) continue;
@@ -133,6 +134,17 @@ const MODEL = (() => {
   }
   return out;
 })();
+
+// No two bikes quite alike: what the tank and mudguards are painted (or left as the old brass gone to rust), the seat, whether it
+// has the bags, and what the forks are. 0 is the one it has always been.
+const LOOKS = [
+  null,
+  { paint: [.5, .08, .06], speck: .12, seat: [.09, .09, .1], stitch: [.05, .05, .05], bags: false, fork: [.74, .74, .76] },
+  { paint: [.12, .19, .36], speck: .06, seat: [.55, .41, .24], stitch: [.42, .3, .17], bags: true, fork: [.16, .16, .17] },
+  { paint: [.76, .7, .56], speck: .2, seat: [.46, .23, .13], stitch: [.33, .15, .09], bags: false, fork: [.86, .63, .17] },
+  { paint: [.07, .07, .08], speck: .04, seat: [.1, .1, .1], stitch: [.06, .06, .06], bags: true, fork: [.74, .74, .76] },
+];
+export const BIKE_LOOKS = LOOKS.length;
 
 // One wheel, turned to how far it has rolled: a fat knobbly tyre, the rim, five black spokes and a polished hub. The brake disc on the
 // front one. They are put together fresh each frame, so they turn.
@@ -168,6 +180,7 @@ class Bike {
     this.fuel = 1;             // how much is in the tank, 0 to 1
     this.sy = y;               // where it is drawn, and you with it: eased up a kerb rather than snapped (it can sink into the step a little)
     this.light = false;        // the headlamp: switched on and off from the bars, and left however you leave it
+    this.look = Math.floor(Math.random() * LOOKS.length);   // which of the ways a bike can look (LOOKS)
   }
 }
 
@@ -186,10 +199,10 @@ export class Bikes {
     this.ride = null;
   }
 
-  toSave() { return this.list.filter((b) => !b.npc && !b.broken && !b.locked).map(b => [+b.x.toFixed(2), +b.y.toFixed(2), +b.z.toFixed(2), +b.yaw.toFixed(3), b.light ? 1 : 0, b.owned ? 1 : 0, +b.fuel.toFixed(3)]); }
+  toSave() { return this.list.filter((b) => !b.npc && !b.broken && !b.locked).map(b => [+b.x.toFixed(2), +b.y.toFixed(2), +b.z.toFixed(2), +b.yaw.toFixed(3), b.light ? 1 : 0, b.owned ? 1 : 0, +b.fuel.toFixed(3), b.look || 0]); }
   fromSave(s) {
     this.clear();
-    if (Array.isArray(s)) for (const [x, y, z, yaw, light, owned, fuel] of s) if (isFinite(x + y + z + yaw)) { const b = new Bike(x, y, z, yaw); b.light = !!light; b.owned = !!owned; b.fuel = isFinite(fuel) ? fuel : 1; this.list.push(b); }
+    if (Array.isArray(s)) for (const [x, y, z, yaw, light, owned, fuel, look] of s) if (isFinite(x + y + z + yaw)) { const b = new Bike(x, y, z, yaw); b.light = !!light; b.owned = !!owned; b.fuel = isFinite(fuel) ? fuel : 1; b.look = look >= 0 && look < LOOKS.length ? look : 0; this.list.push(b); }
   }
 
   // A new one stood on the ground a couple of steps in front of you, side on, so you can see it and swing a leg over.
@@ -852,19 +865,40 @@ export class Bikes {
       // Every voxel on one grid, the same size, sat a hair off the ground: no two faces ever lie in the same place to fight.
       // Leaned over about the line the tyres touch the ground along, the same way the shader leans each voxel.
       const cl = Math.cos(b.lean), sl = Math.sin(b.lean);
+      // Grass is drawn standing a little proud of the block it grows on: on it, the bike sits on top of the grass rather than through
+      // it, where the bottom of the tyre and the top of the grass would fight over the same place.
+      const under = this.g.world.getRaw(Math.floor(b.x), Math.floor(b.sy) - 1, Math.floor(b.z));
+      b.lift = (b.lift || 0) + ((under === M.GRASS || under === M.GRASS2 || under === M.GRASS_DRY ? .15 : 0) - (b.lift || 0)) * .25;
       const at = (x, y, z) => {
         const lx = x * cl + (y - .5) * sl, ly = -x * sl + (y - .5) * cl;
-        return [b.x + (rx * lx + fx * z) * VS, b.sy + .015 + ly * VS, b.z + (rz * lx + fz * z) * VS];
+        return [b.x + (rx * lx + fx * z) * VS, b.sy + .015 + b.lift + ly * VS, b.z + (rz * lx + fz * z) * VS];
       };
       const vox = (x, y, z, col, metal, glow = 0) => { const p = at(x, y, z); add(p[0], p[1], p[2], VS * 1.001, col[0], col[1], col[2], metal, glow); };
-      for (const [x, y, z, r, g, bl, metal, glow] of MODEL) {
+      const L = LOOKS[b.look || 0];
+      for (const [x, y, z, r, g, bl, metal, glow, part] of MODEL) {
+        if (L && part === 'B' && !L.bags) continue;
         const p = at(x, y, z);
         // The headlamp's glass: lit when it is on, a dull grey-yellow when it is not.
-        if (glow > 1.3 && !b.light) add(p[0], p[1], p[2], VS * 1.001, .55, .53, .45, 3, 0);
-        else add(p[0], p[1], p[2], VS * 1.001, r, g, bl, metal, glow);
+        if (glow > 1.3 && !b.light) { add(p[0], p[1], p[2], VS * 1.001, .55, .53, .45, 3, 0); continue; }
+        if (L && part) {
+          // Painted, with the odd chip gone to rust; the seat in its leather; the forks in theirs.
+          let c = null, m = metal;
+          if (part === 'T' || part === 'G') { const h = hash(x, y, z); c = h < L.speck ? [.5, .31, .17] : L.paint.map((v) => v * (.92 + h * .16)); m = h < L.speck ? 2 : 1; }
+          else if (part === 'S') c = L.seat;
+          else if (part === 's') c = L.stitch;
+          else if (part === 'F') c = L.fork;
+          if (c) { add(p[0], p[1], p[2], VS * 1.001, c[0], c[1], c[2], m, glow); continue; }
+        }
+        add(p[0], p[1], p[2], VS * 1.001, r, g, bl, metal, glow);
       }
       wheelCells(false, b.spin, vox);
       wheelCells(true, b.spin, vox);
+      // In the yard, up on a paddock stand: two red uprights cupping the back axle, on feet along the ground, a bar across behind.
+      if (b.yard !== undefined) {
+        const RED = [.46, .1, .08];
+        for (const x of [-4, 4]) { for (let y = 1; y <= HUB_Y; y++) vox(x, y, -10, RED, 1); for (let z = -12; z <= -8; z++) vox(x, 1, z, RED, 1); }
+        for (let x = -3; x <= 3; x++) vox(x, 1, -12, RED, 1);
+      }
       if (b !== this.ride) continue;
       const P = this.g.player, e = P.eyePos();
       // One box from a to z, as thick as it says, laid along the line between them at whatever angle that is.

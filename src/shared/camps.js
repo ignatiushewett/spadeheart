@@ -448,10 +448,12 @@ export function planCamp(def, id, r, ground) {
       const bikeYaw = Math.PI / 2;
       const yard = {
         x0, z0, x1, z1,
-        bikes: [{ x: wx(8.5), z: wz(5.5), yaw: bikeYaw }, { x: wx(8.5), z: wz(8.5), yaw: bikeYaw }],
+        // Stood a little askew, each its own way, not lined up like a showroom.
+        bikes: [{ x: wx(8.5), z: wz(5.5), yaw: bikeYaw + .2 }, { x: wx(8.5), z: wz(8.5), yaw: bikeYaw - .26 }],
         // Down beside each one: facing the bike in pieces from the bench side, the other from between the two.
         work: [{ x: wx(8.6), z: wz(3.9), yaw: ang(0, 1) }, { x: wx(8.6), z: wz(6.9), yaw: ang(0, 1) }],
-        bed: { x: wx(1.5), z: wz(2.5), yaw: ang(0, 1), kind: 'sleep' },
+        // Where the feet go: a sleeper lies back from there, the way they face, so the head ends up on the pillow by the fence.
+        bed: { x: wx(1.5), z: wz(3.95), yaw: ang(0, 1), kind: 'sleep' },
       };
       // The way round: bed to the near bike, out along the open side past the stands, and in to the far one. Never through a stand.
       yard.chain = [yard.bed, yard.work[0], { x: wx(11.6), z: yard.work[0].z }, { x: wx(11.6), z: yard.work[1].z }, yard.work[1]];
@@ -487,7 +489,7 @@ export function planCamp(def, id, r, ground) {
       const cell = (u, v) => [Math.floor(wx(u + .5)), Math.floor(wz(v + .5))];
       add('clinic', x0, z0, x1, z1, 6, { fx, fz });
       const solidCell = (u, v) => { const [a, b] = cell(u, v); block(a, b, a, b); };
-      for (let v = 0; v < CD; v++) { if (v < 4 || v > 5) solidCell(0, v); if (v < 9 || v > 10) solidCell(15, v); }
+      for (let v = 0; v < CD; v++) { solidCell(0, v); solidCell(15, v); }
       for (let u = 0; u < CW2; u++) { if (u < 13 || u > 14) solidCell(u, 0); if (u < 4 || u > 11) solidCell(u, 11); }
       for (const u of [2, 4, 6, 8, 10, 12]) for (let v = 1; v <= 3; v++) solidCell(u, v);
       for (let v = 5; v <= 8; v++) solidCell(14, v);
@@ -495,7 +497,8 @@ export function planCamp(def, id, r, ground) {
       for (const [u, v] of [[11, 9], [12, 9], [1, 9], [1, 10], [5, 1]]) solidCell(u, v);
       const ang = (du, dv) => Math.atan2(fx ? -du : du, fz ? -dv : dv);
       // The cots run back to front, the pillow end against the back wall.
-      const cots = [2, 4, 6, 8, 10, 12].map((u) => ({ x: wx(u + .5), z: wz(2.5), yaw: ang(0, 1), kind: 'sleep' }));
+      // Feet at the foot of each cot, the head back on the pillow against the tent wall.
+      const cots = [2, 4, 6, 8, 10, 12].map((u) => ({ x: wx(u + .5), z: wz(3.95), yaw: ang(0, 1), kind: 'sleep' }));
       const clinic = {
         x0, z0, x1, z1,
         // Who is laid up (some of the cots), and who sits waiting on the bench.
@@ -930,7 +933,8 @@ function stampPart(p, c, box, put, car, letterAt) {
       const U = (u) => (p.fx ? x1 - u : x0 + u), V = (v) => (p.fz ? z1 - v : z0 + v);
       const T = (u, y, v, id) => put(U(u), YB + y, V(v), id);
       const W2 = x1 - x0 + 1, D2 = z1 - z0 + 1;
-      // The ground is the town's own, the same as the streets round it.
+      // The ground is the town's own, except a pad of concrete where the bikes stand, black with oil under each.
+      for (let u = 5; u <= 12; u++) for (let v = 3; v <= 9; v++) T(u, -1, v, (v === 5 || v === 8) && u >= 7 && u <= 9 ? M.CONCRETE_D : M.CONCRETE);
       // A plank fence, waist high, on posts: behind the cot and the bench only, so the yard is open to walk into from three sides.
       for (let v = 0; v <= 5; v++) { const post = v % 3 === 0; T(0, 0, v, post ? M.WOOD_D : M.PLANK); T(0, 1, v, post ? M.WOOD_D : M.PLANK); }
       for (let u = 1; u <= 11; u++) { const post = u % 3 === 0; T(u, 0, 0, post ? M.WOOD_D : M.PLANK); T(u, 1, 0, post ? M.WOOD_D : M.PLANK); }
@@ -970,11 +974,7 @@ function stampPart(p, c, box, put, car, letterAt) {
       // Weathered canvas, patched where it tore, mud splashed up the bottom.
             const cv = (u, y, v) => { const k = ((u * 73856093) ^ (y * 19349663) ^ (v * 83492791) ^ x0) >>> 0; return y === 0 && k % 3 === 0 ? M.CANVAS : k % 13 === 0 ? M.CANVAS : M.TENT_W; };
       // The canvas: the two ends up to the roof, the back wall, and the front, its way in wide open with the flaps tied back.
-      for (let v = 0; v < D2; v++) for (let y = 0; y < roofY(v); y++) {
-        // A door at each end as well, and one at the back: nobody has to go round.
-        if (!(v >= 4 && v <= 5 && y < 3)) T(0, y, v, cv(0, y, v));
-        if (!(v >= 9 && v <= 10 && y < 3)) T(15, y, v, cv(15, y, v));
-      }
+      for (let v = 0; v < D2; v++) for (let y = 0; y < roofY(v); y++) { T(0, y, v, cv(0, y, v)); T(15, y, v, cv(15, y, v)); }
       for (let u = 1; u < W2 - 1; u++) for (let y = 0; y < 4; y++) { if (!(u >= 13 && u <= 14 && y < 3)) T(u, y, 0, cv(u, y, 0)); if (u < 4 || u > 11 || y === 3) T(u, y, 11, cv(u, y, 11)); }
       for (let y = 0; y < 3; y++) { T(3, y, 11, M.CANVAS); T(12, y, 11, M.CANVAS); }
       for (let u = 0; u < W2; u++) for (let v = 0; v < D2; v++) T(u, roofY(v), v, cv(u, 9, v));

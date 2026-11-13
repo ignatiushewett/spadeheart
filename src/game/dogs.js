@@ -30,7 +30,8 @@ export class Dogs {
 
   populate(c, st) {
     this.camps.add(c.id);
-    const adults = st.npcs.filter((n) => n.kind === 'resident' && !n.kid && !n.dead);
+    // Nobody laid up in the doctor's tent has a dog at their heels.
+    const adults = st.npcs.filter((n) => n.kind === 'resident' && !n.kid && !n.dead && !n.patient);
     const count = Math.max(3, Math.min(9, Math.round(c.folk / 45)));
     const used = new Set(), names = NAMES.slice().sort(() => rand() - .5);
     for (let i = 0; i < count; i++) {

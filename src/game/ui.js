@@ -1927,11 +1927,14 @@ export class UI {
           if (near && f.said % 2 === 0 && /[A-Za-z0-9]/.test(ch)) g.audio.voiceAt(this.voiceOf(n), n.x, n.y + 2.4, n.z);
         }
       }
-      const y = n.y + (n.kid ? 2.5 : 3.4) + (n.state === 5 ? -.7 : 0), x = n.x, z = n.z;
+      // Over the head, wherever that is: lying down, it is back along the body and only a little above the bed.
+      const lying = n.state === 7, back = lying ? (n.kid ? 1.1 : 1.7) : 0;
+      const y = n.y + (lying ? 1 : (n.kid ? 2.5 : 3.4) + (n.state === 5 ? -.7 : 0)), x = n.x - Math.sin(n.yaw) * back, z = n.z - Math.cos(n.yaw) * back;
       const w = vp[3] * x + vp[7] * y + vp[11] * z + vp[15];
       const dist = Math.hypot(x - P.x, y - P.y, z - P.z);
       f.los -= dt;
-      if (f.los <= 0) { f.los = .35; f.seen = g.world.los(P.x, P.y + 2.4, P.z, x, y - .4, z); }
+      // Under a roof or a tent, a sleeper's words can still be heard from right beside them.
+      if (f.los <= 0) { f.los = .35; f.seen = dist < 5 || g.world.los(P.x, P.y + 2.4, P.z, x, y - .4, z); }
       if (w <= 0 || !f.seen || dist > 34) { f.el.style.display = 'none'; continue; }
       const nx = (vp[0] * x + vp[4] * y + vp[8] * z + vp[12]) / w, ny = (vp[1] * x + vp[5] * y + vp[9] * z + vp[13]) / w;
       if (Math.abs(nx) > 1.05 || Math.abs(ny) > 1.05) { f.el.style.display = 'none'; continue; }

@@ -3600,7 +3600,8 @@ export class NPCs {
     }
     n.x = goal.x; n.z = goal.z;
     if (night) { n.state = 7; n.yaw = Y.bed.yaw; n.y = STREET_Y + 1; return; }
-    n.y = STREET_Y; n.yaw = goal.yaw; n.state = 6;
+    // Down on one knee at the bike, working on it.
+    n.y = STREET_Y; n.yaw = goal.yaw; n.state = 6.5;
   }
 
   // Nobody stands still while the dead close in round them. They back off, still firing, keeping the crowd in front of them;
