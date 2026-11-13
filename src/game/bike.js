@@ -452,7 +452,7 @@ export class Bikes {
     if (fw > 0 && !st && !hb && long > MAX * .9) b.straight = Math.min(OPEN_T, b.straight + dt);
     else b.straight = Math.max(0, b.straight - dt * (st ? 1 : 1.5));
     const cap = MAX + OPEN * b.straight / OPEN_T;
-    if (fw > 0) long += (long < 0 ? 22 : long < MAX ? 10 * (1 - Math.max(0, long) / MAX) + 1.2 : 2.6) * dt;
+    if (fw > 0) long += (long < 0 ? 22 : long < MAX ? 7.5 * (1 - Math.max(0, long) / MAX) + 1 : 2.2) * dt;
     else if (fw < 0) long -= (long > 0 ? 20 : 5) * dt;
     else long -= Math.sign(long) * Math.min(Math.abs(long), (rider ? 3.2 : 4 + Math.abs(long) * .25) * dt);
     if (hb) long -= Math.sign(long) * Math.min(Math.abs(long), 8 * dt);
@@ -480,7 +480,8 @@ export class Bikes {
     const grip = !rider ? 1.4 : drifting ? (hb ? 1.5 : 2.6) : 11;
     const keep = Math.exp(-grip * dt), shed = lat * (1 - keep);
     lat *= keep;
-    long += Math.sign(long || 1) * Math.abs(shed) * (rider ? .82 : .3);
+    // Carried on as the same speed, not added to it: the turn bends the motion round, it never speeds it up.
+    long = Math.sign(long || 1) * Math.sqrt(long * long + shed * shed * (rider ? .82 : .3) ** 2);
     const speed = Math.hypot(long, lat), slipA = Math.atan2(Math.abs(lat), Math.abs(long) + .001);
     b.vx = fx * long + rx * lat; b.vz = fz * long + rz * lat;
     b.v = long; b.slip = lat;
