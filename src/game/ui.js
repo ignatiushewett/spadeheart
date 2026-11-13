@@ -710,7 +710,7 @@ export class UI {
     if (it) {
       $('wname').textContent = it.name;
       if (it.type === 'gun') {
-        $('ammo').innerHTML = `${P.reloadT > 0 ? '<small>reloading</small>' : P.mags[P.weapon] ?? 0} <small>/ ${P.count(it.ammo)}</small>`;
+        $('ammo').innerHTML = `${P.reloadT > 0 && !(it.perShell || it.cylinder) ? '<small>reloading</small>' : P.mags[P.weapon] ?? 0} <small>/ ${P.count(it.ammo)}</small>`;
       } else if (it.type === 'throw' || it.type === 'block') {
         $('ammo').innerHTML = `${P.count(P.weapon)}`;
       } else $('ammo').innerHTML = '';
@@ -966,7 +966,7 @@ export class UI {
   mapLights(id, w, h, place) {
     const g = this.g, el = $(id), lc = g.renderer.lightCanvas, night = Math.min(1, g.renderer.sky.night || 0);
     if (!el) return;
-    const o = lc && night > .05 ? Math.min(.85, night * .9).toFixed(2) : '0';
+    const o = lc && night > .05 ? Math.min(.95, night * 1.05).toFixed(2) : '0';
     if (el.style.opacity !== o) el.style.opacity = o;
     if (o === '0') return;
     if (el.width !== w || el.height !== h) { el.width = w; el.height = h; }
@@ -976,7 +976,9 @@ export class UI {
     place(x);
     x.imageSmoothingEnabled = true;
     x.globalCompositeOperation = 'lighter';
-    x.globalAlpha = .42;
+    // Laid on more than once: a settlement at night is the brightest thing on the map.
+    x.drawImage(lc, 0, 0, WX, WZ);
+    x.globalAlpha = .7;
     x.drawImage(lc, 0, 0, WX, WZ);
     x.globalAlpha = 1;
     // And the beams that move: a camp's floodlights sweeping the approach, your torch, and a bike's headlamp, each a cone of light
@@ -1001,7 +1003,8 @@ export class UI {
   }
 
   drawMinimap() {
-    const g = this.g, P = g.player, c = $('minimap'), x = c.getContext('2d');
+    const g = this.g, P = g.player, c = $('minimap');
+    let x = c.getContext('2d');
     const W = c.width, cx = W / 2;
     this.mapLights('mm-lights', W, W, (q) => { q.translate(cx, cx); q.rotate(-P.yaw); q.scale(2.4, 2.4); q.translate(-P.x, -P.z); });
     x.save();
@@ -1060,6 +1063,11 @@ export class UI {
       x.beginPath(); x.arc(dx * k, dz * k, 1.6 * px, 0, 6.2832); x.fillStyle = '#9fd4ff'; x.fill();
     }
     x.restore();
+    // You, the north mark and the names, over the light of the hour and the weather.
+    const top = $('mm-top');
+    if (top.width !== W || top.height !== W) { top.width = W; top.height = W; }
+    x = top.getContext('2d');
+    x.clearRect(0, 0, W, W);
     x.fillStyle = '#e8b04a';
     x.beginPath(); x.moveTo(cx, cx - 11); x.lineTo(cx + 7, cx + 8); x.lineTo(cx, cx + 4); x.lineTo(cx - 7, cx + 8); x.closePath(); x.fill();
     const na = -P.yaw;
@@ -1994,7 +2002,8 @@ export class UI {
   drawBigMap() {
     this.clampMapView();
     this.drawMapRail();
-    const g = this.g, c = $('bigmap'), x = c.getContext('2d'), v = this.mapView, s = this.mapScale();
+    const g = this.g, c = $('bigmap'), v = this.mapView, s = this.mapScale();
+    let x = c.getContext('2d');
     x.setTransform(1, 0, 0, 1, 0, 0);
     x.fillStyle = OCEAN;
     x.fillRect(0, 0, c.width, c.height);
@@ -2111,6 +2120,14 @@ export class UI {
       x.fillRect(tx(n.x) - d / 2, tz(n.z) - d / 2, d, d);
     }
     x.globalAlpha = 1;
+    // The names and marks from here on go on a layer of their own over the light of the hour and the weather, so they read the same
+    // at midnight in the rain as at noon.
+    const top = $('bm-top');
+    if (top.width !== c.width || top.height !== c.height) { top.width = c.width; top.height = c.height; }
+    x = top.getContext('2d');
+    x.setTransform(1, 0, 0, 1, 0, 0);
+    x.clearRect(0, 0, c.width, c.height);
+    x.textBaseline = 'middle';
     drawCity();
     // Your own motorbike, at any zoom: a round mark with a B in it, where you left it.
     for (const b of g.bikes.list) {

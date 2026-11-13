@@ -14,6 +14,9 @@ const HUNGER_RATE = 100 / 4000;
 // Rest runs down while you are awake: a full night's sleep lasts about a day and a half before you are running on nothing.
 const REST_RATE = 100 / 2400;
 
+// A bolt gun's bolt drawn back for loading, and run home after.
+const BOLT_OPEN = .3, BOLT_CLOSE = .32;
+
 export class Player {
   constructor(game) {
     this.g = game;
@@ -191,6 +194,7 @@ export class Player {
     this.reloadT = 0;
     this.reloadQ = 0;
     this.reloadPhase = null;
+    this.reloadStop = false;
     this.cook = 0;
     this.g.audio.simple('click');
     this.g.ui.hudDirty = true;
@@ -623,17 +627,15 @@ export class Player {
       if (input.toggleAim) { if (rPressed) this.aimOn = !this.aimOn; if (this.sprinting) this.aimOn = false; } else this.aimOn = false;
       // A scoped bolt gun comes down off the eye to work the bolt, and goes back up once it is done.
       this.aiming = !!(input.toggleAim ? this.aimOn : rmb) && this.reloadT <= 0 && !this.sprinting && !(it.scope && this.fireCd > it.rate * .2);
-      // A revolver held open between rounds: a pull of the trigger snaps it shut, ready to fire.
-      if (this.reloadPhase === 'wait' && pressed && it.cylinder) { this.reloadPhase = 'close'; this.reloadT = it.cylinder.close; this.reloadQ = 0; }
+      // Loading a round at a time, the trigger stops it: the round in hand still goes in, and then no more.
+      if ((it.perShell || it.cylinder) && pressed && this.reloadT > 0 && this.reloadPhase !== 'close') { this.reloadStop = true; this.reloadQ = 0; }
       if (this.reloadT > 0) {
         this.reloadT -= dt;
         if (this.reloadT <= 0) this.finishReload(it, id);
       } else if (this.swapT <= 0 && this.fireCd <= 0 && (it.auto ? lmb : pressed)) {
         if ((this.mags[id] || 0) > 0) this.fireGun(it, id);
-        else {
-          if (pressed) this.g.audio.simple('click');
-          this.startReload(it, id);
-        }
+        // Empty: a dry click and nothing more. Reloading is up to you (R).
+        else if (pressed) this.g.audio.simple('dryfire');
       }
       if (locked && input.pressed.KeyR) this.startReload(it, id);
     } else if (it.type === 'melee') {
@@ -660,18 +662,31 @@ export class Player {
     }
     // Loaded by hand, a round at a time: every tap of R is one more round. Tap it a few times and they go in one after another.
     if (byHand) {
+      // Tapped again while it is being closed up: kept, and it goes straight back in for them once it is shut.
       this.reloadQ = Math.min(it.mag - m, (this.reloadQ || 0) + 1);
-      // A revolver held open, waiting for the next round: straight on with it.
-      if (it.cylinder && this.reloadPhase === 'wait') { this.reloadPhase = 'load'; this.reloadT = it.cylinder.each; return; }
       if (this.reloadT > 0) return;
-      // A revolver is swung open and the empties shaken out first.
-      if (it.cylinder) { this.reloadPhase = 'open'; this.reloadT = it.cylinder.open; this.g.audio.simple('reload'); return; }
-      this.reloadT = it.reload;
+      this.beginHandLoad(it);
       return;
     }
     if (this.reloadT > 0) return;
     this.reloadT = it.reload;
     this.g.audio.simple('reload');
+  }
+
+  // Loading by hand begins: a revolver is swung open and the empties shaken out first; a bolt gun has its bolt drawn back.
+  beginHandLoad(it) {
+    this.reloadStop = false;
+    if (it.cylinder) { this.reloadPhase = 'open'; this.reloadT = it.cylinder.open; this.g.audio.simple('reload'); return; }
+    if (it.bolt) { this.reloadPhase = 'open'; this.reloadT = BOLT_OPEN; this.g.audio.simple('click'); return; }
+    this.reloadPhase = 'load';
+    this.reloadT = it.reload;
+  }
+
+  // Taps of R made while it was being shut: open it up again for them.
+  again(it, id) {
+    const q = this.reloadQ || 0;
+    this.reloadQ = 0;
+    if (q > 0 && (this.mags[id] || 0) < it.mag && this.count(it.ammo)) { this.reloadQ = Math.min(q, it.mag - this.mags[id]); this.beginHandLoad(it); }
   }
 
   finishReload(it, id) {
@@ -681,26 +696,34 @@ export class Player {
       if (this.reloadPhase === 'open' || this.reloadPhase === 'load') {
         if (this.reloadPhase === 'load' && m < it.mag && this.count(it.ammo)) { this.remove(it.ammo, 1); this.mags[id] = m + 1; this.reloadQ = Math.max(0, (this.reloadQ || 0) - 1); this.g.audio.simple('click'); }
         const room = (this.mags[id] || 0) < it.mag && this.count(it.ammo);
-        if (room && this.reloadQ > 0) { this.reloadPhase = 'load'; this.reloadT = C.each; }
-        // Nothing more asked for yet: held open a moment for the next tap of R, then snapped shut.
-        else if (room) { this.reloadPhase = 'wait'; this.reloadT = 1.4; }
-        else { this.reloadPhase = 'close'; this.reloadT = C.close; this.reloadQ = 0; }
+        // As many rounds as were asked for, then shut, the same whether it is full or not.
+        if (room && this.reloadQ > 0 && !this.reloadStop) { this.reloadPhase = 'load'; this.reloadT = C.each; }
+        else { this.reloadPhase = 'close'; this.reloadT = C.close; this.reloadQ = 0; this.reloadStop = false; }
         return;
       }
-      if (this.reloadPhase === 'wait') { this.reloadPhase = 'close'; this.reloadT = C.close; this.reloadQ = 0; return; }
       this.reloadPhase = null;
       this.g.audio.simple('reload');
+      this.again(it, id);
       return;
     }
     if (it.perShell) {
-      if (m < it.mag && this.count(it.ammo)) {
+      const ph = this.reloadPhase;
+      // Done: the bolt run forward and turned down, or a shotgun simply brought back up.
+      const end = () => {
+        this.reloadQ = 0; this.reloadStop = false;
+        if (it.bolt) { this.reloadPhase = 'close'; this.reloadT = BOLT_CLOSE; } else this.reloadPhase = null;
+      };
+      if (ph === 'close') { this.reloadPhase = null; this.g.audio.simple('pump'); this.again(it, id); return; }
+      if (ph === 'load' && m < it.mag && this.count(it.ammo)) {
         this.remove(it.ammo, 1);
         this.mags[id] = m + 1;
         this.reloadQ = Math.max(0, (this.reloadQ || 0) - 1);
         this.g.audio.simple('reload');
-        // Only as many as were asked for: one shell a tap.
-        if (this.reloadQ > 0 && this.mags[id] < it.mag && this.count(it.ammo)) this.reloadT = it.reload;
-      } else this.reloadQ = 0;
+      }
+      const room = this.mags[id] < it.mag && this.count(it.ammo);
+      // Only as many as were asked for, one a tap, and then it is done, the same whether it is full or not.
+      if (room && !this.reloadStop && this.reloadQ > 0) { this.reloadPhase = 'load'; this.reloadT = it.reload; }
+      else end();
     } else {
       const take = this.remove(it.ammo, it.mag - m);
       this.mags[id] = m + take;
@@ -766,7 +789,7 @@ export class Player {
     g.horde.noise(this.x, this.z, it.noise * (this.sanctuary ? .2 : .55), .9);
     g.stats.shots++;
     if (this.sanctuary) g.npcs.firedInCamp();
-    if (id === 'shotgun' || id === 'hunting' || id === 'deer') setTimeout(() => g.audio.simple('pump'), it.rate * 450);
+    if (id === 'shotgun' || id === 'hunting' || id === 'deer') setTimeout(() => g.audio.simple('pump'), it.rate * (id === 'shotgun' ? 450 : 380));
   }
 
   traceBullet(o, dx, dy, dz, it, mx, my, mz, tracer) {

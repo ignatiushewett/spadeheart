@@ -524,6 +524,8 @@ export class Audio2 {
       }
       case 'bonk': this.tone(d(.35, .08), .1, 'triangle', 320, 120, .7); break;
       case 'click': this.noiseBurst(d(.5, 0), .025, 'highpass', 2600, 2000, 1, .8); break;
+      // The hammer or the striker falling on nothing: a sharp metal snap and a dull knock under it.
+      case 'dryfire': { const o = d(1.6, .02); this.noiseBurst(o, .035, 'bandpass', 1500, 950, 3, 1); this.tone(o, .06, 'square', 420, 160, .3); later(18, () => this.noiseBurst(d(1, .02), .05, 'lowpass', 520, 150, 1.2, .9)); break; }
       case 'reload': {
         // Magazine out, magazine in, bolt forward.
         this.noiseBurst(d(.9, .02), .05, 'bandpass', 1500, 900, 3, 1);

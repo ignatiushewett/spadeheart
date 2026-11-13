@@ -183,45 +183,18 @@ function forearm(out, wrist, elbow, S) {
 }
 
 // A hand closed round something upright: a pistol grip or a tool handle. side +1 is the right hand, with the back of the hand out to the right.
-function wrap(out, { x, y, z, w, d, side = 1, S = 1, fingers = 3, trigger = false, elbow }) {
-  // A hair wider than what it holds, so the inside of the hand never sits exactly on the handle's faces and flickers against them.
-  w += .005 * S; d += .005 * S;
-  const t = .021 * S, fw = .024 * S, tall = fw * fingers, top = y + tall / 2;
-  // The back of the hand, the heel behind the grip, and the row of knuckles.
-  out.push([x + side * (w / 2 + t / 2), y, z + .003 * S, t, tall + .006 * S, d + t * 1.2, GLOVE]);
-  out.push([x, y, z + d / 2 + t / 2, w + t * 2, tall, t, GLOVE_L]);
-  out.push([x + side * (w / 2 + t * .72), y, z - d / 2 - t * .1, t * .62, tall * .94, t * 1.1, GLOVE_L]);
-  for (let i = 0; i < fingers; i++) {
-    const fy = top - fw * (i + .5), short = i === fingers - 1 ? .82 : 1;
-    // Round the front of the grip, and on to where the fingertips come to rest against the far side.
-    out.push([x, fy, z - d / 2 - t * .5, w + t * 1.1, fw * .84, t, SKIN]);
-    out.push([x - side * (w / 2 + t * .46), fy, z - d / 2 + d * .28 * short, t * .9, fw * .84, d * .62 * short, SKIN_D]);
-  }
-  // Thumb, across the far side and pointing forward.
-  out.push([x - side * (w / 2 + t * .5), top + fw * .42, z + d * .08, t * .95, fw * .96, d * .86 + .02 * S, SKIN]);
-  out.push([x - side * (w / 2 + t * .3), top + fw * .1, z + d * .42, t * .9, fw * 1.1, t * 1.2, GLOVE]);
-  if (trigger) {
-    // Finger along the frame, curling in to the trigger.
-    out.push([x + side * (w / 2 + t * .2), top + fw * .44, z - d / 2 - .026 * S, t * .72, fw * .78, .052 * S, SKIN]);
-    out.push([x + side * w * .18, top + fw * .36, z - d / 2 - .05 * S, w * .7 + t * .3, fw * .66, t * .62, SKIN_D]);
-  }
+function wrap(out, { x, y, z, w, d, side = 1, S = 1, fingers = 3, elbow }) {
+  // A plain square hand closed round the grip, the way everyone in this city's hands are: one block, no fingers. A hair wider than
+  // what it holds all round, so nothing of the grip's own faces lies on the hand's and flickers.
+  const t = .021 * S, tall = .024 * S * fingers;
+  out.push([x + side * t * .3, y, z + t * .1, w + t * 2.4, tall + .012 * S, d + t * 2.3, SKIN]);
   forearm(out, [x + side * (w * .32 + t * .3), y - tall * .1, z + d / 2 + t * .8], elbow, S);
 }
 
-// A hand underneath something it is steadying: palm up, fingers up one side and thumb up the other.
+// A hand under something it is steadying: one block cupped round the underside and a little way up the sides.
 function cradle(out, { x, y, z, w, h, side = -1, S = 1, len = .09, elbow }) {
-  const t = .021 * S, fw = len / 4, under = y - h / 2;
-  out.push([x, under - t / 2, z, w + t * 1.2, t, len, GLOVE]);
-  out.push([x, under - t * 1.15, z + len * .36, w * .8 + t, t * .7, len * .4, GLOVE_L]);
-  // Fingers up the far side, one by one so they read as fingers.
-  for (let i = 0; i < 4; i++) {
-    const fz = z - len / 2 + fw * (i + .5), rise = Math.min(h * .72, .05 * S) * (i === 3 ? .82 : 1);
-    out.push([x - side * (w / 2 + t * .48), under + rise / 2 - t * .3, fz, t * .9, rise + t * .6, fw * .84, SKIN]);
-  }
-  // The heel of the hand flaring out on the near side, the thumb lying along the top of it, and a knuckle at its root.
-  out.push([x + side * (w / 2 + t * .85), under - t * .1, z + len * .04, t * 1.7, t * 2.1, len * .86, GLOVE]);
-  out.push([x + side * (w / 2 + t * .6), under + t * 1.05 + Math.min(h * .12, .012 * S), z - len * .14, t * 1.05, t * 1.15, len * .66, SKIN]);
-  out.push([x + side * (w / 2 + t * .7), under + t * .95, z + len * .24, t * 1.2, t * 1.25, len * .3, GLOVE_L]);
+  const t = .021 * S, under = y - h / 2, lo = under - t * 1.3, hi = under + Math.min(h * .4, .03 * S);
+  out.push([x, (lo + hi) / 2, z, w + t * 2.4, hi - lo, len, SKIN]);
   forearm(out, [x + side * w * .12, under - t * .9, z + len / 2 + t * .2], elbow, S);
 }
 
@@ -253,16 +226,9 @@ function toolHands(id, y, w, d, S, upper) {
 function pistolHands(id, g) {
   const pose = POSES[id], right = [], left = [], x = 0, y = g.y, z = g.z, t = .021;
   wrap(right, { ...g, side: 1, trigger: true, elbow: viewToModel(pose, RIGHT_ELBOW) });
-  // The other hand comes up under and around the first: heel below, fingers laid over the front, thumb forward along the frame.
+  // The other hand comes up under and around the first: one block, under it and to the left.
   const low = y - .036;
-  left.push([x - g.w / 2 - t * 1.3, low + .012, z + .004, t, .058, g.d + .018, GLOVE]);
-  left.push([x, low - .022, z + .002, g.w + t * 2.6, t * .9, g.d + .02, GLOVE_L]);
-  for (let i = 0; i < 3; i++) {
-    const fy = y - .012 - i * .021;
-    left.push([x + .006, fy, z - g.d / 2 - t * 1.45, g.w + t * 2.4, .018, t * .9, SKIN]);
-    left.push([x + g.w / 2 + t * 1.5, fy, z - g.d / 2 - t * .3, t * .8, .018, t * 2, SKIN_D]);
-  }
-  left.push([x - g.w / 2 - t * 1.25, y + .036, z - .036, t * .9, .021, .07, SKIN]);
+  left.push([x - .004, low + .004, z + .003, g.w + t * 3.1, .058, g.d + .03, SKIN]);
   forearm(left, [x - g.w * .6 - t, low - .018, z + g.d / 2 + t * .4], viewToModel(pose, LEFT_ELBOW), 1);
   return { right, left };
 }
@@ -276,12 +242,9 @@ function heldHands(id, grip) {
 // A hand holding one round between finger and thumb, the round's nose at the origin end pointing forward: the palm behind it, the
 // first finger along the top and the thumb under it, the rest curled in, and the forearm going back down out of sight.
 function pinchHand() {
+  // A plain block of a hand with the round held at its front.
   const out = [];
-  out.push([-.003, -.004, .046, .032, .038, .036, GLOVE]);
-  out.push([-.003, .006, .028, .03, .016, .006, GLOVE_L]);
-  out.push([0, .0105, .021, .012, .009, .034, SKIN]);
-  out.push([0, -.0105, .023, .013, .009, .03, SKIN_D]);
-  out.push([-.004, -.021, .031, .026, .012, .016, SKIN_D]);
+  out.push([-.003, -.004, .044, .032, .036, .04, SKIN]);
   forearm(out, [-.004, -.014, .064], [-.05, -.17, .3], 1);
   return out;
 }
@@ -305,7 +268,7 @@ function buildHands(tone) {
     smg: gunHands('smg', { x: 0, y: -.082, z: .03, w: .036, d: .05 }, { x: 0, y: 0, z: -.225, w: .05, h: .07 }),
     shotgun: gunHands('shotgun', { x: 0, y: -.07, z: .11, w: .04, d: .06 }, { x: 0, y: -.024, z: -.32, w: .05, h: .046, len: .12 }),
     rifle: gunHands('rifle', { x: 0, y: -.082, z: .043, w: .036, d: .05 }, { x: 0, y: .014, z: -.31, w: .062, h: .062, len: .11 }),
-    deer: gunHands('deer', { x: 0, y: -.048, z: .1, w: .05, d: .06 }, { x: 0, y: 0, z: -.17, w: .046, h: .056, len: .11 }),
+    deer: gunHands('deer', { x: 0, y: -.048, z: .1, w: .05, d: .06 }, { x: 0, y: 0, z: -.33, w: .046, h: .056, len: .11 }),
     hunting: gunHands('hunting', { x: 0, y: -.048, z: .1, w: .05, d: .06 }, { x: 0, y: 0, z: -.17, w: .046, h: .056, len: .11 }),
     lmg: gunHands('lmg', { x: 0, y: -.082, z: .075, w: .034, d: .045 }, { x: 0, y: -.03, z: -.28, w: .058, h: .04, len: .12 }),
     rocket: gunHands('rocket', { x: 0, y: -.05, z: -.02, w: .036, d: .06 }, { x: 0, y: .05, z: -.3, w: .08, h: .08, len: .11 }),
@@ -500,8 +463,10 @@ export class ViewModel {
     // The rest of handling the gun has some weight to it too: the magazine slapped home at the end of a reload, the tip forward as
     // one starts, and a gun just drawn settling into your hands.
     if (!pose.melee && player.weapon === this.lastWeapon) {
-      if (player.reloadT > 0 && !(this.prevReload > 0)) { this.sp.vrz += 7; this.sp.vrx -= 6; }
-      if (this.prevReload > 0 && !(player.reloadT > 0)) { this.sp.vy += 3.2; this.sp.vrx += 13; this.sp.vz -= 1.6; this.sp.vrz -= 5; }
+      // Loaded by hand there is no magazine to slap: those ease in and out of the reload with no jolt at either end.
+      const byHand = id === 'shotgun' || id === 'revolver' || id === 'deer' || id === 'hunting';
+      if (!byHand && player.reloadT > 0 && !(this.prevReload > 0)) { this.sp.vrz += 7; this.sp.vrx -= 6; }
+      if (!byHand && this.prevReload > 0 && !(player.reloadT > 0)) { this.sp.vy += 3.2; this.sp.vrx += 13; this.sp.vz -= 1.6; this.sp.vrz -= 5; }
       if (this.prevSwap > 0 && !(player.swapT > 0)) { this.sp.vy -= 1.8; this.sp.vrx -= 9; }
     }
     this.prevReload = player.reloadT; this.prevSwap = player.swapT; this.lastWeapon = player.weapon;
@@ -550,26 +515,35 @@ export class ViewModel {
     rx += this.swayY * 1.1;
     // Reloading looks like what it is for each kind of gun. this.rl eases in and out, so it never snaps into or out of the pose.
     const reloading = player.reloadT > 0 && !pose.melee;
-    if (reloading && player.reloadT > (this.lastReloadT || 0) + .05) { this.reloadTotal = player.reloadT; this.shellN = (this.shellN || 0) + 1; }
+    if (reloading && (player.reloadT > (this.lastReloadT || 0) + .05 || player.reloadPhase !== this.lastPhase)) { this.reloadTotal = Math.max(player.reloadT, .01); this.shellN = (this.shellN || 0) + 1; }
     if (!reloading) this.shellN = 0;
-    this.lastReloadT = player.reloadT;
+    this.lastReloadT = player.reloadT; this.lastPhase = player.reloadPhase;
+    // Where the reload is, for the hands and the bolt further on.
+    this.rlP = reloading ? Math.max(0, Math.min(1, 1 - player.reloadT / (this.reloadTotal || 1))) : 1;
+    this.rlPh = reloading ? player.reloadPhase : null;
     this.rl = (this.rl || 0) + ((reloading ? 1 : 0) - (this.rl || 0)) * Math.min(1, sd * (reloading ? 9 : 7));
     if (this.rl > .001 && !pose.melee) {
       const k = this.rl, p = reloading ? Math.max(0, Math.min(1, 1 - player.reloadT / (this.reloadTotal || 1))) : 1;
       const bump = (at, w) => Math.max(0, 1 - Math.abs(p - at) / w);
       if (id === 'shotgun') {
-        // On its side, port up, a shell pushed in each time round, the hand going back to the belt for the next.
-        const push = p < .4 ? p / .4 : Math.max(0, 1 - (p - .4) / .3);
+        // On its side, port up, held there the whole time; a nudge as each shell is thumbed home.
+        const push = this.rlPh === 'load' ? bump(.82, .13) : 0;
         rz += .75 * k; rx += .14 * k; py -= .035 * k; px -= .03 * k;
-        pz -= .025 * push * k; rx += .05 * push * k; rz -= .06 * push * k;
+        pz -= .018 * push * k; rx += .04 * push * k; rz -= .05 * push * k;
+      } else if (id === 'deer' || id === 'hunting') {
+        // Rolled a little to show the open action, held there; a nudge as each round is pressed down into it.
+        const push = this.rlPh === 'load' ? bump(.82, .13) : 0;
+        rz += .34 * k; rx += .08 * k; py -= .03 * k; px -= .015 * k;
+        pz -= .01 * push * k; rz -= .04 * push * k; py -= .006 * push * k;
       } else if (id === 'revolver') {
-        // Rolled over, muzzle up, cylinder out: a flick to shake the empties out, a nudge for every round thumbed in, and a flick of
-        // the wrist to snap it shut.
-        rz += .95 * k; rx += .5 * k; py += .015 * k; px -= .05 * k;
-        const ph = player.reloadPhase;
+        // Rolled over, muzzle up, cylinder out: a flick to shake the empties out, a nudge for every round thumbed in, then rolled
+        // straight back up to the grip as the cylinder is pushed shut, in one movement, and left there once it is done.
+        const ph = player.reloadPhase, e = (t) => t * t * (3 - 2 * t);
+        if (ph === 'close') this.rvOut = 1 - e(p); else if (ph) this.rvOut = 1;
+        const out = this.rvOut ?? 1;
+        rz += .95 * k * out; rx += .5 * k * out; py += .015 * k * out; px -= .05 * k * out;
         if (ph === 'open') { rx += .35 * bump(.65, .3) * k; py += .02 * bump(.65, .3) * k; }
         else if (ph === 'load') { rz += .06 * Math.sin(p * Math.PI) * k; py -= .008 * Math.sin(p * Math.PI) * k; }
-        else if (ph === 'close') { rz -= .45 * bump(.55, .35) * k; rx -= .12 * bump(.55, .35) * k; }
       } else if (id === 'lmg') {
         // Belt-fed: canted over a little and the muzzle dipped, so you look down into the top of it, then the cover slammed shut at the end.
         rz += .32 * k; rx -= .2 * k; py -= .045 * k; px -= .03 * k; pz += .03 * k;
@@ -666,13 +640,19 @@ export class ViewModel {
       gl.drawArrays(gl.TRIANGLES, 0, m.count);
       if (id === 'deer' || id === 'hunting') {
         // The bolt: lifted (turned about the bore), drawn back, run forward, turned down, over most of the time between shots.
-        const D = (id === 'deer' ? .8 : 1.05) * .85, bu = this.boltT === undefined ? 1 : Math.min(1, (this.boltT += Math.min(dt, 1 / 30)) / D);
+        const D = (id === 'deer' ? .8 : 1.05) * .85;
+        let bu = this.boltT === undefined ? 1 : Math.min(1, (this.boltT += Math.min(dt, 1 / 30)) / D);
+        const ph = this.rlPh, rp = this.rlP;
+        if (ph) { bu = ph === 'open' ? .15 + .4 * rp : ph === 'close' ? .55 + .45 * rp : .55; this.boltT = 99; }
         const ease = (a, b) => Math.max(0, Math.min(1, (bu - a) / (b - a)));
         const lift = bu < .15 ? 0 : bu < .32 ? ease(.15, .32) : bu < .75 ? 1 : 1 - ease(.75, .9);
         const back = bu < .32 ? 0 : bu < .55 ? ease(.32, .55) : 1 - ease(.55, .75);
         const a = lift * 1.15, c = Math.cos(a), sn = Math.sin(a), py = .036, L7 = this.local;
         L7.fill(0); L7[0] = c; L7[1] = sn; L7[4] = -sn; L7[5] = c; L7[10] = 1; L7[15] = 1;
         L7[12] = sn * py; L7[13] = py * (1 - c); L7[14] = back * .075;
+        // Kept for the hand: it goes to the bolt, works it, and comes back to the grip.
+        (this.boltM || (this.boltM = new Float32Array(16))).set(L7);
+        this.boltU = bu;
         multiply(this.fmv, mv, L7);
         gl.uniformMatrix4fv(u.uModelView, false, this.fmv);
         gl.bindVertexArray(this.bolt.vao);
@@ -730,7 +710,26 @@ export class ViewModel {
     const hands = this.hands[id];
     if (hands) {
       gl.bindVertexArray(hands.right.vao);
-      gl.drawArrays(gl.TRIANGLES, 0, hands.right.count);
+      // Working a bolt: the shooting hand comes off the grip, up to the handle, rides it up and back and forward and down, and
+      // returns to the grip for the next shot.
+      const bolting = (id === 'deer' || id === 'hunting') && this.boltU !== undefined && this.boltU < 1 && this.boltM;
+      if (bolting) {
+        const bu = this.boltU, r = bu < .05 ? 0 : bu < .15 ? (bu - .05) / .1 : bu < .9 ? 1 : Math.max(0, 1 - (bu - .9) / .1);
+        const T = this.local2 || (this.local2 = new Float32Array(16)), Mb = this.local3 || (this.local3 = new Float32Array(16));
+        T.fill(0); T[0] = T[5] = T[10] = T[15] = 1; T[12] = .03 * r; T[13] = .072 * r; T[14] = -.045 * r;
+        multiply(Mb, this.boltM, T);
+        if (this.rlPh === 'load') {
+          const rp = this.rlP, e = (t) => t * t * (3 - 2 * t);
+          const reach = rp < .38 ? e(rp / .38) : rp < .74 ? 1 - e((rp - .38) / .36) : 0;
+          Mb[12] += .05 * reach; Mb[13] -= .17 * reach; Mb[14] += .09 * reach;
+          // Pressing it down into the action.
+          Mb[13] -= .012 * Math.max(0, 1 - Math.abs(rp - .84) / .1);
+        }
+        multiply(this.fmv, mv, Mb);
+        gl.uniformMatrix4fv(u.uModelView, false, this.fmv);
+        gl.drawArrays(gl.TRIANGLES, 0, hands.right.count);
+        gl.uniformMatrix4fv(u.uModelView, false, mv);
+      } else gl.drawArrays(gl.TRIANGLES, 0, hands.right.count);
       if (hands.left) {
         // The left hand has a life of its own: it trails the gun a little when you walk, takes the kick late, and goes off to find
         // a fresh magazine during a reload, going back and forth for as long as it takes.
@@ -759,7 +758,13 @@ export class ViewModel {
           const k = this.rl, p = player.reloadT > 0 ? Math.max(0, Math.min(1, 1 - player.reloadT / (this.reloadTotal || 1))) : 1;
           const tip = lmgReloadAt(p).tip;
           ox += tip[0] * k; oy += tip[1] * k; oz += tip[2] * k;
-        } else if (this.rl > .001 && !pose.melee) {
+        } else if (id === 'shotgun' && this.rl > .001) {
+          // From the gun to the belt for a shell, back up under the gun, and thumbed in at the port; still between shells.
+          const k = this.rl, rp = this.rlP, e = (t) => t * t * (3 - 2 * t);
+          const reach = this.rlPh === 'load' ? (rp < .38 ? e(rp / .38) : rp < .74 ? 1 - e((rp - .38) / .36) : 0) : 0;
+          const push = this.rlPh === 'load' ? Math.max(0, 1 - Math.abs(rp - .84) / .1) : 0;
+          ox -= .03 * reach * k; oy -= .17 * reach * k; oz += .13 * reach * k - .03 * push * k;
+        } else if (this.rl > .001 && !pose.melee && id !== 'deer' && id !== 'hunting') {
           const k = this.rl, p = player.reloadT > 0 ? Math.max(0, Math.min(1, 1 - player.reloadT / (this.reloadTotal || 1))) : 1;
           // Away to a pouch or the belt and back: once for a magazine, once a shell for a shotgun, under the cylinder for a revolver.
           const reach = id === 'shotgun' ? (p < .4 ? 1 - p / .4 : (p - .4) / .6) : id === 'revolver' ? (player.reloadPhase === 'load' ? .25 + .75 * Math.abs(1 - p * 2) : .3) : p < .15 ? p / .15 : p < .6 ? 1 : Math.max(0, 1 - (p - .6) / .12);

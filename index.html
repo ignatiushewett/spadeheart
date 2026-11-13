@@ -237,9 +237,12 @@ select { background: #1c1b18; color: var(--ink); border: 1px solid var(--line); 
 /* The light of the hour and the weather, laid over the maps: blue and dim (but readable) at night, warm at either end of the day, grey
    under rain. Multiplied in, so it tints what is drawn rather than covering it. */
 .map-grade { position: absolute; pointer-events: none; mix-blend-mode: multiply; background: #fff; }
-#mm-grade, #mm-lights { top: 0; left: 0; width: 196px; height: 196px; }
+#mm-grade, #mm-lights, #mm-top { top: 0; left: 0; width: 196px; height: 196px; }
+/* The names and marks, over the light of the hour and the weather, so they always read the same. Bordered like the minimap so they line up. */
+.map-top { position: absolute; pointer-events: none; }
+#mm-top { box-sizing: border-box; border: 1px solid transparent; }
 .map-lights { position: absolute; pointer-events: none; mix-blend-mode: screen; opacity: 0; }
-#hud.no-map #mm-grade, #hud.no-map #mm-lights { display: none; }
+#hud.no-map #mm-grade, #hud.no-map #mm-lights, #hud.no-map #mm-top { display: none; }
 #mapbox #loc { box-sizing: border-box; width: 196px; padding: 5px 8px; background: rgba(10,10,10,.72); border: 1px solid rgba(255,255,255,.2); border-top: 0; text-align: center; font-size: 13px; line-height: 1.3; text-shadow: 0 1px 2px #000; }
 #hud.no-map #mapbox #loc { border-top: 1px solid rgba(255,255,255,.2); }
 #prompt { position: absolute; left: 50%; bottom: 25%; transform: translateX(-50%); padding: 5px 12px; background: rgba(0,0,0,.6); display: none; white-space: nowrap; }
@@ -468,7 +471,7 @@ body.talking #hud > *:not(#caption) { visibility: hidden; }
   <div id="dmg"></div>
   <div id="status"></div>
   <div id="topbar"><canvas id="compass" width="840" height="86"></canvas><div id="gate-note"></div><div id="mag-bar"></div><div id="siren-bar"></div></div>
-  <div id="mapbox"><canvas id="minimap" width="392" height="392"></canvas><div class="map-grade" id="mm-grade"></div><canvas class="map-lights" id="mm-lights" width="392" height="392"></canvas><div id="loc"></div></div>
+  <div id="mapbox"><canvas id="minimap" width="392" height="392"></canvas><div class="map-grade" id="mm-grade"></div><canvas class="map-lights" id="mm-lights" width="392" height="392"></canvas><canvas class="map-top" id="mm-top" width="392" height="392"></canvas><div id="loc"></div></div>
   <div id="vitals">
     <div class="vit-row"><div id="hp-num">100</div><div id="armor-tag"></div></div>
     <div id="bar-hp" class="bar"><i></i></div>
@@ -678,7 +681,7 @@ body.talking #hud > *:not(#caption) { visibility: hidden; }
   <div class="panel" id="map-panel">
     <div class="panel-head"><h2>Ballarat</h2><span style="color:var(--faint);font-size:12px">Slider or W / S to move up and down, drag to pan, wheel to zoom</span></div>
     <div id="map-wrap">
-      <div style="position:relative;min-height:0;overflow:hidden"><canvas id="bigmap" style="position:absolute;inset:0"></canvas><div class="map-grade" id="bm-grade" style="inset:0"></div><canvas class="map-lights" id="bm-lights" style="position:absolute;inset:0"></canvas></div>
+      <div style="position:relative;min-height:0;overflow:hidden"><canvas id="bigmap" style="position:absolute;inset:0"></canvas><div class="map-grade" id="bm-grade" style="inset:0"></div><canvas class="map-lights" id="bm-lights" style="position:absolute;inset:0"></canvas><canvas class="map-top" id="bm-top" style="inset:0"></canvas></div>
       <div id="map-rail"><div id="map-thumb"></div><div id="map-you"></div></div>
     </div>
     <div class="panel-foot"><button class="btn primary" data-close>Close</button></div>
