@@ -314,6 +314,7 @@ export class Particles {
     // Where the rain reaches, so a bike under a roof stays dry.
     renderer.bindRainMap(p);
     gl.activeTexture(gl.TEXTURE0);
+    if (p.u.uRideSpeed) gl.uniform1f(p.u.uRideSpeed, renderer.rideSpeed || 0);
     gl.bindVertexArray(this.cubeVAO);
     gl.drawArraysInstanced(gl.TRIANGLES, 0, 36, total);
     renderer.stats.draws++;

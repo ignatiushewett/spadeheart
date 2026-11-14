@@ -218,9 +218,12 @@ export class Bikes {
 
   // Never more than a dozen about. The ones you paid for are the last to go.
   trim() {
+    // Never yours, never one standing in a yard (they come and go with you), never the one being ridden: if there is nothing else to
+    // clear, the dozen can wait.
     while (this.list.length > 12) {
-      const i = this.list.findIndex((o) => !o.owned && o !== this.ride && o.yard === undefined);
-      this.list.splice(i >= 0 ? i : 0, 1);
+      const i = this.list.findIndex((o) => !o.owned && o !== this.ride && o.yard === undefined && !o.npc);
+      if (i < 0) break;
+      this.list.splice(i, 1);
     }
   }
 
@@ -884,9 +887,10 @@ export class Bikes {
       };
       // Each voxel's size carries a tag far too small to see, where on the bike it is, so the rain drops on it stay with the bike as it
       // goes rather than sliding across it.
-      // How fast it is going goes in there too, in steps of three blocks a second, so the drops on it can blow back along it.
-      const sb = Math.min(7, Math.round(Math.hypot(b.vx || 0, b.vz || 0) / 3)) * 2.2e-4;
-      const tag = (x, y, z) => VS * 1.001 + sb + (((x * 7 + y * 13 + z * 31) & 127) + 1) * 1.5e-6;
+      // The tag is where on the bike the voxel is (so the rain on it can be laid over the whole bike as one), and whether this is the
+      // bike you are riding (so it can stream back over it as you go).
+      const rid = b === this.ride ? 5e-4 : 0;
+      const tag = (x, y, z) => VS * 1.001 + rid + ((x + 8) + Math.max(0, Math.min(19, y)) * 16 + Math.max(0, Math.min(36, z + 20)) * 320) * 3e-8;
       const vox = (x, y, z, col, metal, glow = 0) => { const p = at(x, y, z); add(p[0], p[1], p[2], tag(x, y, z), col[0], col[1], col[2], metal, glow); };
       const L = LOOKS[b.look || 0];
       for (const [x, y, z, r, g, bl, metal, glow, part] of MODEL) {

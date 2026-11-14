@@ -800,7 +800,7 @@ class Game {
       if (best) { sim.evacuate(best, sim.state[best.id]); note(`${best.name} is evacuating.`); }
       else note('No settlement left to evacuate.');
     } else if (kind === 'bike') {
-      this.bikes.spawn();
+      this.bikes.spawn().owned = true;
       note('A motorbike, in front of you. E to get on and off; W and S throttle and brake, A and D steer, Space for the handbrake, F for the headlamp.');
     } else if (kind === 'fly') {
       P.fly = !P.fly;
@@ -3295,6 +3295,7 @@ class Game {
       (g) => {
         this.actors.draw(g, r);
         this.bikes.build();
+        { const rd = this.bikes.ride; r.rideSpeed = rd ? Math.hypot(rd.vx || 0, rd.vz || 0) : 0; }
         this.particles.drawCubes(g, r, this.bikes.cubes, this.bikes.n);
         if (this.state === 'play') this.viewModel.drawThrown(g, r, P);
       },

@@ -1271,13 +1271,14 @@ out vec3 vLocN;
 flat out float vBuilt;  // part of something built (a bike): it gets wet
 flat out float vSeed;
 flat out float vSpeed;
+flat out vec3 vMPos;
 void main(){
   float a=iCol.a, c=cos(a), s=sin(a);
   // A bike's voxel carries where on the bike it is in the last places of its size: a seed that goes where the bike goes.
-  // The tag in the last places of a bike voxel's size: how fast the bike is going, in steps of three blocks a second, and where on the bike
-  // this voxel is.
-  float tg=max(0.,iPos.w-.125125), sb=floor(tg/2.2e-4+.0001);
-  vLoc=aPos; vLocN=aNormal; vSpeed=sb*3.; vSeed=fract((tg-sb*2.2e-4)/1.5e-6*.618)*91.;
+  // The tag in the last places of a bike voxel's size: whether it is the bike being ridden, and where on the bike this voxel is.
+  float tg=max(0.,iPos.w-.125125), rd=tg>4.9e-4?1.:0., id=floor((tg-rd*5e-4)/3e-8+.5);
+  vMPos=vec3(mod(id,16.)-8.,mod(floor(id/16.),20.),floor(id/320.)-20.);
+  vLoc=aPos; vLocN=aNormal; vSpeed=rd; vSeed=fract(id*.618)*91.;
   // A glow below zero marks a part of something built (a vehicle): turned about the vertical, and leaned over sideways, not tumbling.
   // Its glow is -1 - that, with how metal it is (0 to 3) in fours on top, and its lean in sixteens on top of that (24 is upright,
   // each step a fortieth of a radian).
@@ -1310,6 +1311,8 @@ in vec3 vLocN;
 flat in float vBuilt;
 flat in float vSeed;
 flat in float vSpeed;
+flat in vec3 vMPos;
+uniform float uRideSpeed;
 uniform sampler2D uRainMap;
 uniform vec3 uRainMapO;
 layout(location=0) out vec4 outCol;
@@ -1352,17 +1355,28 @@ void main(){
       // The shine is in the reflection, strongest at a glancing angle: looked straight down on, wet paint is just darker.
       c+=(env*(.03+.5*fres)+L*.35*fres)*w*.6;
       c+=uSunCol*pow(max(dot(Rf,uSunDir),0.),90.)*sh*w*.9;
+      // On the bike you are riding, with it moving: one sheet of drops laid over the whole bike, in its own terms, streaming steadily back
+      // over it towards you, across one part and on to the next. Standing still (or anyone else's): each spot gets a drop now and then,
+      // holds it and loses it, on the bike's own voxel so they go where it goes.
+      bool flow=vSpeed>.5&&uRideSpeed>.5;
       if(uRainNow>.01){
-        // Drops: each spot on the bike gets one now and then, holds it and loses it on its own clock, on the bike's own voxel (four spots
-        // to a side) so they go where it goes. Riding, they creep slowly back towards you over the tank and the guards. (A voxel's own
-        // +z is the bike's back.)
-        vec3 ln=normalize(vLocN);
-        vec3 wp=vLoc*4.+.5;
-        vec3 cell=floor(wp)+vec3(vSeed*.7,vSeed*1.3,vSeed*2.1);
-        float seed=hash12(cell.xy*1.7+cell.z*3.1), ph=uTime*(.45+seed*.9)*.8+seed*9.;
-        float life=fract(ph), gen=floor(ph);
-        vec3 f=fract(wp)-.5;
-        float on=step(1.-.065*w*uRainNow*1.5,hash12(cell.xy+cell.z*7.1+gen*1.13))*smoothstep(0.,.12,life)*smoothstep(1.,.6,life);
+        vec3 ln=normalize(vLocN), f, cell;
+        float on;
+        if(flow){
+          // Where on the bike, in voxels (a voxel's own +z is the bike's back).
+          vec3 P=vMPos+vec3(vLoc.x,vLoc.y,-vLoc.z)+.5;
+          vec3 S=P*4.;
+          S.z+=uTime*min(uRideSpeed,22.)*1.6*4.;
+          cell=floor(S); f=fract(S)-.5; f.z=-f.z; f.x=f.x;
+          on=step(1.-.065*w*uRainNow*1.5,hash12(cell.xy*1.7+cell.z*3.1+.5))*(1.-step(.5,abs(ln.z)));
+        } else {
+          vec3 wp=vLoc*4.+.5;
+          cell=floor(wp)+vec3(vSeed*.7,vSeed*1.3,vSeed*2.1);
+          float seed=hash12(cell.xy*1.7+cell.z*3.1), ph=uTime*(.45+seed*.9)*.8+seed*9.;
+          float life=fract(ph), gen=floor(ph);
+          f=fract(wp)-.5;
+          on=step(1.-.065*w*uRainNow*1.5,hash12(cell.xy+cell.z*7.1+gen*1.13))*smoothstep(0.,.12,life)*smoothstep(1.,.6,life);
+        }
         float bead=on*smoothstep(.36,.0,length(f-ln*dot(f,ln)));
         // A bead takes some of the colour of what it sits on: water on dark paint, not a white fleck.
         c+=(L*.75+env*.25+vec3(.01))*mix(vec3(1.),.35+col*2.2,.45)*bead*w*.68;
