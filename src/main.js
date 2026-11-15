@@ -50,7 +50,7 @@ const DB_NAME = 'acez';
 // Where the title flight ends: out over the bay to the east-south-east of her, looking back west-north-west past her and the Landing to
 // Weston, the plateau and Albion on the skyline, with the edge of the map only far off in the haze.
 const MENU_SHOT = { angle: -.18, dist: 185, height: 88, turn: .1, pitch: -.14, fov: 1.05, flight: 125, startHeight: 30, startOff: 44, startPitch: -.1 };
-export const VERSION = 'v0.93';
+export const VERSION = 'v0.94';
 const SAVE_KEY = 'slot15';  // bumped whenever the map changes: old voxel edits no longer line up
 export const SLOTS = 3;
 // Slot 1 keeps the plain key, so a save from before there were slots simply becomes the first character.
@@ -828,13 +828,19 @@ class Game {
     // Nobody hurries this. The only key that does anything is the one that opens the pause menu.
     if (this.wakeFx && e.code !== 'Escape') return;
     if (ui.modal === 'dialog') {
-      const slot = { ArrowUp: 0, ArrowLeft: 1, ArrowRight: 2, ArrowDown: 3 }[e.code];
-      if (e.code.startsWith('Digit') || slot !== undefined) {
-        const b = document.getElementById('dlg-opts').children[slot ?? +e.code.slice(5) - 1];
+      // Up and down through the list, Enter to say the one picked (or finish the line they are saying), or a line's number.
+      if (e.code === 'ArrowUp' || e.code === 'ArrowDown') { ui.moveChoice(e.code === 'ArrowUp' ? -1 : 1); return; }
+      if (e.code.startsWith('Digit')) {
+        const b = document.getElementById('dlg-opts').children[+e.code.slice(5) - 1];
         if (b) b.click();
         return;
       }
-      if (e.code === 'Space' || e.code === 'Enter') { ui.finishLine(); return; }
+      if (e.code === 'Enter') {
+        const b = document.getElementById('dlg-opts').children[ui.dlgSel];
+        if (b && !b.disabled) b.click(); else ui.finishLine();
+        return;
+      }
+      if (e.code === 'Space') { ui.finishLine(); return; }
     }
     // Dead: the only way on is one of the buttons on that screen. Escape closing it left you dead with nothing to press.
     if (ui.modal === 'death') return;

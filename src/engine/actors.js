@@ -398,6 +398,9 @@ export class ActorRenderer {
   draw(gl, renderer) {
     const p = renderer.pActor.use();
     renderer.frameUniforms(p);
+    // Where the rain reaches, so nobody under a roof has drops landing on them.
+    renderer.bindRainMap(p);
+    gl.activeTexture(gl.TEXTURE0);
     gl.activeTexture(gl.TEXTURE5);
     gl.bindTexture(gl.TEXTURE_2D, this.variantTex);
     gl.activeTexture(gl.TEXTURE0);

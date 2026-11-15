@@ -1208,7 +1208,16 @@ in vec3 vAhead;
 uniform sampler2D uVariants;
 uniform float uNightGlow;
 uniform vec3 uFactions[10];
+uniform sampler2D uRainMap;
+uniform vec3 uRainMapO;
 layout(location=0) out vec4 outCol;
+// Out under the sky, or under a roof? The rain map knows, near the camera; further off, out in it.
+float underSky(vec3 p,float fallback){
+  if(uRainMapO.z<=0.) return fallback;
+  vec2 m=(p.xz-uRainMapO.xy)/uRainMapO.z;
+  if(any(lessThan(m,vec2(0.)))||any(greaterThanEqual(m,vec2(1.)))) return fallback;
+  return p.y>=textureLod(uRainMap,m,0.).r*255.+1.?1.:0.;
+}
 void main(){
   vec3 col=vSlot==15?pow(uFactions[clamp(vFaction,0,9)],vec3(2.2)):pow(texelFetch(uVariants,ivec2(vSlot,vVariant),0).rgb,vec3(2.2));
   // Chunky voxel grime and blood splatter, different per body.
@@ -1264,7 +1273,8 @@ void main(){
     c+=uSunCol*pow(max(dot(reflect(-v,n),uSunDir),0.),40.)*sampleShadow(vWorld,n,dist)*shine*.35;
     // Drops sat on them while the rain is landing, the same as on a gun or a bike: each spot gets one now and then, holds it and loses it on
     // its own clock, and some run down before they go. They stay put on the body as it moves.
-    if(uRainNow>.01){
+    // Only where the rain is landing on them: under a roof they stay wet a while, but nothing new arrives.
+    if(uRainNow>.01&&underSky(vWorld+vec3(0.,.5,0.),1.)>.5){
       vec3 bp=vLocal*30., cell=floor(bp);
       float seed=hash12(cell.xy*1.7+cell.z*3.1+float(vVariant)*.37), ph=uTime*(.45+seed*.9)*.8+seed*9.;
       float life=fract(ph), gen=floor(ph);

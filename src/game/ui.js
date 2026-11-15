@@ -1221,7 +1221,8 @@ export class UI {
         html += `<div class="news-item contract${n.bad ? ' fell' : ''}">${n.title ? `<b>${n.title}</b>` : ''}<small>${when}, Contract</small><p>${n.text}</p></div>`;
       } else {
         const station = n.campId !== undefined && g.layout.camps[n.campId] ? g.layout.camps[n.campId].name : null;
-        const by = station ? (n.who && n.who !== station ? `${station} Radio, ${n.who}` : `${station} Radio`) : n.who;
+        // The station's name is already over the list: just who is speaking, or the operator when it is the station itself.
+        const by = station ? (n.who && n.who !== station ? n.who : 'Radio operator') : n.who;
         html += `<div class="news-item radio"><small>${when}, ${by}</small><p>${n.text}</p></div>`;
       }
     }
@@ -1229,35 +1230,58 @@ export class UI {
     $('news-list').scrollTop = 0;
   }
 
+  // The inventory, Pip-Boy fashion: a tab for each kind of thing, its things listed big down the left, and whichever one is under the
+  // pointer (or was last used) laid out in full on the right. Left and right arrows go from tab to tab.
   renderInventory(detail) {
     const P = this.g.player;
-    const groups = [['Weapons and tools', ['melee', 'gun', 'throw', 'block', 'tool']], ['Armour', ['armor', 'pack']], ['Medicine and food', ['med', 'food']], ['Ammunition', ['ammo']], ['Papers and keys', ['papers', 'keys']], ['Junk', ['junk']]];
-    const box = $('inv-list');
-    box.innerHTML = '';
-    for (const [title, types] of groups) {
-      const ids = Object.keys(P.inventory).filter((id) => types.includes(ITEMS[id]?.type));
-      if (!ids.length) continue;
-      const t = document.createElement('div');
-      t.className = 'list-title';
-      t.textContent = title;
-      box.appendChild(t);
-      ids.sort((a, b) => WEAPON_ORDER.indexOf(a) - WEAPON_ORDER.indexOf(b));
-      for (const id of ids) {
-        const it = ITEMS[id];
-        const b = document.createElement('button');
-        b.className = `item ${P.weapon === id || P.armor === id ? 'eq' : ''}`;
-        const mag = it.type === 'gun' ? ` ${P.mags[id] ?? 0}/${it.mag}` : '';
-        b.innerHTML = `<span>${it.name}${P.count(id) > 1 ? ` <small>x${P.count(id)}</small>` : ''}</span><small>${mag}</small>`;
-        b.addEventListener('mouseenter', () => this.itemDetail('inv-detail', id));
-        b.addEventListener('click', () => { P.useItem(id); this.renderInventory(id); });
-        b.addEventListener('contextmenu', (e) => {
-          e.preventDefault();
-          if (it.type === 'papers' || it.type === 'keys') { this.toast('You are keeping those.'); return; }
-          if (P.remove(id, 1)) { this.g.addPickup(P.x, P.y + .5, P.z, { id, count: 1 }); this.renderInventory(id); }
-        });
-        box.appendChild(b);
-      }
+    const TABS = [['weapons', 'Weapons', ['melee', 'gun', 'throw', 'block', 'tool']], ['apparel', 'Apparel', ['armor', 'pack']], ['aid', 'Aid', ['med', 'food']], ['ammo', 'Ammo', ['ammo']], ['misc', 'Misc', ['papers', 'keys']], ['junk', 'Junk', ['junk']]];
+    const idsOf = (types) => Object.keys(P.inventory).filter((id) => types.includes(ITEMS[id]?.type)).sort((a, b) => WEAPON_ORDER.indexOf(a) - WEAPON_ORDER.indexOf(b) || ITEMS[a].name.localeCompare(ITEMS[b].name));
+    // Something just used or picked: its own tab comes up.
+    if (detail && ITEMS[detail]) { const t = TABS.find((q) => q[2].includes(ITEMS[detail].type)); if (t) this.invTab = t[0]; }
+    if (!TABS.some((t) => t[0] === this.invTab)) this.invTab = 'weapons';
+    const tabs = $('inv-tabs');
+    tabs.innerHTML = '';
+    for (const [key, name, types] of TABS) {
+      const b = document.createElement('button');
+      b.className = `inv-tab${key === this.invTab ? ' on' : ''}`;
+      const n = idsOf(types).length;
+      b.innerHTML = `${name}<small>${n}</small>`;
+      b.addEventListener('click', () => { this.invTab = key; this.g.audio.simple('ui'); this.renderInventory(); });
+      tabs.appendChild(b);
     }
+    if (!this.invKeys) {
+      this.invKeys = true;
+      document.addEventListener('keydown', (e) => {
+        if (this.modal !== 'inventory' || (e.code !== 'ArrowLeft' && e.code !== 'ArrowRight')) return;
+        const keys = ['weapons', 'apparel', 'aid', 'ammo', 'misc', 'junk'], k = keys.indexOf(this.invTab);
+        this.invTab = keys[(k + (e.code === 'ArrowRight' ? 1 : keys.length - 1)) % keys.length];
+        this.g.audio.simple('ui');
+        this.renderInventory();
+        e.preventDefault();
+      });
+    }
+    const box = $('inv-list');
+    box.innerHTML = '<div class="inv-head"><span>Item</span><span>Qty</span><span>Wt</span></div>';
+    const ids = idsOf(TABS.find((t) => t[0] === this.invTab)[2]);
+    if (!ids.length) box.insertAdjacentHTML('beforeend', '<div class="empty">Nothing here.</div>');
+    const sel = detail && ids.includes(detail) ? detail : ids.includes(this.invSel) ? this.invSel : ids[0];
+    for (const id of ids) {
+      const it = ITEMS[id], n = P.count(id);
+      const b = document.createElement('button');
+      b.className = `item${P.weapon === id || P.armor === id ? ' eq' : ''}${id === sel ? ' sel' : ''}`;
+      const qty = it.type === 'gun' ? `${P.mags[id] ?? 0}/${it.mag}` : n > 1 ? `${n}` : '';
+      b.innerHTML = `<span class="n">${it.name}</span><span class="q">${qty}</span><span class="w">${it.weight ? (it.weight * n).toFixed(it.weight * n < 10 ? 1 : 0) : ''}</span>`;
+      b.addEventListener('mouseenter', () => { this.invSel = id; for (const o of box.querySelectorAll('.item.sel')) o.classList.remove('sel'); b.classList.add('sel'); this.itemDetail('inv-detail', id); });
+      b.addEventListener('click', () => { P.useItem(id); this.renderInventory(id); });
+      b.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        if (it.type === 'papers' || it.type === 'keys') { this.toast('You are keeping those.'); return; }
+        if (P.remove(id, 1)) { this.g.addPickup(P.x, P.y + .5, P.z, { id, count: 1 }); this.renderInventory(id); }
+      });
+      box.appendChild(b);
+    }
+    this.invSel = sel;
+    if (sel) this.itemDetail('inv-detail', sel); else $('inv-detail').innerHTML = '';
     $('inv-sum').textContent = `${P.carryWeight().toFixed(1)} / ${P.carryCap()} kg    ${SP} ${fmt(P.scrip)}`;
     const A = P.armor ? ITEMS[P.armor] : null;
     $('inv-stats').innerHTML = [
@@ -1265,12 +1289,26 @@ export class UI {
       ['Reputation', P.rep <= -30 ? 'Marked' : P.rep < 0 ? 'Distrusted' : P.rep < 25 ? 'Neutral' : P.rep < 60 ? 'Respected' : 'Well known'],
       ['Zombies killed', fmt(P.kills)], ['Headshots', fmt(P.headshots)], ['Voxels broken', fmt(P.voxelsBroken)], ['Commissions', fmt(this.g.stats.jobs)], ['Time played', playTime(this.g.stats.playSecs || 0)], ['Operations', fmt(this.g.stats.ops || 0)],
     ].map(([a, b]) => `${a.padEnd(16, ' ')}<b>${b}</b>`).join('<br>');
-    if (detail) this.itemDetail('inv-detail', detail);
   }
 
   itemDetail(host, id) {
     const it = ITEMS[id];
     if (!it) return;
+    const P = this.g.player;
+    // In the inventory: the name big, what it is in a line, and its figures in a table.
+    if (host === 'inv-detail') {
+      const rows = [];
+      if (it.type === 'gun') rows.push(['Damage', `${it.pellets ? `${it.pellets} x ` : ''}${it.dmg || 'blast'}`], ['Fire rate', `${Math.round(60 / it.rate)} rpm`], ['Magazine', `${P.mags[id] ?? 0} / ${it.mag}`], ['Ammo', `${ITEMS[it.ammo].name} (${P.count(it.ammo)})`], ['Range', `${it.range} m`]);
+      if (it.type === 'melee') rows.push(['Damage', it.dmg], ['Hits', it.cleave], ['Block damage', it.blockDmg]);
+      if (it.type === 'armor') rows.push(['Protection', `${Math.round((it.armor || 0) * 100)}%`]);
+      if (it.heal) rows.push(['Health', `+${it.heal}`]);
+      if (it.food) rows.push(['Food', `+${it.food}`]);
+      if (it.stim) rows.push(['Sprint', `${it.stim} s`]);
+      rows.push(['Weight', it.weight ? `${it.weight} kg` : '-'], ['Value', `${SP} ${fmt(it.value || 0)}`]);
+      if (P.count(id) > 1) rows.push(['Carrying', `${P.count(id)}`]);
+      $(host).innerHTML = `<div class="dt">${it.name}</div><p class="dd">${it.desc || ''}</p><table>${rows.map(([a, b]) => `<tr><td>${a}</td><td>${b}</td></tr>`).join('')}</table>`;
+      return;
+    }
     const parts = [];
     if (it.type === 'gun') parts.push(`${it.pellets ? `${it.pellets} x ` : ''}${it.dmg || 'blast'} damage`, `${Math.round(60 / it.rate)} rpm`, `${it.mag} rounds`, `${ITEMS[it.ammo].name}`);
     if (it.type === 'melee') parts.push(`${it.dmg} damage`, `hits ${it.cleave}`, `${it.blockDmg} block damage`);
@@ -1462,30 +1500,27 @@ export class UI {
     return b;
   }
 
-  // Never more than four things to say: three choices across the top and the way out at the bottom.
-  // Anything longer turns into pages behind a "More".
-  setChoices(list, back, page = 0) {
+  // Everything there is to say, in one numbered list, Fallout fashion, the way out last. Up and down to pick, Enter to say it, or its
+  // number.
+  setChoices(list, back) {
     const box = $('dlg-opts');
     box.innerHTML = '';
-    const per = 3;
-    let shown = list, more = false;
-    if (list.length > per) {
-      const size = per - 1, pages = Math.ceil(list.length / size);
-      const p = page % pages;
-      shown = list.slice(p * size, p * size + size);
-      more = true;
-      this.choicePage = p;
-    }
-    for (const c of shown) this.optionButton(c.label, c.fn, c.cls || '', !!c.off);
-    if (more) this.optionButton('More', () => this.setChoices(list, back, page + 1), 'seen');
-    while (box.children.length < per) {
-      const gap = document.createElement('span');
-      gap.className = 'gap';
-      box.appendChild(gap);
-    }
-    // No way out to offer: the slot stays, empty, so the four always sit in the same places.
+    this.dlgSel = -1;
+    for (const c of list) this.optionButton(c.label, c.fn, c.cls || '', !!c.off);
     if (back) this.optionButton(back.label, back.fn, 'seen');
-    else { const gap = document.createElement('span'); gap.className = 'gap'; box.appendChild(gap); }
+  }
+
+  // Up and down through what there is to say.
+  moveChoice(d) {
+    const opts = [...$('dlg-opts').children].filter((b) => !b.disabled);
+    if (!opts.length) return;
+    const all = [...$('dlg-opts').children];
+    let k = opts.indexOf(all[this.dlgSel]);
+    k = k < 0 ? (d > 0 ? 0 : opts.length - 1) : (k + d + opts.length) % opts.length;
+    for (const b of all) b.classList.remove('sel');
+    opts[k].classList.add('sel');
+    opts[k].scrollIntoView({ block: 'nearest' });
+    this.dlgSel = all.indexOf(opts[k]);
   }
 
   renderOptions(thread) {
@@ -1494,7 +1529,7 @@ export class UI {
     this.hideContractPage();
     $('dlg-jobs').innerHTML = '';
     const owedTo = n.kind === 'follower' ? -1 : n.camp >= 0 ? n.camp : n.factionId ? n.factionId - 1 : -1;
-    const leave = { label: 'Leave', fn: () => g.resume() };
+    const leave = { label: 'Goodbye.', fn: () => g.resume() };
     if (owedTo >= 0 && g.npcs.owesBail(owedTo) && (g.npcs.hostileCamp(owedTo) || n.kind === 'clerk' || n.kind === 'roamer')) {
       const list = [];
       if (n.kind === 'clerk' || n.kind === 'roamer') {
@@ -1522,7 +1557,7 @@ export class UI {
     const isDeed = (t) => t.recruit || t.dismiss || t.food || t.give || t.scrip || t.rest;
     // What they are for comes first, one key away. Chatting is what is left after that.
     const root = this.actionsFor(n, topics.filter(isDeed), topics.some(isWork));
-    root.push({ label: 'Talk', fn: () => this.talkMenu() });
+    root.push({ label: 'There is something I wanted to ask you.', fn: () => this.talkMenu() });
     this.setChoices(root, leave);
   }
 
@@ -1531,7 +1566,7 @@ export class UI {
     const g = this.g, P = g.player;
     const list = [];
     if (n.doctor) list.push(this.treatment(n));
-    if (n.role) list.push({ label: n.doctor ? 'Buy medicine' : 'Trade', cls: n.doctor ? '' : 'primary', fn: () => this.openTrade(n) });
+    if (n.role) list.push({ label: n.doctor ? '[Barter] I need some medicine.' : '[Barter] Let me see what you have.', cls: n.doctor ? '' : 'primary', fn: () => this.openTrade(n) });
     if (n.role === 'mechanic') list.push(this.refuel(n));
     // Anyone working a contract for the camp gets a box from the traders, once a day.
     if (n.role && !n.doctor && n.camp >= 0 && g.jobs.perkFree(n.camp, 'box')) list.push({ label: 'Contract supplies (free today)', cls: 'quest', fn: () => {
@@ -1676,7 +1711,7 @@ export class UI {
     }
     this.setChoices(list, thread
       ? { label: 'Something else', fn: () => { this.say(this.smallTalk()); this.talkMenu(); } }
-      : { label: 'Back', fn: () => { this.say(this.smallTalk()); this.renderOptions(); } });
+      : { label: 'Let us talk about something else.', fn: () => { this.say(this.smallTalk()); this.renderOptions(); } });
   }
 
   // Three things you come to a town hall for, always in the same place.
@@ -1739,13 +1774,13 @@ export class UI {
         state: signed ? 'Joined' : !target ? '' : pat || clr ? 'Under contract' : j && j.void ? 'Terminated' : '', off: !target || signed || pat || clr || !!(j && j.void), fn: () => this.contractCard(n, 'vanguard') },
     ];
     this.board(cards);
-    this.setChoices([], { label: 'Back', fn: () => { $('dlg-jobs').innerHTML = ''; this.say(this.smallTalk()); this.renderOptions(); } });
+    this.setChoices([], { label: 'Let us talk about something else.', fn: () => { $('dlg-jobs').innerHTML = ''; this.say(this.smallTalk()); this.renderOptions(); } });
   }
 
   workMenu() {
     const g = this.g, n = this.dlgNpc;
     $('dlg-jobs').innerHTML = '';
-    const back = { label: 'Back', fn: () => { $('dlg-jobs').innerHTML = ''; this.say(this.smallTalk()); this.renderOptions(); } };
+    const back = { label: 'Let us talk about something else.', fn: () => { $('dlg-jobs').innerHTML = ''; this.say(this.smallTalk()); this.renderOptions(); } };
     const list = n.kind === 'clerk' ? [] : g.dialogue.topics(n).filter((q) => q.job || q.pay).map((t) => this.topicChoice(n, t, () => this.workMenu()));
     if (n.kind === 'clerk') {
       const c = g.layout.camps[n.camp], op = g.campSim.state[n.camp].op, j = g.jobs.opJob(n.camp), words = [];
@@ -1848,7 +1883,7 @@ export class UI {
       else g.jobs.signPatrol(c);
       backTo();
       this.say(plan === 'patrol' ? 'Signed. The corners are marked on your map.' : 'Signed. I will be counting.');
-    } }], { label: 'Back', fn: backTo });
+    } }], { label: 'Let us talk about something else.', fn: backTo });
   }
 
   jobCard(n, job) {
@@ -1859,7 +1894,7 @@ export class UI {
     d.className = 'job';
     d.innerHTML = `<b>${job.title}</b><p>${job.desc}</p><span class="pay">${SP} ${job.reward}${job.bonus ? ` + ${ITEMS[job.bonus].name}` : ''}</span>`;
     box.appendChild(d);
-    this.setChoices([{ label: 'I will take it', cls: 'quest', fn: () => { g.jobs.accept(job); this.workMenu(); } }], { label: 'Back', fn: () => this.workMenu() });
+    this.setChoices([{ label: 'I will take it', cls: 'quest', fn: () => { g.jobs.accept(job); this.workMenu(); } }], { label: 'Let us talk about something else.', fn: () => this.workMenu() });
   }
 
   smallTalk() {
@@ -1874,7 +1909,8 @@ export class UI {
     d.className = 'radio';
     if (station) d.dataset.station = station;
     const b = document.createElement('b');
-    b.textContent = station ? (who && who !== station ? `${station} Radio, ${who}: ` : `${station} Radio: `) : `${who}: `;
+    // Someone by name speaks for themself; the station's own calls come from its operator, with the place, so you know where.
+    b.textContent = station ? (who && who !== station ? `${who}: ` : `${station} operator: `) : `${who}: `;
     d.appendChild(b);
     d.appendChild(document.createTextNode(text));
     box.appendChild(d);
@@ -1908,12 +1944,16 @@ export class UI {
     while (this.floaters.length >= 10) this.floaters.shift().el.remove();
     const el = document.createElement('div');
     el.className = 'floater';
-    el.textContent = text;
+    // The words come up a letter at a time, as they are said, with the same blips as someone talking to you, softer and from where
+    // they are standing. What is still to come takes its place already, unseen, so the line does not shift about as it fills in.
+    const shown = document.createElement('span'), rest = document.createElement('span');
+    rest.style.visibility = 'hidden';
+    const said = n === this.dlgNpc ? text.length : 0;
+    shown.textContent = text.slice(0, said); rest.textContent = text.slice(said);
+    el.append(shown, rest);
     host.appendChild(el);
-    // The words are up all at once, but they are said at the speed you would hear them: the same blips as someone talking to you,
-    // softer, and from where they are standing.
     // Up at least as long as it takes them to say it.
-    this.floaters.push({ n, el, t: Math.max(seconds + text.length * .025, text.length * .042 + 1), los: 0, seen: true, text, said: n === this.dlgNpc ? text.length : 0, sayT: 0 });
+    this.floaters.push({ n, el, shown, rest, t: Math.max(seconds + text.length * .025, text.length * .042 + 1), los: 0, seen: true, text, said, sayT: 0 });
   }
 
   updateFloaters(dt) {
@@ -1932,6 +1972,7 @@ export class UI {
           f.sayT += ch === '.' || ch === '?' || ch === '!' ? .25 : .036;
           if (near && f.said % 2 === 0 && /[A-Za-z0-9]/.test(ch)) g.audio.voiceAt(this.voiceOf(n), n.x, n.y + 2.4, n.z);
         }
+        f.shown.textContent = f.text.slice(0, f.said); f.rest.textContent = f.text.slice(f.said);
       }
       // Over the head, wherever that is: lying down, it is back along the body and only a little above the bed.
       const lying = n.state === 7, back = lying ? (n.kid ? 1.1 : 1.7) : 0;

@@ -21,6 +21,9 @@ export class RainMap {
     this.pendN = 0;
     this.sweep = 0;
     this.version = 0;
+    // Columns looked at before their chunk had loaded: counted as covered for now (no rain falling into a room that just has not
+    // arrived yet), and looked at again each frame until it has.
+    this.retry = [];
   }
 
   // The top of this column, or -1 if it is outside the map.
@@ -46,7 +49,8 @@ export class RainMap {
       for (let iz = 0; iz < N; iz++) for (let ix = 0; ix < N; ix++) {
         const ox = ix + dx, oz = iz + dz, i = ix + iz * N;
         if (ox >= 0 && oz >= 0 && ox < N && oz < N) { const o = ox + oz * N; top[i] = this.top[o]; hang[i] = this.hang[o]; gapTop[i] = this.gapTop[o]; floor[i] = this.floor[o]; }
-        else this.pending[this.pendN++] = i;
+        // Not looked at yet: covered until it is, so no rain falls into a room in the meantime.
+        else { this.pending[this.pendN++] = i; top[i] = 255; }
       }
       // Nearest first, so what is around you is right before what is at the edge.
       if (this.pendN > 0) {
@@ -58,6 +62,7 @@ export class RainMap {
       this.x0 = nx0; this.z0 = nz0;
     }
     let budget = 1500;
+    if (this.retry.length) { const again = this.retry.splice(0, 500); for (const i of again) { this.scan(i); budget -= 3; } }
     while (this.pendN > 0 && budget > 0) { this.scan(this.pending[--this.pendN]); budget -= 3; }
     for (let k = 0; k < 360 && budget > 0; k++, budget--) {
       this.scan(this.sweep);
@@ -76,6 +81,12 @@ export class RainMap {
   scan(i) {
     const N = RAIN_N, w = this.w, x = this.x0 + (i % N), z = this.z0 + ((i / N) | 0);
     if (x < 0 || z < 0 || x >= WX || z >= WZ) { this.top[i] = 0; this.hang[i] = 0; this.gapTop[i] = 0; this.floor[i] = 0; return; }
+    if (!w.loadMask[(x >> 5) + (z >> 5) * CW]) {
+      // Not built yet: no rain here until it is, then the real answer.
+      this.top[i] = 255; this.hang[i] = 0; this.gapTop[i] = 0; this.floor[i] = 0;
+      if (this.retry.length < 4096) this.retry.push(i);
+      return;
+    }
     let y = Math.min(255, w.colTopCy((x >> 5) + (z >> 5) * CW) * 32 + 31);
     while (y > 0 && !w.get(x, y, z)) y--;
     this.top[i] = y;

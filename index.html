@@ -247,7 +247,7 @@ select { background: #1c1b18; color: var(--ink); border: 1px solid var(--line); 
 #hud.no-map #mapbox #loc { border-top: 1px solid rgba(255,255,255,.2); }
 #prompt { position: absolute; left: 50%; bottom: 25%; transform: translateX(-50%); padding: 5px 12px; background: rgba(0,0,0,.6); display: none; white-space: nowrap; }
 #toasts { position: absolute; left: 26px; bottom: 150px; display: flex; flex-direction: column; gap: 3px; width: 420px; }
-#toasts div { background: rgba(0,0,0,.5); padding: 3px 9px; font-size: 13px; width: fit-content; animation: toast 3.8s forwards; border-left: 2px solid var(--amber); }
+#toasts div { background: rgba(0,0,0,.5); padding: 3px 9px; font: 13px/1.4 var(--mono); width: fit-content; animation: toast 3.8s forwards; border-left: 2px solid var(--amber); }
 #toasts div.bad { border-left-color: var(--red); }
 #toasts div.good { border-left-color: var(--green); }
 #toasts div.radio { border-left-color: var(--blue); animation-duration: 9s; max-width: 420px; }
@@ -281,7 +281,7 @@ body.waking #hud > * { visibility: hidden; }
 #dmg { position: absolute; left: 50%; top: 50%; width: 0; height: 0; }
 #dmg i { position: absolute; left: -70px; top: -220px; width: 140px; height: 54px; border-radius: 50%; background: radial-gradient(ellipse at center, rgba(216,50,40,.8), rgba(216,50,40,0) 70%); transform-origin: 70px 220px; animation: dmg .9s forwards; }
 @keyframes dmg { to { opacity: 0; } }
-.floater { position: absolute; transform: translate(-50%,-100%); max-width: 300px; text-align: center; color: #efe9d9; line-height: 1.25; text-shadow: 0 1px 3px #000, 0 0 6px rgba(0,0,0,.75); pointer-events: none; display: none; }
+.floater { position: absolute; transform: translate(-50%,-100%); max-width: 300px; text-align: center; color: #efe9d9; font-family: var(--mono); line-height: 1.25; text-shadow: 0 1px 3px #000, 0 0 6px rgba(0,0,0,.75); pointer-events: none; display: none; }
 .marker { position: absolute; font: 11px var(--mono); color: #bfe6ff; transform: translate(-50%,-100%); text-align: center; text-shadow: 0 1px 2px #000; display: none; }
 .marker::after { content: ""; display: block; width: 8px; height: 8px; border: 2px solid #6ec6ff; transform: rotate(45deg); margin: 3px auto 0; }
 #devmenu { position: fixed; z-index: 45; left: 26px; top: 190px; width: 300px; display: none; padding: 10px 12px 12px; background: rgba(12,12,10,.9); border: 1px solid var(--line); font: 12px/1.4 var(--mono); }
@@ -310,7 +310,7 @@ body.waking #hud > * { visibility: hidden; }
 #radio-camps button:disabled { color: var(--faint); cursor: default; }
 #news-list { scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
 #news-list .list-title:first-child { margin-top: 2px; }
-.news-item { padding: 2px 0 2px 10px; margin: 6px 0 12px; border-left: 2px solid var(--blue); font-size: 13px; }
+.news-item { padding: 2px 0 2px 10px; margin: 6px 0 12px; border-left: 2px solid var(--blue); font: 13px/1.45 var(--mono); }
 .news-item.report { border-left-color: var(--amber); }
 .news-item.contract { border-left-color: var(--green); }
 .news-item.win { border-left-color: var(--green); }
@@ -329,6 +329,36 @@ body.waking #hud > * { visibility: hidden; }
 .item.eq { color: var(--amber); }
 .item small { color: var(--dim); font-family: var(--mono); font-size: 12px; }
 .detail { color: var(--dim); font-size: 13px; min-height: 58px; padding-top: 10px; border-top: 1px solid var(--line); margin-top: 10px; }
+/* The inventory, a tab to each kind of thing, the way a Pip-Boy does it: big rows in the mono face, and the one under the pointer laid out
+   in full on the right. */
+.inv-tabs { display: flex; gap: 2px; padding: 0 14px; border-bottom: 1px solid var(--line); flex: none; overflow-x: auto; scrollbar-width: none; }
+.inv-tab { padding: 10px 14px 9px; color: var(--dim); font: 600 14px var(--mono); text-transform: uppercase; letter-spacing: .08em; border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; background: none; cursor: pointer; }
+.inv-tab small { color: var(--faint); font-size: 11px; margin-left: 4px; }
+.inv-tab:hover { color: var(--ink); }
+.inv-tab.on { color: var(--amber); border-bottom-color: var(--amber); }
+.inv-tab.on small { color: var(--amber-d); }
+#inv-panel .split { grid-template-columns: 1.45fr 1fr; }
+#inv-list .inv-head, #inv-list .item { display: grid; grid-template-columns: 1fr 52px 48px; gap: 8px; align-items: center; }
+#inv-list .inv-head { color: var(--faint); font: 11px var(--mono); text-transform: uppercase; letter-spacing: .1em; padding: 6px 12px 4px; border-bottom: 1px solid var(--line); }
+#inv-list .item { font: 14px/1.3 var(--mono); padding: 6px 12px; color: var(--ink); }
+#inv-list .item .n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#inv-list .item .q, #inv-list .item .w, #inv-list .inv-head span:not(:first-child) { text-align: right; color: var(--dim); }
+#inv-list .item.eq .n::before { content: '\25A0  '; color: var(--amber); font-size: 12px; }
+#inv-list .item:hover, #inv-list .item.sel { background: rgba(232,176,74,.1); }
+#inv-list .empty { color: var(--faint); font: 14px var(--mono); padding: 14px 12px; }
+#inv-detail { font-family: var(--mono); }
+/* Trading, in the same big mono rows: your goods on the left, theirs on the right. */
+#trade-buy .item, #trade-sell .item { font: 15px/1.3 var(--mono); padding: 7px 10px; color: var(--ink); align-items: center; }
+#trade-buy .item small, #trade-sell .item small { font: 13px var(--mono); color: var(--amber); }
+#trade-buy .item span small, #trade-sell .item span small { color: var(--dim); }
+#trade-buy .list-title, #trade-sell .list-title { font-family: var(--mono); font-size: 13px; }
+#trade-detail { font-family: var(--mono); }
+#inv-detail .dt { color: var(--ink); font-size: 19px; font-weight: 600; margin-bottom: 6px; }
+#inv-detail .dd { color: var(--dim); font-size: 13px; line-height: 1.5; margin: 0 0 10px; }
+#inv-detail table { width: 100%; border-collapse: collapse; font-size: 14px; }
+#inv-detail td { padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,.05); }
+#inv-detail td:first-child { color: var(--faint); text-transform: uppercase; font-size: 11px; letter-spacing: .1em; }
+#inv-detail td:last-child { color: var(--ink); text-align: right; }
 .detail b { color: var(--ink); }
 .stats { font: 13px/1.7 var(--mono); color: var(--dim); }
 .stats b { color: var(--ink); font-weight: 400; }
@@ -376,15 +406,11 @@ body.talking.reading-contract::before { height: 0; }
 #dialog-panel .panel-body { padding: 4px 20px 14px; }
 #dlg-text { font-size: 18px; line-height: 1.5; margin: 0 0 12px; min-height: 3em; }
 #dlg-standing { color: var(--amber); font-size: 12px; font-family: var(--mono); }
-.dlg-opts { display: grid; grid-template-columns: 1fr 1fr; grid-template-areas: "a a" "b c" "d d"; gap: 3px 28px; }
-.dlg-opts > :nth-child(1) { grid-area: a; justify-self: center; }
-.dlg-opts > :nth-child(2) { grid-area: b; justify-self: end; text-align: right; }
-.dlg-opts > :nth-child(3) { grid-area: c; justify-self: start; }
-.dlg-opts > :nth-child(4) { grid-area: d; justify-self: center; }
-.dlg-opts button { padding: 5px 10px; min-height: 30px; max-width: 390px; border-bottom: 2px solid transparent; }
-.dlg-opts > .gap { display: block; min-height: 30px; }
+/* What you can say, the way Fallout lays it out: every line in one numbered column, the whole of what you would say, the way out last. */
+.dlg-opts { display: flex; flex-direction: column; align-items: stretch; gap: 1px; max-height: 36vh; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+.dlg-opts button { text-align: left; padding: 5px 10px; min-height: 30px; font: 16px/1.35 var(--mono); border-left: 2px solid transparent; }
 .dlg-opts button .kbd { margin-right: 6px; }
-.dlg-opts button:hover { border-bottom-color: var(--amber); color: var(--amber); background: rgba(232,176,74,.08); }
+.dlg-opts button:hover, .dlg-opts button.sel { border-left-color: var(--amber); color: var(--amber); background: rgba(232,176,74,.08); }
 .dlg-opts button.seen { color: var(--dim); }
 .dlg-opts button.quest { color: #9fd0ff; }
 .dlg-opts button.off, .dlg-opts button.off:hover { color: rgba(233,228,216,.28); background: none; cursor: default; }
@@ -451,8 +477,7 @@ body.talking #hud > *:not(#caption) { visibility: hidden; }
 #boot-veil.on { display: flex; }
 #boot-veil.out { opacity: 0; pointer-events: none; }
 #boot-veil .menu-title { margin: 0 0 26px; }
-#boot-veil .click { color: var(--dim); font-size: 14px; letter-spacing: .32em; text-transform: uppercase; animation: veil-pulse 2.2s ease-in-out infinite; }
-@keyframes veil-pulse { 0%, 100% { opacity: .35; } 50% { opacity: 1; } }
+#boot-veil .click { color: var(--dim); font-size: 15px; letter-spacing: .04em; }
 #death { flex-direction: column; align-items: center; justify-content: center; background: radial-gradient(circle at center, rgba(60,0,0,.2), rgba(0,0,0,.82)); }
 #death h1 { font-size: 66px; color: var(--red); font-weight: 700; }
 #death p { color: var(--dim); max-width: 520px; text-align: center; }
@@ -641,7 +666,8 @@ body.talking #hud > *:not(#caption) { visibility: hidden; }
 
 <div id="inventory" class="screen center">
   <div class="panel" id="inv-panel">
-    <div class="panel-head"><h2>Inventory</h2><span id="inv-sum" class="mono" style="color:var(--dim);font-size:12px"></span></div>
+    <div class="panel-head" style="justify-content:flex-end"><span id="inv-sum" class="mono" style="color:var(--dim);font-size:12px"></span></div>
+    <div class="inv-tabs" id="inv-tabs"></div>
     <div class="panel-body split" style="flex:1;overflow:hidden">
       <div class="list" id="inv-list"></div>
       <div style="display:flex;flex-direction:column;min-height:0">
@@ -649,7 +675,7 @@ body.talking #hud > *:not(#caption) { visibility: hidden; }
         <div class="detail" id="inv-detail"></div>
       </div>
     </div>
-    <div class="panel-foot"><span style="flex:1;color:var(--faint);font-size:12px;align-self:center">Click to use or equip. Right-click to drop one.</span><button class="btn primary" data-close>Close</button></div>
+    <div class="panel-foot"><span style="flex:1;color:var(--faint);font-size:12px;align-self:center">Click to use or equip. Right-click to drop one. Left and right arrows change tab.</span><button class="btn primary" data-close>Close</button></div>
   </div>
   <div class="panel" id="news-panel">
     <div class="panel-head"><h2>Radio</h2></div>
@@ -662,8 +688,8 @@ body.talking #hud > *:not(#caption) { visibility: hidden; }
   <div class="panel" id="trade-panel">
     <div class="panel-head"><h2 id="trade-title"></h2><span id="trade-sum" class="mono" style="color:var(--amber);font-size:14px"></span></div>
     <div class="panel-body split" style="flex:1;overflow:hidden">
-      <div class="list" id="trade-buy"></div>
       <div class="list" id="trade-sell"></div>
+      <div class="list" id="trade-buy"></div>
     </div>
     <div class="detail" id="trade-detail" style="margin:0 20px;padding-bottom:6px"></div>
     <div class="panel-foot"><span style="flex:1;color:var(--faint);font-size:12px;align-self:center">Click to trade one lot. Shift-click to trade ten.</span><button class="btn primary" data-close>Done</button></div>
