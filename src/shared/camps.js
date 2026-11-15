@@ -467,7 +467,7 @@ export function planCamp(def, id, r, ground) {
       const solidCell = (u, v) => { const [a, b] = cell(u, v); block(a, b, a, b); };
       for (let v = 0; v <= 5; v++) solidCell(0, v);
       for (let u = 0; u <= 11; u++) solidCell(u, 0);
-      const solids = [[1, 1], [1, 2], [1, 3], [4, 1], [5, 1], [12, 1], [12, 2], [6, 4], [13, 5], [13, 8], [13, 9]];
+      const solids = [[1, 1], [1, 2], [1, 3], [4, 1], [5, 1], [12, 1], [12, 2], [6, 4], [14, 0], [13, 8], [13, 9]];
       for (let u = 7; u <= 10; u++) solids.push([u, 1]);
       for (const [u, v] of solids) solidCell(u, v);
       const ang = (du, dv) => Math.atan2(fx ? -du : du, fz ? -dv : dv);
@@ -498,7 +498,7 @@ export function planCamp(def, id, r, ground) {
       c.vendors.push({ role: 'mechanic', x: yard.work[0].x, z: yard.work[0].z, yaw: yard.work[0].yaw, browse, yard });
       // A car in for work as well, pulled up at the far side of the yard.
       { const [ax, az] = cell(14, 2), [bx, bz] = cell(17, 10); add('wreck', Math.min(ax, bx), Math.min(az, bz), Math.max(ax, bx), Math.max(az, bz), 5, { kind: 1, dir: 0 }); }
-      light(Math.floor(wx(7)), Math.floor(wz(5)), 10);
+      light(Math.floor(wx(14.5)), Math.floor(wz(.5)), 10);
     }
   }
 
@@ -997,9 +997,9 @@ function stampPart(p, c, box, put, car, letterAt) {
       T(13, 0, 9, M.CRATE); T(13, 1, 9, M.CRATE); T(13, 0, 8, M.CRATE_OPEN);
       // The cot, made up, in the corner against the fence.
       T(1, 0, 1, M.PILLOW); T(1, 0, 2, M.MATTRESS); T(1, 0, 3, M.BLANKET_G);
-      // A lamp on a pole by the bikes, for working late.
-      for (let y = 0; y < 3; y++) T(13, y, 5, M.WOOD_D);
-      T(13, 3, 5, M.LAMP);
+      // A lamp on a pole on the grass by the nose of the car, for working late.
+      for (let y = 0; y < 3; y++) T(14, y, 0, M.WOOD_D);
+      T(14, 3, 0, M.LAMP);
       break;
     }
     case 'clinic': {

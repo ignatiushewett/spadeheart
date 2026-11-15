@@ -981,11 +981,10 @@ export class UI {
         x.fillText(`${dist}m`, px, LY);
       }
     }
-    // Your companions: a green circle each, and how far, once they are more than a few steps off.
+    // Your companions: a green circle each, always, with their name, and how far once they are more than a few steps off.
     for (const f of g.npcs.followers) {
       if (!f || f.dead) continue;
       const dist = Math.round(Math.hypot(f.x - P.x, f.z - P.z));
-      if (dist < 6) continue;
       let r = Math.atan2(f.x - P.x, -(f.z - P.z)) - yaw;
       while (r > Math.PI) r -= Math.PI * 2;
       while (r < -Math.PI) r += Math.PI * 2;
@@ -994,7 +993,7 @@ export class UI {
       x.beginPath(); x.arc(px, 11, 6.5, 0, 6.2832);
       x.fillStyle = '#8fd27a'; x.fill();
       x.strokeStyle = 'rgba(8,14,8,.9)'; x.lineWidth = 2; x.stroke();
-      const label = `${f.name ? f.name.split(' ')[0] : 'Companion'}, ${dist}m`;
+      const who = f.name ? f.name.split(' ')[0] : 'Companion', label = dist < 6 ? who : `${who}, ${dist}m`;
       x.font = '600 21px Quantico, Bahnschrift, Segoe UI, sans-serif';
       x.lineWidth = 4; x.strokeStyle = 'rgba(10,8,6,.8)';
       x.strokeText(label, px, LY);
