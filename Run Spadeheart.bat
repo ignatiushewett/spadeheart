@@ -17,7 +17,7 @@ if not exist node_modules\electron\dist\electron.exe (
   )
 )
 if not exist node_modules\electron\dist\electron.exe (
-  echo Could not get the game window ready. Is Node.js installed? You can still play with start.bat, in the browser.
+  echo Could not get the game window ready. Is Node.js installed? You can still play in the browser with "Run in Browser.bat".
   pause
   exit /b 1
 )
