@@ -111,6 +111,19 @@ export function planCamp(def, id, r, ground) {
   const px = r.plazaX ?? c.cx, pz = r.plazaZ ?? c.cz;
   // Carver Yard keeps its books in the old church, on the edge of the square.
   const harlem = def.key === 'garvey';
+  // The way up into a watchtower: in off the wall walk, round and up a stair inside the shaft, and out through a hatch in the lookout
+  // floor. `entry` are the cells cut through to get in, at walk height; the stair winds round the inside of the shaft from `start`.
+  const towerClimb = (p, entry, start) => {
+    const ix0 = p.x0 + 1, ix1 = p.x1 - 1, iz0 = p.z0 + 1, iz1 = p.z1 - 1, loop = [];
+    for (let x = ix0; x < ix1; x++) loop.push([x, iz0]);
+    for (let z = iz0; z < iz1; z++) loop.push([ix1, z]);
+    for (let x = ix1; x > ix0; x--) loop.push([x, iz1]);
+    for (let z = iz1; z > iz0; z--) loop.push([ix0, z]);
+    const k = Math.max(0, loop.findIndex(([x, z]) => x === start[0] && z === start[1]));
+    const inner = [];
+    for (let z = iz0 + 1; z < iz1; z++) for (let x = ix0 + 1; x < ix1; x++) inner.push([x, z]);
+    p.climb = { entry, ring: loop.slice(k).concat(loop.slice(0, k)), inner };
+  };
   const mkGate = (side) => {
     const horiz = side === 'N' || side === 'S';
     const tc = horiz ? px : pz;
@@ -126,7 +139,10 @@ export function planCamp(def, id, r, ground) {
       // Built out from the wall's outer face, which keeps the walkway behind it clear all the way past.
       const tx = horiz ? tc + s * (gateHalf + 3) : (side === 'W' ? r.x0 - 1 : r.x1 + 1);
       const tz = horiz ? (side === 'N' ? r.z0 - 1 : r.z1 + 1) : tc + s * (gateHalf + 3);
-      c.parts.push({ t: 'tower', x0: tx - 2, z0: tz - 2, x1: tx + 2, z1: tz + 2, h: def.H + 5, mat: def.wall });
+      const tw = { t: 'tower', x0: tx - 2, z0: tz - 2, x1: tx + 2, z1: tz + 2, h: def.H + 5, mat: def.wall };
+      // In through the middle of its inner face, straight off the walk.
+      towerClimb(tw, [[tx + inX * 2, tz + inZ * 2]], [tx + inX, tz + inZ]);
+      c.parts.push(tw);
       reserve(tx - 3, tz - 3, tx + 3, tz + 3);
       const yaw = side === 'N' ? Math.PI : side === 'S' ? 0 : side === 'W' ? -Math.PI / 2 : Math.PI / 2;
       // Floodlights on the gate towers, aimed out across the approach.
@@ -150,15 +166,23 @@ export function planCamp(def, id, r, ground) {
   for (const s of def.gates) mkGate(s);
   // Corner towers sit outside the corner, so the walkways on either side join up behind them.
   for (const [tx, tz] of [[r.x0 - 2, r.z0 - 2], [r.x1 + 2, r.z0 - 2], [r.x0 - 2, r.z1 + 2], [r.x1 + 2, r.z1 + 2]]) {
+    // A corner tower only touches the walk at its inner corner, so the way in is cut through the top of the wall beside it: off the
+    // walk onto the wall head, and in through the tower's side.
+    const sx = tx < c.cx ? 1 : -1, sz = tz < c.cz ? 1 : -1, WX0 = sx > 0 ? r.x0 : r.x1, WZ0 = sz > 0 ? r.z0 : r.z1;
+    const cornerClimb = (tw) => towerClimb(tw, [[WX0 + sx * 2, WZ0], [WX0 + sx, WZ0]], [WX0, WZ0]);
     // A humbler camp puts up something lower and narrower: a lookout, not a keep.
     if (def.lowCorners) {
       const lx = tx < c.cx ? r.x0 - 1 : r.x1 + 1, lz = tz < c.cz ? r.z0 - 1 : r.z1 + 1;
-      c.parts.push({ t: 'tower', x0: lx - 2, z0: lz - 2, x1: lx + 2, z1: lz + 2, h: def.H + 5, mat: def.wall, big: true });
+      const tw = { t: 'tower', x0: lx - 2, z0: lz - 2, x1: lx + 2, z1: lz + 2, h: def.H + 5, mat: def.wall, big: true };
+      cornerClimb(tw);
+      c.parts.push(tw);
       c.guards.push({ x: lx + .5, y: YB + def.H + 6, z: lz + .5, yaw: Math.atan2(lx - c.cx, lz - c.cz), sniper: true });
       light(lx, lz, 16);
       continue;
     }
-    c.parts.push({ t: 'tower', x0: tx - 3, z0: tz - 3, x1: tx + 3, z1: tz + 3, h: def.H + 8, mat: def.wall, big: true });
+    const tw = { t: 'tower', x0: tx - 3, z0: tz - 3, x1: tx + 3, z1: tz + 3, h: def.H + 8, mat: def.wall, big: true };
+    cornerClimb(tw);
+    c.parts.push(tw);
     reserve(tx - 4, tz - 4, tx + 4, tz + 4);
     c.guards.push({ x: tx + .5, y: YB + def.H + 9, z: tz + .5, yaw: Math.atan2(tx - c.cx, tz - c.cz), sniper: true });
     light(tx, tz, 22);
@@ -952,6 +976,21 @@ function stampPart(p, c, box, put, car, letterAt) {
       box(x0 - 1, YB + h + 5, z0 - 1, x1 + 1, YB + h + 5, z1 + 1, p.big ? M.RUST : M.CANVAS);
       // The lamp hangs up against the roof, well over anyone's head.
       put(cxm, YB + h + 4, czm, M.LAMP);
+      if (p.climb) {
+        // The stair inside: a step a block higher every cell round the shaft from the walk to the lookout floor, each one built solid
+        // down to the walk so nobody goes under it, and the floor left open over the last few so you come up through it.
+        const fy = YB + c.hc - 1, top = YB + h, N = top - fy, frame = !(p.mat === 'stone' || p.mat === 'brick');
+        const { ring, entry, inner } = p.climb;
+        ring.forEach(([x, z], k) => {
+          const col = k <= N ? k : 0;
+          for (let y = fy; y < top; y++) put(x, y, z, y <= fy + col ? M.PLANK : 0);
+          // Stepping up needs a block more than standing does: open over every step that comes within four of the floor.
+          if (k >= N - 5 && k < N) put(x, top, z, 0);
+        });
+        // In the open frames, a post up the middle so there is no drop down the well to the ground.
+        if (frame) for (const [x, z] of inner) for (let y = fy; y < top; y++) put(x, y, z, M.WOOD_D);
+        for (const [x, z] of entry) { put(x, fy, z, M.PLANK); for (let y = fy + 1; y <= fy + 3; y++) put(x, y, z, 0); }
+      }
       break;
     }
     case 'bonfire': {

@@ -29,6 +29,7 @@ export class Drips {
     if (!g.settings.drips || rate < .03) { this.clear(); return; }
     if ((this.findT -= dt) <= 0) { this.findT = .7; this.find(cam); }
     let made = 0;
+    const ra = this.rainAlpha();
     for (const s of this.spots) {
       if (made >= 150 || rand() >= rate * s.k * dt) continue;
       made++;
@@ -38,7 +39,7 @@ export class Drips {
       // Past arm's length they thin out: a few blocks off they should be a hint, not a curtain.
       const far = Math.hypot(x - cam.x, s.y - cam.y, z - cam.z), fade = 1 - .6 * Math.min(1, Math.max(0, (far - 4) / 12));
       const col = this.colour(x, (s.y + s.land) / 2, z);
-      fx.sprite(4, x, s.y - .1, z, 0, -v, 0, .012 + far * .0005, 0, col[0], col[1], col[2], .6 * vis * fade, life, .18);
+      fx.sprite(4, x, s.y - .1, z, 0, -v, 0, .012 + far * .0005, 0, col[0], col[1], col[2], ra * vis * fade, life, .18);
       if (this.landing.length < 900) this.landing.push({ t: life, x, y: s.land + .04, z, far, vis: vis * fade, col });
     }
     // Where it lands, a bead of light and gone.
@@ -68,7 +69,7 @@ export class Drips {
       const sx = x + Math.sin(a) * r, sz = z + Math.cos(a) * r, sy = y + top * (.45 + rand() * .35);
       const far = Math.hypot(sx - cam.x, sy - cam.y, sz - cam.z), fade = 1 - .6 * Math.min(1, Math.max(0, (far - 4) / 12));
       const col = this.colour(sx, sy, sz), v = 6.5 + rand() * 2, life = (sy - y) / v;
-      fx.sprite(4, sx, sy, sz, 0, -v, 0, .009 + far * .0004, 0, col[0], col[1], col[2], .4 * fade, life, .12);
+      fx.sprite(4, sx, sy, sz, 0, -v, 0, .009 + far * .0004, 0, col[0], col[1], col[2], this.rainAlpha() * .8 * fade, life, .12);
     };
     for (const n of g.npcs.list) {
       if (n.dead || !(n.wet > (n.underRoof ? .45 : .2))) continue;
@@ -86,30 +87,42 @@ export class Drips {
     });
   }
 
-  // Only as bright as the light where it falls: the sky by day, the camp's lamps and fires, anything burning close by, and your own torch.
-  // A drop in the dark is a dark drop, a dim thread like the rain around it, not nothing: it does not blink out when the torch goes off.
+  // The same colour as the rain falling past it (RAIN_FS): the air's own colour, a little of whatever light is on the drop, and at night the
+  // rain's faint floor, darker still where nothing lights it.
   colour(x, y, z) {
-    const r = this.g.renderer, s = r.sky, night = s.night || 0, day = 1 - night * .9;
-    const L = r.lightAt(x, z), f = s.fog || [.1, .1, .1], k = s.skyCol || [.1, .1, .1];
-    // Water picks up whatever light is going: a lamp across the yard is enough to show a drip.
-    let cr = (f[0] * 1.4 + k[0] * .3) * day + L[0] * 1.15, cg = (f[1] * 1.4 + k[1] * .3) * day + L[1] * 1.15, cb = (f[2] * 1.4 + k[2] * .3) * day + L[2] * 1.15;
+    const r = this.g.renderer, s = r.sky, f = s.fog || [.1, .1, .1], k = s.skyCol || [.1, .1, .1], sun = s.sunCol || [0, 0, 0];
+    const L = r.lightAt(x, z), hk = Math.max(0, Math.min(1, 1 - (y - 12) / 34));
+    let lr = L[0] * hk, lg = L[1] * hk, lb = L[2] * hk;
     for (let i = 0; i < (r.lightCount || 0); i++) {
-      const o = i * 4, dx = r.lightPos[o] - x, dy = r.lightPos[o + 1] - y, dz = r.lightPos[o + 2] - z, rad = r.lightPos[o + 3];
-      const d = Math.hypot(dx, dy, dz);
+      const o = i * 4, d = Math.hypot(r.lightPos[o] - x, r.lightPos[o + 1] - y, r.lightPos[o + 2] - z), rad = r.lightPos[o + 3];
       if (d >= rad) continue;
-      const a = (1 - d / rad) ** 1.4;
-      cr += r.lightCol[i * 3] * a * 1.1; cg += r.lightCol[i * 3 + 1] * a * 1.1; cb += r.lightCol[i * 3 + 2] * a * 1.1;
+      const a = (1 - d / rad) ** 2 * 1.4;
+      lr += r.lightCol[i * 3] * a; lg += r.lightCol[i * 3 + 1] * a; lb += r.lightCol[i * 3 + 2] * a;
     }
     if (r.spot > 0 && r.camPos) {
       const vx = x - r.camPos[0], vy = y - r.camPos[1], vz = z - r.camPos[2], d = Math.hypot(vx, vy, vz) || 1;
       const c = (vx * r.camForward[0] + vy * r.camForward[1] + vz * r.camForward[2]) / d;
-      if (c > .86 && d < 40) { const t = r.spot * Math.min(1, (c - .86) / .1) / (1 + d * d * .014) * 1.4; cr += t; cg += t * .95; cb += t * .86; }
+      const ss = (t) => { const u = Math.max(0, Math.min(1, t)); return u * u * (3 - 2 * u); };
+      const t = r.spot * ss((c - .86) / .115) / (1 + d * d * .014) * ss((32 - d) / 26) * .26;
+      lr += t; lg += t * .95; lb += t * .86;
     }
-    // Right under a lamp they glint, but they are still water, not sparks.
-    const top = Math.max(cr, cg, cb), cap = top > 1.1 ? 1.1 / top : 1;
-    // The floor the rain has at night, a little under it, and it gives way as soon as there is real light on the drop.
-    const fl = (r.rainFloor || 0) * .7 * Math.max(0, 1 - top / .25);
-    return [cr * cap + .002 + fl * .74, cg * cap + .002 + fl * .82, cb * cap + .003 + fl];
+    const n = 1 + (lr * .3 + lg * .5 + lb * .2) * 1.6;
+    lr /= n; lg /= n; lb /= n;
+    const litK = Math.max(0, Math.min(1, (lr * .3 + lg * .5 + lb * .2) * 3)), dark = 1 - litK;
+    const fl = r.rainFloor || 0, nk = Math.max(0, Math.min(1, fl / .09)), fk = fl * (.45 + .55 * litK);
+    const m = (1 - .45 * nk * dark * dark), base = 1 - .3 * litK;
+    return [
+      ((f[0] * 1.5 + k[0] * .25 + sun[0] * .05 + .006) * base + lr * .62 + .74 * fk) * m,
+      ((f[1] * 1.5 + k[1] * .25 + sun[1] * .05 + .007) * base + lg * .62 + .82 * fk) * m,
+      ((f[2] * 1.5 + k[2] * .25 + sun[2] * .05 + .009) * base + lb * .62 + 1 * fk) * m,
+    ];
+  }
+
+  // How opaque the rain is right here (the rain's own alpha, as drawRain sets it): drips are drawn no stronger than that.
+  rainAlpha() {
+    const r = this.g.renderer, rain = Math.max(r.rain || 0, .25);
+    const light = Math.min(1, rain / .3) * (1 - Math.min(1, Math.max(0, (rain - .3) / .45)));
+    return (.22 + rain * .4 + light * .09) * (1 + Math.max((r.rainIndoor || 0) * 1.6, r.rainNight || 0)) * .45;
   }
 
   find(cam) {
@@ -118,8 +131,10 @@ export class Drips {
     for (let z = cz - R; z <= cz + R; z++) for (let x = cx - R; x <= cx + R; x++) {
       const i = m.index(x, z);
       if (i < 0 || !m.hang[i]) continue;
-      const y = m.top[i];
+      let y = m.top[i];
       if (y <= STREET_Y || y > cam.y + 26) continue;
+      // Off the underside of the ledge, however thick it is, not out of the middle of its face.
+      while (y > m.top[i] - 2 && g.world.get(x, y - 1, z)) y--;
       // Each open side is an edge of its own: the beside column is well below, so the water drops off this side and lands on whatever is down there.
       // A step down of one or two is just the roof going on; the water runs over it, not off it.
       for (const [dx, dz] of EDGES) {

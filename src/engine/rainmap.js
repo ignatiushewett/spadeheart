@@ -90,9 +90,10 @@ export class RainMap {
     let y = Math.min(255, w.colTopCy((x >> 5) + (z >> 5) * CW) * 32 + 31);
     while (y > 0 && !w.get(x, y, z)) y--;
     this.top[i] = y;
-    this.hang[i] = y > STREET_Y && !w.get(x, y - 1, z) ? 1 : 0;
     let a = y - 1;
     while (a > 0 && w.get(x, a, z)) a--;
+    // A ledge up to three blocks thick with open air under it drips off its edge: an eave, an awning, the rim along the top of a wall.
+    this.hang[i] = y > STREET_Y && a > STREET_Y - 2 && y - a <= 3 ? 1 : 0;
     let f = a;
     while (f > 0 && !w.get(x, f, z)) f--;
     this.gapTop[i] = a;

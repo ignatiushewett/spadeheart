@@ -1590,7 +1590,8 @@ void main(){
     float a=smoothstep(1.,.0,abs(p.x))*smoothstep(1.,.5,abs(p.y))*vCol.a;
     // A drip in the dark is a dark drip: it still crosses the light behind it.
     float lum=dot(vCol.rgb,vec3(.3,.5,.2));
-    outCol=vec4(vCol.rgb*a,vKind>3.5?a*mix(.5,.12,smoothstep(.02,.25,lum)):0.);
+    // The same as a rain streak: dark where unlit, mostly light of its own where lit.
+    outCol=vec4(vCol.rgb*a,vKind>3.5?a*mix(.42,.22,smoothstep(.02,.2,lum)):0.);
   }
 }`;
 
