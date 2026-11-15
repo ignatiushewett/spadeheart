@@ -189,16 +189,26 @@ export function planCamp(def, id, r, ground) {
   }
   c.maxY = Math.max(c.maxY, YB + def.H + 14);
   const nearGate = (side, t) => c.gates.some((g) => g.side === side && Math.abs(g.tc - t) < gateHalf + 7);
-  // People at work on the wall, by the log piles: spots for them to stand and hammer at it.
+  // People at work on the wall: right up against its inside face, under the walkway, hammering at the boards and the patches. The strip
+  // along the inside of the wall is out of bounds to everyone else (see the block() calls below); a lane is opened in to each of these.
+  const wallLanes = [];
   for (const side of ['N', 'S', 'W', 'E']) {
     const horiz = side === 'N' || side === 'S', a0 = horiz ? r.x0 : r.z0, a1 = horiz ? r.x1 : r.z1;
+    const sideGates = c.gates.filter((g) => g.side === side), mid = (a0 + a1) >> 1;
     for (let t = a0 + 10; t < a1 - 10; t++) {
-      if ((((t % 37) + 37) % 37) !== 2 || c.gates.some((g) => g.side === side && Math.abs(t - g.tc) < 12)) continue;
+      if ((((t % 37) + 37) % 37) !== 2 || sideGates.some((g) => Math.abs(t - g.tc) < 8 + def.H + 4)) continue;
+      // Clear of the stairs up to the walkway in the middle of a wall with no gate in it.
+      if (!sideGates.length && Math.abs(t - mid) < def.H + 8) continue;
       const inX = side === 'W' ? 1 : side === 'E' ? -1 : 0, inZ = side === 'N' ? 1 : side === 'S' ? -1 : 0;
       const base = horiz ? (side === 'N' ? r.z0 : r.z1) : (side === 'W' ? r.x0 : r.x1);
       for (const k of [-2, 2]) {
-        const x = horiz ? t + k + .5 : base + inX * 8.5, z = horiz ? base + inZ * 8.5 : t + k + .5;
+        const u = t + k;
+        // Not where one of the posts under the walkway stands in the way.
+        if ([u - 1, u, u + 1].some((v) => ((v % 8) + 8) % 8 === 0)) continue;
+        const x = horiz ? u + .5 : base + inX * 2.65, z = horiz ? base + inZ * 2.65 : u + .5;
         c.pois.push({ x, z, kind: 'work', yaw: Math.atan2(-inX, -inZ) });
+        const r0 = base + (horiz ? inZ : inX) * 2, r1 = base + (horiz ? inZ : inX) * 7;
+        wallLanes.push(horiz ? [u - 1, Math.min(r0, r1), u + 1, Math.max(r0, r1)] : [Math.min(r0, r1), u - 1, Math.max(r0, r1), u + 1]);
       }
     }
   }
@@ -240,6 +250,7 @@ export function planCamp(def, id, r, ground) {
   reserve(r.x0, r.z0, r.x0 + 10, r.z1); reserve(r.x1 - 10, r.z0, r.x1, r.z1);
   block(r.x0, r.z0, r.x1, r.z0 + 6); block(r.x0, r.z1 - 6, r.x1, r.z1);
   block(r.x0, r.z0, r.x0 + 6, r.z1); block(r.x1 - 6, r.z0, r.x1, r.z1);
+  for (const [a, b, e, f] of wallLanes) for (let z = b; z <= f; z++) for (let x = a; x <= e; x++) if (inR(x, z)) solid[(x - r.x0) + (z - r.z0) * W] = 0;
   const AV = 4;
   reserve(px - AV, r.z0, px + AV, r.z1); reserve(harlem ? px : r.x0, pz - AV, r.x1, pz + AV);
 
@@ -491,7 +502,7 @@ export function planCamp(def, id, r, ground) {
       const solidCell = (u, v) => { const [a, b] = cell(u, v); block(a, b, a, b); };
       for (let v = 0; v <= 5; v++) solidCell(0, v);
       for (let u = 0; u <= 11; u++) solidCell(u, 0);
-      const solids = [[1, 1], [1, 2], [1, 3], [4, 1], [5, 1], [12, 1], [12, 2], [6, 4], [3, 6], [13, 8], [13, 9]];
+      const solids = [[1, 1], [1, 2], [1, 3], [4, 1], [5, 1], [12, 1], [12, 2], [6, 4], [2, 10], [13, 8], [13, 9]];
       for (let u = 7; u <= 10; u++) solids.push([u, 1]);
       for (const [u, v] of solids) solidCell(u, v);
       const ang = (du, dv) => Math.atan2(fx ? -du : du, fz ? -dv : dv);
@@ -522,7 +533,7 @@ export function planCamp(def, id, r, ground) {
       c.vendors.push({ role: 'mechanic', x: yard.work[0].x, z: yard.work[0].z, yaw: yard.work[0].yaw, browse, yard });
       // A car in for work as well, pulled up at the far side of the yard.
       { const [ax, az] = cell(14, 2), [bx, bz] = cell(17, 10); add('wreck', Math.min(ax, bx), Math.min(az, bz), Math.max(ax, bx), Math.max(az, bz), 5, { kind: 1, dir: 0 }); }
-      light(Math.floor(wx(3.5)), Math.floor(wz(6.5)), 10);
+      light(Math.floor(wx(2.5)), Math.floor(wz(10.5)), 10);
     }
   }
 
@@ -890,11 +901,6 @@ export function stampCamp(c, ctx) {
           P(t, y, row, h >= 1 && h < H - 2 && ph < 11 ? [M.PLANK, M.RUST, M.WOOD_D, M.ROOF_TIN, M.PLANK][ph % 5] : wallVoxel(wall, t, h, row, H));
         }
       }
-      // Logs lying along the inside of the wall, where the repairs are being done: a pile every so often, away from the gates.
-      const pile = ((t % 37) + 37) % 37;
-      if (pile < 5 && t > a0 + 10 && t < a1 - 10 && !c.gates.some((g) => g.side === sideKey && Math.abs(t - g.tc) < 12)) {
-        P(t, YB, 6, M.LOG); if (pile >= 1 && pile <= 3) P(t, YB + 1, 6, M.LOG); if (pile === 2) P(t, YB, 7, M.LOG);
-      }
       // The top of the wall stands out a block past the face below it, all the way along and over the gates: a coping two blocks wide,
       // set a block further out than the wall it sits on, which you can see from the road.
       for (let h = H - 2; h < H; h++) if (YB + h >= oy && YB + h < oy + CS) P(t, YB + h, -1, wallVoxel(wall, t, h, 0, H));
@@ -1037,8 +1043,8 @@ function stampPart(p, c, box, put, car, letterAt) {
       // The cot, made up, in the corner against the fence.
       T(1, 0, 1, M.PILLOW); T(1, 0, 2, M.MATTRESS); T(1, 0, 3, M.BLANKET_G);
       // A lamp on a pole on the patch of grass in front of the lean-to, for working late.
-      for (let y = 0; y < 3; y++) T(3, y, 6, M.WOOD_D);
-      T(3, 3, 6, M.LAMP);
+      for (let y = 0; y < 3; y++) T(2, y, 10, M.WOOD_D);
+      T(2, 3, 10, M.LAMP);
       break;
     }
     case 'clinic': {

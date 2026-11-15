@@ -45,9 +45,38 @@ function score() {
 
 const SCORE = score();
 
+// For when someone you have been playing dies for good: the same piano in the same room, in the same key, but slow struck chords
+// instead of a running figure, rolled from the bass up the way a hand spreads a chord it cannot quite reach. A lament, quieter as it
+// goes, that comes to rest on the tonic and stays there.
+const LAMENT = [
+  ['C2 C3 G3 C4 Eb4', 'Ab1 Ab2 Eb3 C4 Eb4', 'F2 F3 Ab3 C4 F4', 'G1 G2 D3 B3 D4'],
+  ['C2 C3 G3 Eb4 G4', 'Bb1 Bb2 G3 Eb4 G4', 'Ab1 Ab2 Ab3 C4 Eb4', 'G1 G2 F3 B3 D4'],
+  ['Eb2 Eb3 G3 Bb3 Eb4', 'C2 C3 G3 C4 Eb4', 'F2 F3 Ab3 C4 Ab4', 'Bb1 Bb2 F3 D4 F4'],
+  ['Eb2 Eb3 G3 Bb3 G4', 'Ab1 Ab2 Ab3 C4 Eb4', 'D2 D3 Ab3 C4 F4', 'G1 G2 G3 B3 D4'],
+  ['C2 C3 G3 C4 Eb4', 'Ab1 Ab2 Eb3 C4 Eb4', 'Db2 Db3 Ab3 Db4 F4', 'G1 G2 D3 B3 F4'],
+  ['Ab1 Ab2 C3 F3 C4', 'G1 G2 D3 F3 B3'],
+];
+function lament() {
+  const out = [], BEAT = 1.25;
+  let t = 0;
+  LAMENT.forEach((bar, b) => {
+    const v = .52 - b * .045;
+    bar.forEach((chord, i) => {
+      const last = b === LAMENT.length - 1, slow = last ? 1.35 + i * .25 : 1;
+      chord.split(' ').forEach((n, k) => out.push({ t: t + k * .028, m: midi(n), v: (k === 0 ? v * 1.05 : v * .82) * (i === 0 ? 1 : .9) }));
+      t += BEAT * slow;
+    });
+  });
+  // The end: rolled slowly, and left to ring out.
+  'C2 C3 G3 C4 Eb4 G4'.split(' ').forEach((n, k) => out.push({ t: t + .4 + k * .16, m: midi(n), v: .3 }));
+  return { notes: out, length: t + 9 + REST };
+}
+export const LAMENT_SCORE = lament();
+
 export class MenuMusic {
-  constructor(ctx, dest) {
+  constructor(ctx, dest, sc = SCORE) {
     this.ctx = ctx;
+    this.score = sc;
     this.fade = ctx.createGain();
     this.fade.gain.value = 0;
     this.fade.connect(dest);
@@ -114,11 +143,12 @@ export class MenuMusic {
     const now = this.ctx.currentTime;
     // It plays on under the fade, and stops booking notes once nobody could hear them.
     if (this.endAt && now >= this.endAt) { clearInterval(this.timer); this.timer = 0; this.endAt = 0; return; }
-    while (this.origin + SCORE.notes[this.next].t < now + 2) {
-      const n = SCORE.notes[this.next];
+    const S = this.score;
+    while (this.origin + S.notes[this.next].t < now + 2) {
+      const n = S.notes[this.next];
       this.strike(Math.max(now + .02, this.origin + n.t + (Math.random() - .5) * .012), n.m, n.v * (.94 + Math.random() * .12));
       this.next++;
-      if (this.next >= SCORE.notes.length) { this.next = 0; this.origin += SCORE.length; }
+      if (this.next >= S.notes.length) { this.next = 0; this.origin += S.length; }
     }
   }
 

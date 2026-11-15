@@ -778,11 +778,23 @@ uniform sampler2D uCityMap;
 uniform sampler2D uLoadMask;
 uniform vec2 uWorldSize;
 layout(location=0) out vec4 outCol;
+// Land within eight blocks of the sea: the far scenery draws it in steps at its own height, so the flat ground plane leaves it alone,
+// and so does the water's cut-out, which would otherwise leave holes beside it.
+bool coastal(sampler2D cm,vec2 p,vec2 ws){
+  for(int k=0;k<8;k++){
+    vec2 o=k<4?vec2(k==0?8.:k==1?-8.:0.,k==2?8.:k==3?-8.:0.):vec2(k==4||k==6?6.:-6.,k<6?6.:-6.);
+    vec2 q=(p+o)/ws;
+    if(any(lessThan(q,vec2(0.)))||any(greaterThanEqual(q,vec2(1.)))) return true;
+    if(textureLod(cm,q,0.).a<.5) return true;
+  }
+  return false;
+}
 void main(){
   vec2 uv=vWorld.xz/uWorldSize;
   if(texture(uLoadMask,uv).r>.5) discard;
   vec4 m=texture(uCityMap,uv);
   if(m.a<.5) discard;
+  if(coastal(uCityMap,vWorld.xz,uWorldSize)) discard;
   float dist=length(vWorld-uCam);
   vec3 n=vec3(0.,1.,0.);
   float sh=sampleShadow(vWorld,n,dist);
@@ -796,6 +808,17 @@ export const WATER_FS = COMMON + FRAME_UNIFORMS + LIGHTING + /* glsl */`
 in vec3 vWorld;
 uniform sampler2D uCityMap;
 uniform sampler2D uLoadMask;
+// Land within eight blocks of the sea: the far scenery draws it in steps at its own height, so the flat ground plane leaves it alone,
+// and so does the water's cut-out, which would otherwise leave holes beside it.
+bool coastal(sampler2D cm,vec2 p,vec2 ws){
+  for(int k=0;k<8;k++){
+    vec2 o=k<4?vec2(k==0?8.:k==1?-8.:0.,k==2?8.:k==3?-8.:0.):vec2(k==4||k==6?6.:-6.,k<6?6.:-6.);
+    vec2 q=(p+o)/ws;
+    if(any(lessThan(q,vec2(0.)))||any(greaterThanEqual(q,vec2(1.)))) return true;
+    if(textureLod(cm,q,0.).a<.5) return true;
+  }
+  return false;
+}
 uniform vec2 uWorldSize;
 layout(location=0) out vec4 outCol;
 float vn(vec2 p){ vec2 i=floor(p),f=fract(p); f=f*f*(3.-2.*f);
@@ -851,7 +874,7 @@ void main(){
   // Depth precision is coarse far out: never let water fight the distant shoreline.
   // Only where the far scenery stands in for the land, though: where the real blocks are built, their own shore keeps the water out, and
   // the map's coarser coastline would cut holes in the sea beside it down to the bed.
-  if(dist>300.&&all(greaterThan(vWorld.xz,vec2(0.)))&&all(lessThan(vWorld.xz,uWorldSize))&&texture(uCityMap,vWorld.xz/uWorldSize).a>.5&&textureLod(uLoadMask,vWorld.xz/uWorldSize,0.).r<.5) discard;
+  if(dist>300.&&all(greaterThan(vWorld.xz,vec2(0.)))&&all(lessThan(vWorld.xz,uWorldSize))&&texture(uCityMap,vWorld.xz/uWorldSize).a>.5&&textureLod(uLoadMask,vWorld.xz/uWorldSize,0.).r<.5&&!coastal(uCityMap,vWorld.xz,uWorldSize)) discard;
   float e=.35+dist*.002;
   vec2 p=vWorld.xz;
   nearWater=1.-smoothstep(120.,420.,dist);

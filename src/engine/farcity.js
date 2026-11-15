@@ -100,13 +100,19 @@ export class FarCity {
       };
       for (let z = 0; z < WZ; z += T) for (let x = 0; x < WX; x += T) {
         const a = at(x, z), b = at(x + T, z), c = at(x, z + T), e = at(x + T, z + T);
-        if (Math.max(a, b, c, e) <= 2 && L.forestAt(x + 8, z + 8) < .3) continue;
-        const i = (z + 8) * WX + x + 8, g = ground[i];
-        // On the shore one tilted quad makes a long pale ramp out over the water. There the ground is drawn in steps of four blocks
-        // instead, each flat at its own height and dropping straight into the sea, as the built shore does.
-        if (Math.min(a, b, c, e) === -4 && Math.max(a, b, c, e) > -4) {
-          const Q = 4, wet = (sx, sz) => sx < 0 || sz < 0 || sx >= WX || sz >= WZ || ground[sz * WX + sx] === G.WATER;
-          const hq = (qx, qz) => { const sx = x + qx * Q + 2, sz = z + qz * Q + 2; return wet(sx, sz) ? null : STREET_Y - 1 + Math.max(terr[sz * WX + sx], -1); };
+        // On the shore one tilted quad makes a long pale ramp out over the water, and the flat stand-in for low ground (the ground plane,
+        // at street height) stands up over a low island like a slab. So any tile with water in it or within eight blocks of it is drawn
+        // here, low or not, in steps of four blocks, each flat at its own height and dropping straight into the sea, as the built shore
+        // does; the ground plane and the water's own cut-out both leave these tiles alone (coastal() in GROUND_FS and WATER_FS).
+        const wet = (sx, sz) => sx < 0 || sz < 0 || sx >= WX || sz >= WZ || ground[sz * WX + sx] === G.WATER || (ground[sz * WX + sx] === G.PARK && terr[sz * WX + sx] < -2);
+        let coast = false, dry = false;
+        for (let sz = z - 8; sz <= z + T + 8 && !(coast && dry); sz += 4) for (let sx = x - 8; sx <= x + T + 8; sx += 4) {
+          if (wet(sx, sz)) coast = true;
+          else if (sx >= x && sx < x + T && sz >= z && sz < z + T) dry = true;
+        }
+        if (coast && dry) {
+          const Q = 4;
+          const hq = (qx, qz) => { const sx = x + qx * Q + 2, sz = z + qz * Q + 2; return wet(sx, sz) ? null : Math.max(STREET_Y - 1 + terr[sz * WX + sx], WATER_Y + .35); };
           const bk = tverts[Math.min(tverts.length - 1, Math.floor(z / BUCKET))], sea = WATER_Y - 2;
           for (let qz = 0; qz < T / Q; qz++) for (let qx = 0; qx < T / Q; qx++) {
             const h = hq(qx, qz);
@@ -124,6 +130,8 @@ export class FarCity {
           }
           continue;
         }
+        if (Math.max(a, b, c, e) <= 2 && L.forestAt(x + 8, z + 8) < .3) continue;
+        const i = (z + 8) * WX + x + 8, g = ground[i];
         if (g === G.WATER && Math.max(a, b, c, e) <= 6) continue;
         const canopy = (cx, cz) => { const j = Math.min(WZ - 1, cz) * WX + Math.min(WX - 1, cx); return ground[j] === G.PARK ? 8 * Math.max(0, Math.min(1, (L.forestAt(cx, cz) - .3) / .25)) : 0; };
         const ta = canopy(x, z), tb = canopy(x + T, z), tc = canopy(x, z + T), te = canopy(x + T, z + T), trees = (ta + tb + tc + te) / 4;

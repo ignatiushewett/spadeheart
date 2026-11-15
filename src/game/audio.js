@@ -1,7 +1,7 @@
 // All sound is synthesised at runtime, so the game ships with no audio assets. Weapons and the long
 // ambient beds are rendered once into buffers, a few variations of each, and then played back
 // through distance filters and a street-canyon reverb.
-import { MenuMusic } from './menumusic.js';
+import { MenuMusic, LAMENT_SCORE } from './menumusic.js';
 
 const rand = Math.random;
 const TAU = Math.PI * 2;
@@ -61,12 +61,14 @@ export class Audio2 {
     this.musicLevel.gain.value = this.volume * .55 * (this.musicShare ?? 1);
     this.musicLevel.connect(comp);
     this.music = new MenuMusic(ctx, this.musicLevel);
+    this.lament = new MenuMusic(ctx, this.musicLevel, LAMENT_SCORE);
     // The interface, and the voice of whoever you are talking to, go round the muffle too: a menu being up is exactly when they need
     // to be heard, not when they should sound like they are through a wall.
     this.uiLevel = ctx.createGain();
     this.uiLevel.gain.value = this.volume;
     this.uiLevel.connect(comp);
     if (this.wantMusic) this.music.play();
+    if (this.wantLament) this.lament.play(2.5);
     // Long slapback impulse: the sound of gunfire between Albion towers.
     const len = ctx.sampleRate * 2.6;
     const ir = ctx.createBuffer(2, len, ctx.sampleRate);
@@ -218,6 +220,14 @@ export class Audio2 {
     if (!this.music) return;
     if (on) this.music.play();
     else this.music.stop();
+  }
+
+  // When someone dies for good: the lament, in over a couple of seconds, and out slowly when you leave.
+  deathMusic(on) {
+    this.wantLament = on;
+    if (!this.lament) return;
+    if (on) this.lament.play(2.5);
+    else this.lament.stop(4);
   }
 
   setListener(x, y, z, yaw) {

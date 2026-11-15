@@ -2241,6 +2241,7 @@ class Game {
 
   quitToMenu() {
     if (this.devOpen) this.toggleDev(false);
+    this.audio.deathMusic(false);
     this.player.fly = false;
     this.saveGame();
     this.horde.bankAll();
@@ -2255,6 +2256,7 @@ class Game {
 
   beginLoad(title, after) {
     this.audio.menuMusic(false);
+    this.audio.deathMusic(false);
     this.npcs.showcase = false;
     this.state = 'loading';
     this.loadTitle = title;
@@ -2313,9 +2315,12 @@ class Game {
     document.exitPointerLock();
     const survival = P.loadout === 'survival';
     document.querySelector('#death h1').textContent = survival ? `${P.charName} is dead` : 'Overrun';
-    document.getElementById('death-respawn').textContent = survival ? 'Start as someone new' : 'Wake up';
+    // Gone for good in survival: the only way on is back to the menu.
+    document.getElementById('death-respawn').textContent = 'Wake up';
+    document.getElementById('death-respawn').style.display = survival ? 'none' : '';
     document.getElementById('death-menu').style.display = survival ? '' : 'none';
-    document.getElementById('death-restart').style.display = survival ? '' : 'none';
+    document.getElementById('death-menu').classList.toggle('primary', survival);
+    document.getElementById('death-restart').style.display = 'none';
     if (survival) {
       this.saveGame();
       const days = Math.max(1, this.day - (P.bornDay || 1) + 1);
@@ -2323,6 +2328,7 @@ class Game {
         if (this.state !== 'play') return;
         document.getElementById('death-text').textContent = `${days === 1 ? 'One day' : `${days} days`} in the city, ${P.kills.toLocaleString('en-US')} infected down. Nobody is coming back from this one, but the city carries on without them.`;
         this.deathShown = true;
+        this.audio.deathMusic(true);
         this.ui.open('death', false);
       }, 1800);
       return;
