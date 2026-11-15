@@ -50,7 +50,7 @@ const DB_NAME = 'acez';
 // Where the title flight ends: out over the bay to the east-south-east of her, looking back west-north-west past her and the Landing to
 // Weston, the plateau and Albion on the skyline, with the edge of the map only far off in the haze.
 const MENU_SHOT = { angle: -.18, dist: 185, height: 88, turn: .1, pitch: -.14, fov: 1.05, flight: 125, startHeight: 30, startOff: 44, startPitch: -.1 };
-export const VERSION = 'v0.91';
+export const VERSION = 'v0.92';
 const SAVE_KEY = 'slot15';  // bumped whenever the map changes: old voxel edits no longer line up
 export const SLOTS = 3;
 // Slot 1 keeps the plain key, so a save from before there were slots simply becomes the first character.

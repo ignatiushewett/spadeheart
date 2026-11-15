@@ -3548,10 +3548,10 @@ export class NPCs {
     if (d > .3) {
       const off = Math.abs(n.z - aisle) > .4 && Math.abs(goal.x - n.x) > .6;
       const tx = off ? n.x : goal.x, tz = off ? aisle : goal.z;
-      const ex = tx - n.x, ez = tz - n.z, e = Math.hypot(ex, ez) || 1, step = Math.min(e, 1.4 * dt);
+      const ex = tx - n.x, ez = tz - n.z, e = Math.hypot(ex, ez) || 1, step = Math.min(e, 2.6 * dt);
       n.x += ex / e * step; n.z += ez / e * step; n.y = STREET_Y;
       n.yaw = Math.atan2(ex, ez); n.state = .7;
-      n.phase += 3 * dt * 2.1;
+      n.phase += 4.6 * dt * 2.1;
       return;
     }
     n.x = goal.x; n.z = goal.z; n.y = STREET_Y; n.yaw = goal.yaw;
@@ -3592,7 +3592,7 @@ export class NPCs {
       return;
     }
     if (d > .3) {
-      const step = Math.min(d, 1.5 * dt);
+      const step = Math.min(d, 2.4 * dt);
       n.x += dx / d * step; n.z += dz / d * step; n.y = STREET_Y;
       n.yaw = Math.atan2(dx, dz); n.state = .7;
       n.phase += 3 * dt * 2.1;

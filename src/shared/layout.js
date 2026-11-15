@@ -90,7 +90,7 @@ const Z = {
   estate: { blk: [190, 140], drop: 0.38, f: [2, 3], st: [S.manor, S.manor, S.manorB, S.cottage, S.clapW], lot: [56, 88], house: [11, 17], dens: 35 },
   farmtown: { blk: [130, 90], rural: true, f: [1, 2], st: [S.clapW, S.clapY, S.brick, S.cedar, S.clapG, S.brick2], lot: [22, 36], tall: 0, parking: .14, garden: .12, fields: .1, alley: .1, dens: 45 },
   farmhouse: { blk: [240, 170], rural: true, f: [1, 2], st: [S.clapW, S.clapW, S.clapY, S.cedar, S.cottage, S.clapG, S.barn], lot: [40, 64], house: [7, 13], garden: .14, fields: .55, dens: 22 },
-  grainyard: { blk: [180, 130], rural: true, f: [1, 3], st: [S.barn, S.barn, S.warehouse, S.silo], lot: [40, 70], parking: .18, fields: .2, alley: .2, dens: 24 },
+  grainyard: { blk: [180, 130], rural: true, f: [1, 3], st: [S.barn, S.barn, S.warehouse], lot: [40, 70], parking: .18, fields: .2, alley: .2, dens: 24 },
   village: { blk: [100, 70], drop: 0.3, f: [1, 2], st: [S.clapW, S.cedar, S.cottage, S.clapY, S.brick], lot: [20, 28], house: [3, 5], dens: 38 },
 };
 
@@ -490,9 +490,8 @@ export function buildLayout(seed = 1609) {
     const x = qx * 4, z = qz * 4;
     let b = EB[q] * (1 - TB[q]) + LB[q];
     b *= WQ[q] * CQ[q];
-    // The tunnel keeps its road low, and the approaches come down to meet it.
-    const tk = sstep(1 - lineDist(x, z, TUN) / 160);
-    BQ[q] = b * (1 - tk) + 6 * tk;
+    // (The tunnel no longer flattens the ridge round it: the hill stands as it is and the road goes in under it. See tun below.)
+    BQ[q] = b;
   }
   const sampleQ = (A, x, z) => {
     const fx = Math.max(0, Math.min(QW - 1.001, x / 4)), fz = Math.max(0, Math.min(QD - 1.001, z / 4));
@@ -1066,7 +1065,6 @@ export function buildLayout(seed = 1609) {
   landmark('Union Terminal', R_TERMINAL, S.granite, [0, 4]);
   landmark('Albion General', R_HOSPITAL, S.whitebrick, [0, 9]);
   landmark('Grand Severn Hotel', R_GRAND, S.beachP, [0, 6, 6, 14]);
-  landmark('Weston Co-op Elevator', R_ELEVATOR, S.silo, [0, 10], { blank: true });
 
   // Farmsteads out among the fields: a house, a barn and a silo round a dirt yard, a long way from each other.
   const farms = [];
@@ -1273,6 +1271,24 @@ export function buildLayout(seed = 1609) {
     }
   }
 
+  // No sliver of a building: wherever a lot is less than three blocks across, one way or the other, that part of it is left as open
+  // ground (an alley in town, grass by a house), so nothing stands a block or two wide off the side of something bigger.
+  for (let pass = 0; pass < 3; pass++) {
+    for (let z = 2; z < WZ - 2; z++) for (let x = 2, i = z * WX + 2; x < WX - 2; x++, i++) {
+      const id = lot[i];
+      if (!id) continue;
+      const b = buildings[id - 1];
+      if (b.name || b.gone) continue;
+      const span = (d) => {
+        let a = 0, c = 0;
+        while (a < 2 && lot[i - d * (a + 1)] === id) a++;
+        while (c < 2 && lot[i + d * (c + 1)] === id) c++;
+        return a + c + 1;
+      };
+      if (span(1) < 3 || span(WX) < 3) { lot[i] = 0; ground[i] = b.house ? G.PARK : G.ALLEY; mark[i] = 0; }
+    }
+  }
+
   // Edge distance inside each lot drives setbacks, roof pitch and facade detection.
   for (let z = 1; z < WZ - 1; z++) for (let x = 1, i = z * WX + 1; x < WX - 1; x++, i++) {
     const id = lot[i];
@@ -1413,10 +1429,12 @@ export function buildLayout(seed = 1609) {
       const fx = x / 4, ix = fx | 0, ux = fx - ix;
       const b = rowB[ix] * (1 - ux) + rowB[ix + 1] * ux, base = Math.round(b);
       if (tun[i]) {
-        terr[i] = base - 1;
-        // Deep enough under the hill to have a roof: the column's top is the hillside, and the road runs through underneath.
-        const e = sampleQ(EQ, x, z) + 34 * sstep(1 - Math.abs(z - 2075) / 150);
-        if (e - base >= 10) { height[i] = Math.min(250, STREET_Y + Math.round(e)); mark[i] |= 32; }
+        // The road keeps the level it comes in at, all the way through. Where the hill stands well over it, the hill is its roof, at the
+        // height of the hillside either side, so the ridge goes on over the top unbroken; nearer the ends, where it is lower, the road
+        // runs in an open cutting between the banks.
+        const road = Math.min(base, 6);
+        terr[i] = road - 1;
+        if (b - road >= 10) { height[i] = Math.min(250, STREET_Y + Math.round(b)); mark[i] |= 32; }
         continue;
       }
       if (g === G.ROAD) { terr[i] = base - 1; continue; }
@@ -1434,6 +1452,25 @@ export function buildLayout(seed = 1609) {
     }
   }
   for (const [i, d] of slump) terr[i] = -d;
+  // The tunnel's roof is the hillside: across each row, from the ground on one side of it to the ground on the other, so the ridge
+  // carries straight on over the top with no groove or hump where the tunnel is.
+  for (let z = 1; z < WZ - 1; z++) {
+    let x = 1;
+    while (x < WX - 1) {
+      const i0 = z * WX + x;
+      if (!tun[i0]) { x++; continue; }
+      let xb = x;
+      while (xb + 1 < WX - 1 && tun[z * WX + xb + 1]) xb++;
+      const left = terr[z * WX + x - 1], right = terr[z * WX + xb + 1];
+      for (let k = x; k <= xb; k++) {
+        const i = z * WX + k;
+        if (!(mark[i] & 32)) continue;
+        const t = xb > x ? (k - x) / (xb - x) : .5;
+        height[i] = Math.min(250, Math.max(height[i], STREET_Y + Math.round(left + (right - left) * t)));
+      }
+      x = xb + 1;
+    }
+  }
   // Cliffs: wherever the hillside is too steep to hold soil. The plateau's edges are lined with them.
   for (let z = 2; z < WZ - 2; z++) for (let x = 2, i = z * WX + 2; x < WX - 2; x++, i++) {
     if (ground[i] !== G.PARK || terr[i] < 12) continue;
@@ -1642,7 +1679,7 @@ export function buildLayout(seed = 1609) {
     ['Exchange Tower', mid(R_EXCHANGE).x, mid(R_EXCHANGE).z, 1, 'mark'], ['Meridian Building', mid(R_MERIDIAN).x, mid(R_MERIDIAN).z, 1, 'mark'], ['Carrow Trust', mid(R_CARROW).x, mid(R_CARROW).z, 1, 'mark'],
     ['Meridian Square', SQ.x, (SQ.z0 + SQ.z1) >> 1, 1, 'mark'], ['State House', mid(R_STATE).x, mid(R_STATE).z, 1, 'mark'], ['Union Terminal', mid(R_TERMINAL).x, mid(R_TERMINAL).z, 1, 'mark'],
     ['Albion General', mid(R_HOSPITAL).x, mid(R_HOSPITAL).z, 1, 'mark'], ['Albion Athenaeum', mid(P_LIBRARY).x, mid(P_LIBRARY).z, 1, 'mark'], ['Grand Severn Hotel', mid(R_GRAND).x, mid(R_GRAND).z, 1, 'mark'],
-    ['Weston Co-op Elevator', mid(R_ELEVATOR).x, mid(R_ELEVATOR).z, 1, 'mark'], ['Trinity Ranger Station', 3780, 1790, 1, 'mark'], ['Mt. Page Trailhead', 895, 2013, 1, 'mark'],
+['Trinity Ranger Station', 3780, 1790, 1, 'mark'], ['Mt. Page Trailhead', 895, 2013, 1, 'mark'],
     ['Pleasure Pier', PLEASURE.x, PLEASURE.z, 1, 'mark'],
     ...['Pine Hill Motel', 'Surfside Gas', 'Junction Diner', 'Ridge View Motel', 'Valley Feed & Seed'].map((n) => { const b = named(n); return [n, mid(b).x, mid(b).z, 1, 'mark']; }),
   ].map(([name, x, z, tier, kind]) => ({ name, x: Math.round(x), z: Math.round(z), tier, kind }));
