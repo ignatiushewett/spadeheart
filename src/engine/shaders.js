@@ -1363,12 +1363,18 @@ void main(){
         vec3 ln=normalize(vLocN), f, cell;
         float on;
         if(flow){
-          // Where on the bike, in voxels (a voxel's own +z is the bike's back).
+          // Where on the bike, in voxels (a voxel's own +z is the bike's back). The drops run back along lanes, each lane at its own
+          // pace (the air does not push them all alike), a good deal slower than the bike is going; and each drop has a life of its own
+          // as it goes, landing, riding back a way and going, so the sheet never looks like a belt of dots.
           vec3 P=vMPos+vec3(vLoc.x,vLoc.y,-vLoc.z)+.5;
           vec3 S=P*4.;
-          S.z+=uTime*min(uRideSpeed,22.)*1.6*4.;
-          cell=floor(S); f=fract(S)-.5; f.z=-f.z; f.x=f.x;
-          on=step(1.-.065*w*uRainNow*1.5,hash12(cell.xy*1.7+cell.z*3.1+.5))*(1.-step(.5,abs(ln.z)));
+          vec2 lane=floor(S.xy);
+          float lr=hash12(lane*1.37+.21), v=min(uRideSpeed,20.);
+          S.z+=(uTime*v*(.22+.3*lr)+lr*37.)*4.;
+          cell=floor(S); f=fract(S)-.5; f.z=-f.z;
+          float sd=hash12(cell.xy*1.7+cell.z*3.1+.5), ph=uTime*(.35+sd*.5)+sd*9.;
+          float life=fract(ph), gen=floor(ph);
+          on=step(1.-.065*w*uRainNow*1.5,hash12(cell.xy+cell.z*7.1+gen*1.13))*smoothstep(0.,.15,life)*smoothstep(1.,.65,life)*(1.-step(.5,abs(ln.z)));
         } else {
           vec3 wp=vLoc*4.+.5;
           cell=floor(wp)+vec3(vSeed*.7,vSeed*1.3,vSeed*2.1);
