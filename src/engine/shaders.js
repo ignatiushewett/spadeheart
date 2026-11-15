@@ -860,9 +860,10 @@ void main(){
   // Haze near the horizon and below it.
   float below=smoothstep(.2,-.01,d.y);
   col=mix(col,uFogCol,below*below);
-  // Under the horizon there is nothing to see but the ground, so the sky there goes to a dark grassy green: if a hole ever opens in the
-  // world underfoot, it reads as shadowed ground, not a window onto bright sky. Darker still at night.
-  col=mix(col,vec3(.075,.1,.048)*(1.-uNight*.85),1.-smoothstep(-.18,-.02,d.y));
+  // Under the horizon there is nothing to see but the ground, so steeply down the sky goes to a dark grassy green: if a hole ever opens
+  // in the world underfoot, it reads as shadowed ground, not a window onto bright sky. Darker still at night. Just under the horizon,
+  // though, anything showing through is a long way off, across the haze, the bay or the far country, so there it stays the haze.
+  col=mix(col,vec3(.075,.1,.048)*(1.-uNight*.85),1.-smoothstep(-.42,-.2,d.y));
   outCol=vec4(col,1.);
 }`;
 
