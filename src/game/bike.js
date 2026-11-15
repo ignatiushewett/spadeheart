@@ -594,7 +594,10 @@ export class Bikes {
       b.x = nx; b.z = nz;
       // It sits on the higher of what is under its two wheels.
       const rx2 = b.x - fx * 10 * VS, rz2 = b.z - fz * 10 * VS, fx2 = b.x + fx * 10 * VS, fz2 = b.z + fz * 10 * VS;
-      const gy = Math.max(this.ground(rx2, rz2, b.y + 1.2), this.ground(fx2, fz2, b.y + 1.2), this.ground(b.x, b.z, b.y + 1.2));
+      // Only what a wheel could actually roll up onto, a kerb or a step: a wheel up against a wall finds the wall's top there, and
+      // taking that would lift the bike up the face of it a block a frame, out of reach on top.
+      const steps = [this.ground(rx2, rz2, b.y + 1.2), this.ground(fx2, fz2, b.y + 1.2), this.ground(b.x, b.z, b.y + 1.2)].filter((v) => v - b.y <= 1.1);
+      const gy = steps.length ? Math.max(...steps) : b.y;
       if (gy >= b.y) { b.y = gy; b.vy = 0; } else { b.vy -= 26 * dt; b.y = Math.max(gy, b.y + b.vy * dt); if (b.y === gy) b.vy = 0; }
     }
     if (rider) b.sy = b.y < b.sy ? b.y : b.sy + (b.y - b.sy) * Math.min(1, dt * (7 + Math.abs(b.v) * .35));

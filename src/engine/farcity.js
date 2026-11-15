@@ -1,6 +1,6 @@
 // Skyline proxy: every town as merged boxes and the hills as one coarse sheet, so Albion and Mt. Page are always on the horizon.
 // A per-column load mask in the shader swaps each piece for real voxels once meshed.
-import { WX, WZ, STREET_Y, G } from '../shared/constants.js';
+import { WX, WZ, STREET_Y, WATER_Y, G } from '../shared/constants.js';
 import { PALETTE, M } from '../shared/materials.js';
 import { STYLES, P, PROP_STRIDE } from '../shared/layout.js';
 import { aabbInFrustum } from './math.js';
@@ -102,6 +102,28 @@ export class FarCity {
         const a = at(x, z), b = at(x + T, z), c = at(x, z + T), e = at(x + T, z + T);
         if (Math.max(a, b, c, e) <= 2 && L.forestAt(x + 8, z + 8) < .3) continue;
         const i = (z + 8) * WX + x + 8, g = ground[i];
+        // On the shore one tilted quad makes a long pale ramp out over the water. There the ground is drawn in steps of four blocks
+        // instead, each flat at its own height and dropping straight into the sea, as the built shore does.
+        if (Math.min(a, b, c, e) === -4 && Math.max(a, b, c, e) > -4) {
+          const Q = 4, wet = (sx, sz) => sx < 0 || sz < 0 || sx >= WX || sz >= WZ || ground[sz * WX + sx] === G.WATER;
+          const hq = (qx, qz) => { const sx = x + qx * Q + 2, sz = z + qz * Q + 2; return wet(sx, sz) ? null : STREET_Y - 1 + Math.max(terr[sz * WX + sx], -1); };
+          const bk = tverts[Math.min(tverts.length - 1, Math.floor(z / BUCKET))], sea = WATER_Y - 2;
+          for (let qz = 0; qz < T / Q; qz++) for (let qx = 0; qx < T / Q; qx++) {
+            const h = hq(qx, qz);
+            if (h === null) continue;
+            const x0 = x + qx * Q, z0 = z + qz * Q, x1 = x0 + Q, z1 = z0 + Q, sx = x0 + 2, sz = z0 + 2;
+            const col = GC[ground[sz * WX + sx]] || grass;
+            quad(bk, [[x0, h, z1], [x1, h, z1], [x1, h, z0], [x0, h, z0]], [0, 1, 0], col, .3);
+            const low = (nx, nz) => { const v = (nx < 0 || nz < 0 || nx >= T / Q || nz >= T / Q) ? (wet(x + nx * Q + 2, z + nz * Q + 2) ? sea : h) : hq(nx, nz); return v === null ? sea : v; };
+            const side = col.map((v) => v * .8);
+            const lw = low(qx - 1, qz), le = low(qx + 1, qz), ln = low(qx, qz - 1), ls = low(qx, qz + 1);
+            if (lw < h) quad(bk, [[x0, lw, z0], [x0, lw, z1], [x0, h, z1], [x0, h, z0]], [-1, 0, 0], side, .3);
+            if (le < h) quad(bk, [[x1, le, z1], [x1, le, z0], [x1, h, z0], [x1, h, z1]], [1, 0, 0], side, .3);
+            if (ln < h) quad(bk, [[x1, ln, z0], [x0, ln, z0], [x0, h, z0], [x1, h, z0]], [0, 0, -1], side, .3);
+            if (ls < h) quad(bk, [[x0, ls, z1], [x1, ls, z1], [x1, h, z1], [x0, h, z1]], [0, 0, 1], side, .3);
+          }
+          continue;
+        }
         if (g === G.WATER && Math.max(a, b, c, e) <= 6) continue;
         const canopy = (cx, cz) => { const j = Math.min(WZ - 1, cz) * WX + Math.min(WX - 1, cx); return ground[j] === G.PARK ? 8 * Math.max(0, Math.min(1, (L.forestAt(cx, cz) - .3) / .25)) : 0; };
         const ta = canopy(x, z), tb = canopy(x + T, z), tc = canopy(x, z + T), te = canopy(x + T, z + T), trees = (ta + tb + tc + te) / 4;
@@ -126,11 +148,13 @@ export class FarCity {
         const edgeH = Math.max(0, terr[cz * WX + cx]), k = Math.min(1, d / 500);
         // Right at the edge it starts a little below the ground there, so the country past it never stands up over the map and shows a
         // gap under it; it rises to the height of the trees over the first stretch out.
-        const canopy = 8 * Math.min(1, d / 90), lift = canopy - 1.5 * (1 - Math.min(1, d / 90));
+        // (The woods on it are pictures now, FarTrees, so the ground stays the ground.)
+        const lift = -1.5 * (1 - Math.min(1, d / 90));
         return edgeH * (1 - k * k * (3 - 2 * k)) + (14 + 46 * vn(x / 700, z / 700) + 14 * vn(x / 180 + 3, z / 180)) * k * k * (3 - 2 * k) + lift;
       };
       const woodC = [srgb(M.LEAF, .75), srgb(M.LEAF2, .75), srgb(M.LEAF, .65)];
       const land = (x, z) => (x < 0 ? true : z < 0 ? x < topC : z >= WZ ? x < botC : false);
+      this.skirt = { height: skirtH, land, FAR, noise: vn };
       for (let z = -FAR; z < WZ + FAR; z += S) for (let x = -FAR; x < WX; x += S) {
         if (x >= 0 && z >= 0 && z < WZ) continue;
         if (!land(x + S / 2, z + S / 2)) continue;

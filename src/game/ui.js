@@ -981,6 +981,26 @@ export class UI {
         x.fillText(`${dist}m`, px, LY);
       }
     }
+    // Your companions: a green circle each, and how far, once they are more than a few steps off.
+    for (const f of g.npcs.followers) {
+      if (!f || f.dead) continue;
+      const dist = Math.round(Math.hypot(f.x - P.x, f.z - P.z));
+      if (dist < 6) continue;
+      let r = Math.atan2(f.x - P.x, -(f.z - P.z)) - yaw;
+      while (r > Math.PI) r -= Math.PI * 2;
+      while (r < -Math.PI) r += Math.PI * 2;
+      if (Math.abs(r) > fov) continue;
+      const px = W / 2 + r / fov * W / 2;
+      x.beginPath(); x.arc(px, 11, 6.5, 0, 6.2832);
+      x.fillStyle = '#8fd27a'; x.fill();
+      x.strokeStyle = 'rgba(8,14,8,.9)'; x.lineWidth = 2; x.stroke();
+      const label = `${f.name ? f.name.split(' ')[0] : 'Companion'}, ${dist}m`;
+      x.font = '600 21px Quantico, Bahnschrift, Segoe UI, sans-serif';
+      x.lineWidth = 4; x.strokeStyle = 'rgba(10,8,6,.8)';
+      x.strokeText(label, px, LY);
+      x.fillStyle = '#b6e6a4';
+      x.fillText(label, px, LY);
+    }
     x.fillStyle = '#e8b04a';
     x.fillRect(W / 2 - 1, H - 20, 2, 18);
   }
@@ -1566,7 +1586,7 @@ export class UI {
     const g = this.g, P = g.player;
     const list = [];
     if (n.doctor) list.push(this.treatment(n));
-    if (n.role) list.push({ label: n.doctor ? '[Barter] I need some medicine.' : '[Barter] Let me see what you have.', cls: n.doctor ? '' : 'primary', fn: () => this.openTrade(n) });
+    if (n.role) list.push({ label: n.doctor ? '[Trade] I need some medicine.' : '[Trade] Let me see what you have.', cls: 'primary', fn: () => this.openTrade(n) });
     if (n.role === 'mechanic') list.push(this.refuel(n));
     // Anyone working a contract for the camp gets a box from the traders, once a day.
     if (n.role && !n.doctor && n.camp >= 0 && g.jobs.perkFree(n.camp, 'box')) list.push({ label: 'Contract supplies (free today)', cls: 'quest', fn: () => {

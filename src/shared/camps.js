@@ -1,7 +1,7 @@
 // Survivor settlements: walled towns packed tight as slums, each with its own look and flag.
 // planCamp turns a definition into plain data; stampCamp turns that data into voxels chunk by chunk.
 // Everything placed reserves its footprint first, so no two pieces of a camp can overlap.
-import { STREET_Y, WX, G } from './constants.js';
+import { STREET_Y, WX, WZ, G } from './constants.js';
 import { M, CLOTH_OF, FLAGS, F_CLOTH } from './materials.js';
 import { h2, makeRng } from './rng.js';
 
@@ -165,6 +165,30 @@ export function planCamp(def, id, r, ground) {
   }
   c.maxY = Math.max(c.maxY, YB + def.H + 14);
   const nearGate = (side, t) => c.gates.some((g) => g.side === side && Math.abs(g.tc - t) < gateHalf + 7);
+  // People at work on the wall, by the log piles: spots for them to stand and hammer at it.
+  for (const side of ['N', 'S', 'W', 'E']) {
+    const horiz = side === 'N' || side === 'S', a0 = horiz ? r.x0 : r.z0, a1 = horiz ? r.x1 : r.z1;
+    for (let t = a0 + 10; t < a1 - 10; t++) {
+      if ((((t % 37) + 37) % 37) !== 2 || c.gates.some((g) => g.side === side && Math.abs(t - g.tc) < 12)) continue;
+      const inX = side === 'W' ? 1 : side === 'E' ? -1 : 0, inZ = side === 'N' ? 1 : side === 'S' ? -1 : 0;
+      const base = horiz ? (side === 'N' ? r.z0 : r.z1) : (side === 'W' ? r.x0 : r.x1);
+      for (const k of [-2, 2]) {
+        const x = horiz ? t + k + .5 : base + inX * 8.5, z = horiz ? base + inZ * 8.5 : t + k + .5;
+        c.pois.push({ x, z, kind: 'work', yaw: Math.atan2(-inX, -inZ) });
+      }
+    }
+  }
+  // The outer watch: a few posted just outside the wall, two to a side, looking out, wherever there is ground to stand on there (not in a
+  // gateway, the water or someone's house).
+  for (const side of ['N', 'S', 'W', 'E']) for (const f of [.3, .7]) {
+    const horiz = side === 'N' || side === 'S', t = Math.round(horiz ? r.x0 + (r.x1 - r.x0) * f : r.z0 + (r.z1 - r.z0) * f);
+    if (nearGate(side, t)) continue;
+    const x = horiz ? t : side === 'W' ? r.x0 - 8 : r.x1 + 8, z = horiz ? (side === 'N' ? r.z0 - 8 : r.z1 + 8) : t;
+    if (x < 2 || z < 2 || x >= WX - 2 || z >= WZ - 2) continue;
+    const gr = ground[z * WX + x];
+    if (gr === G.WATER || gr === G.LOT) continue;
+    c.sentries.push({ x: x + .5, z: z + .5, yaw: side === 'N' ? Math.PI : side === 'S' ? 0 : side === 'W' ? -Math.PI / 2 : Math.PI / 2, outer: true });
+  }
   const walkY = YB + hc;
   // A thin line on the wall itself: a few people walking each side of it. Most people here are down in the town.
   const POST = 3;   // one lookout per this many 13-voxel stretches
@@ -417,8 +441,10 @@ export function planCamp(def, id, r, ground) {
   // A fenced corner with a bench, tyres and drums, a cot under a tarp, and two bikes: one in pieces that the mechanic is always at, and
   // one going that is for sale. Laid out the same everywhere, turned so the fence runs along the outside wall and it opens onto the town.
   {
-    const YW = 14, YD = 10;
-    const corners = [[r.x0 + 11, r.z0 + 11, 0, 0], [r.x1 - 11 - YW, r.z0 + 11, 1, 0], [r.x0 + 11, r.z1 - 11 - YD, 0, 1], [r.x1 - 11 - YW, r.z1 - 11 - YD, 1, 1]];
+    const YW = 18, YD = 13;
+    // A corner of the town, but drawn a good way in towards the middle of it (not as far as the doctor's tent).
+    const inward = (cx, cz) => [Math.round(cx + (px - cx) * .3), Math.round(cz + (pz - cz) * .3)];
+    const corners = [[...inward(r.x0 + 11, r.z0 + 11), 0, 0], [...inward(r.x1 - 11 - YW, r.z0 + 11), 1, 0], [...inward(r.x0 + 11, r.z1 - 11 - YD), 0, 1], [...inward(r.x1 - 11 - YW, r.z1 - 11 - YD), 1, 1]];
     for (let i = corners.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [corners[i], corners[j]] = [corners[j], corners[i]]; }
     let at = null;
     for (const [tx, tz, fx, fz] of corners) {
@@ -457,6 +483,10 @@ export function planCamp(def, id, r, ground) {
       };
       // The way round: bed to the near bike, out along the open side past the stands, and in to the far one. Never through a stand.
       yard.chain = [yard.bed, yard.work[0], { x: wx(11.6), z: yard.work[0].z }, { x: wx(11.6), z: yard.work[1].z }, yard.work[1]];
+      // And the car pulled up at the far side: a place beside it to work on that as well, on from the bike for sale.
+      const carSpot = { x: wx(13.3), z: wz(6), yaw: ang(1, 0) };
+      yard.work.push(carSpot);
+      yard.chain.push(carSpot);
       c.mechYard = yard;
       // Where the curious stand and talk bikes with whoever is working: by the open side, looking in.
       const browse = [];
@@ -466,6 +496,8 @@ export function planCamp(def, id, r, ground) {
         c.pois.push(p);
       }
       c.vendors.push({ role: 'mechanic', x: yard.work[0].x, z: yard.work[0].z, yaw: yard.work[0].yaw, browse, yard });
+      // A car in for work as well, pulled up at the far side of the yard.
+      { const [ax, az] = cell(14, 2), [bx, bz] = cell(17, 10); add('wreck', Math.min(ax, bx), Math.min(az, bz), Math.max(ax, bx), Math.max(az, bz), 5, { kind: 1, dir: 0 }); }
       light(Math.floor(wx(7)), Math.floor(wz(5)), 10);
     }
   }
@@ -829,8 +861,15 @@ export function stampCamp(c, ctx) {
           if (y < YB) { P(t, y, row, M.CONCRETE_D); continue; }
           // The top band is set a block out (see below), so on the inside it gives way to the walkway: boards at its foot, open above.
           if (row === 1 && h >= H - 2) { if (h === H - 2) P(t, y, row, M.PLANK); continue; }
-          P(t, y, row, wallVoxel(wall, t, h, row, H));
+          // Patched where it gave way: a square of plank, rusted sheet or tin put in over the hole, here and there along both faces.
+          const ph = (((Math.floor(t / 2) * 73856093) ^ (Math.floor(h / 2) * 19349663) ^ (row * 83492791) ^ (fixed * 2654435761)) >>> 0) % 100;
+          P(t, y, row, h >= 1 && h < H - 2 && ph < 11 ? [M.PLANK, M.RUST, M.WOOD_D, M.ROOF_TIN, M.PLANK][ph % 5] : wallVoxel(wall, t, h, row, H));
         }
+      }
+      // Logs lying along the inside of the wall, where the repairs are being done: a pile every so often, away from the gates.
+      const pile = ((t % 37) + 37) % 37;
+      if (pile < 5 && t > a0 + 10 && t < a1 - 10 && !c.gates.some((g) => g.side === sideKey && Math.abs(t - g.tc) < 12)) {
+        P(t, YB, 6, M.LOG); if (pile >= 1 && pile <= 3) P(t, YB + 1, 6, M.LOG); if (pile === 2) P(t, YB, 7, M.LOG);
       }
       // The top of the wall stands out a block past the face below it, all the way along and over the gates: a coping two blocks wide,
       // set a block further out than the wall it sits on, which you can see from the road.
@@ -1554,7 +1593,6 @@ function stampPart(p, c, box, put, car, letterAt) {
       for (let u = mid - 7; u <= mid + 7; u++) if (Math.abs(u - mid) > 5) for (let y = YB; y <= YB + 2; y++) C(D - 2, y, u, M.SHELF);
       for (let v = D - 7; v <= D - 6; v++) for (let u = mid - 3; u <= mid + 3; u++) C(v, YB, u, M.WOOD);
       for (let u = mid - 5; u <= mid + 5; u++) for (let y = YB + 1; y <= YB + 5; y++) C(D - 2, y, u, (u + mid) % 2 && y % 2 ? M.TENT_W : M.PLANK);
-      C(D - 2, YB + 7, mid, M.LAMP);
       break;
     }
     case 'wreck': {

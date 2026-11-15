@@ -2270,7 +2270,10 @@ export class Horde {
       if (d2 > 150 * 150) continue;
       const along = dx * nx + dz * nz;
       if (along < -6) continue;
-      A.push(d2 < 28 * 28 ? 0 : 1, c[o], c[o + 1], c[o + 2], c[o + 3], c[o + 7], 10 + t, c[o + 5], c[o + 6]);
+      // Out in the rain, the dead get as wet as the living (lying under a roof, they stay dry).
+      let cw = wetBits;
+      if (cw && map) { const top = map.at(c[o], c[o + 2]); if (top >= 0 && top >= c[o + 1] + 1) cw = 0; }
+      A.push(d2 < 28 * 28 ? 0 : 1, c[o], c[o + 1], c[o + 2], c[o + 3], c[o + 7], 10 + t, c[o + 5], c[o + 6] + cw);
     }
     for (const f of this.flying) {
       const dx = f.x - cx, dz = f.z - cz;

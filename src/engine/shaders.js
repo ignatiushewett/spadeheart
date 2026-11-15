@@ -1,5 +1,6 @@
 // GLSL sources. LIGHTING is shared by every lit surface so the world, zombies and debris
 // all sit in the same atmosphere.
+import { M } from '../shared/materials.js';
 export const MAX_LIGHTS = 16;
 export const MAX_SPOTS = 4;
 
@@ -243,13 +244,20 @@ vec3 applyFog(vec3 col, vec3 wp){
 vec3 shade(vec3 albedo, vec3 wp, vec3 n, float sky, float ao, float dist){
   float ndl=max(dot(n,uSunDir),0.);
   float sh=ndl>0.?sampleShadow(wp,n,dist):0.;
-  vec3 amb=mix(uGroundCol,uSkyCol,n.y*.5+.5)*mix(.1,1.,sky);
-  // Fill so interiors are dark but still readable.
-  amb+=vec3(.008,.009,.011)*(1.-uCityLightK*.9);
+  vec3 amb=mix(uGroundCol,uSkyCol,n.y*.5+.5)*mix(.07,1.,sky);
+  // Fill so interiors are dark but still readable: a dim, warm one, the colour of a room that has a lamp in it somewhere.
+  amb+=vec3(.009,.007,.005)*(1.-uCityLightK*.9);
   vec3 c=albedo*(amb*ao+uSunCol*ndl*sh*mix(.25,1.,sky));
   c+=albedo*dynLights(wp,n);
-  // Daylight drowns a lamp outdoors. Under a roof it still does its job.
-  c+=albedo*cityGlow(wp)*(1.-uCityLightK)*(1.-sky)*1.6*(.55+.45*max(n.y,0.));
+  // Under a roof the lamps light the room their own way: warmer, pooled bright under each one and falling away to dark corners, rather
+  // than the even wash they cast over a street. (dynLights has already added the street's share, so that much is taken back off.)
+  float inside=1.-sky, up=.55+.45*max(n.y,0.);
+  vec3 g=cityGlow(wp);
+  if(inside>0.&&g.r+g.g>0.){
+    vec3 pool=g*g/(g+vec3(.16))*1.3*vec3(1.1,.86,.62);
+    // Daylight drowns a lamp outdoors. Under a roof it still does its job.
+    c+=albedo*inside*up*(pool*(uCityLightK+(1.-uCityLightK)*1.6)-g*uCityLightK)*mix(1.,ao,.5);
+  }
   return c;
 }
 `;
@@ -404,6 +412,20 @@ void main(){
   float low=smoothstep(26.,12.,vWorld.y);
   col*=mix(1.,.84,low);
   col=mix(col,col*vec3(.92,.95,.8),low*.4);
+  if((flags&1)!=0&&vId==${M.LAMP}){
+    // A lamp: a diffuser lit from inside, white-hot at the middle of each face and warming to amber at its edge, in a thin dark frame.
+    // No grime on it and no weather: it reads as the light, not as a yellow block.
+    vec3 e=pow(pal.rgb,vec3(2.2));
+    vec3 f3=fract(vWorld+.0001);
+    vec2 fu=abs(n.x)>.5?f3.zy:abs(n.z)>.5?f3.xy:f3.xz;
+    float r=max(abs(fu.x-.5),abs(fu.y-.5))*2.;
+    float core=1.-smoothstep(.05,.9,r);
+    vec3 lc=mix(e*vec3(1.,.62,.3),vec3(1.,.84,.6),core)*(1.+core*1.4);
+    lc*=mix(1.,.3,smoothstep(.84,.95,r));
+    outCol=vec4(lc*(1.6+uNightGlow*3.4),1.);
+    outCol.rgb=applyFog(outCol.rgb,vWorld);
+    return;
+  }
   if((flags&1)!=0){
     outCol=vec4(col*(1.5+uNightGlow*3.),1.);
     outCol.rgb=applyFog(outCol.rgb,vWorld);
@@ -718,7 +740,8 @@ void main(){
   vLeaf=iDim.z; vShade=iDim.w;
   gl_Position=uViewProj*vec4(wp,1.);
   // The real tree is built here now: this one stands aside.
-  if(textureLod(uLoadMask,iPos.xz/uWorldSize,0.).r>.5) gl_Position=vec4(2.,2.,2.,1.);
+  vec2 mu=iPos.xz/uWorldSize;
+  if(all(greaterThanEqual(mu,vec2(0.)))&&all(lessThan(mu,vec2(1.)))&&textureLod(uLoadMask,mu,0.).r>.5) gl_Position=vec4(2.,2.,2.,1.);
 }`;
 
 export const TREE_FS = COMMON + FRAME_UNIFORMS + LIGHTING + /* glsl */`
@@ -772,6 +795,7 @@ export const WATER_VS = GROUND_VS;
 export const WATER_FS = COMMON + FRAME_UNIFORMS + LIGHTING + /* glsl */`
 in vec3 vWorld;
 uniform sampler2D uCityMap;
+uniform sampler2D uLoadMask;
 uniform vec2 uWorldSize;
 layout(location=0) out vec4 outCol;
 float vn(vec2 p){ vec2 i=floor(p),f=fract(p); f=f*f*(3.-2.*f);
@@ -825,7 +849,9 @@ void main(){
   vec3 v=uCam-vWorld;
   float dist=length(v); v/=dist;
   // Depth precision is coarse far out: never let water fight the distant shoreline.
-  if(dist>300.&&texture(uCityMap,vWorld.xz/uWorldSize).a>.5&&all(greaterThan(vWorld.xz,vec2(0.)))&&all(lessThan(vWorld.xz,uWorldSize))) discard;
+  // Only where the far scenery stands in for the land, though: where the real blocks are built, their own shore keeps the water out, and
+  // the map's coarser coastline would cut holes in the sea beside it down to the bed.
+  if(dist>300.&&all(greaterThan(vWorld.xz,vec2(0.)))&&all(lessThan(vWorld.xz,uWorldSize))&&texture(uCityMap,vWorld.xz/uWorldSize).a>.5&&textureLod(uLoadMask,vWorld.xz/uWorldSize,0.).r<.5) discard;
   float e=.35+dist*.002;
   vec2 p=vWorld.xz;
   nearWater=1.-smoothstep(120.,420.,dist);
@@ -1952,12 +1978,17 @@ void main(){
   vA=far?smoothstep(36.,50.,dist)*smoothstep(118.,78.,dist)*mix(.75,1.,day)
          :smoothstep(mix(42.,50.,day),8.,dist)*mix(.3,1.,smoothstep(1.,6.,dist))*(1.+day*.35*smoothstep(14.,34.,dist));
   if(vA<.003){ gl_Position=vec4(2.,2.,2.,1.); vP=vec2(0.); vLit=vec3(0.); return; }
-  // Under a roof there is no rain. Out past the window there is.
+  // Under a roof there is no rain. Out past the window there is. Both ends of the streak are tested, the tail as well as the drop, so a
+  // drop just above a roof never trails down through the ceiling into the room under it, or slants over into the next column's.
   if(uRainMapO.z>0.){
-    vec2 m=(base.xz-uRainMapO.xy)/uRainMapO.z;
-    if(all(greaterThanEqual(m,vec2(0.)))&&all(lessThan(m,vec2(1.)))){
-      float top=textureLod(uRainMap,m,0.).r*255.;
-      if(top>0.&&base.y<top+1.){ gl_Position=vec4(2.,2.,2.,1.); vA=0.; vP=vec2(0.); vLit=vec3(0.); return; }
+    vec3 tail=base+dirV*streak;
+    for(int k=0;k<2;k++){
+      vec3 pt=k==0?base:tail;
+      vec2 m=(pt.xz-uRainMapO.xy)/uRainMapO.z;
+      if(all(greaterThanEqual(m,vec2(0.)))&&all(lessThan(m,vec2(1.)))){
+        float top=textureLod(uRainMap,m,0.).r*255.;
+        if(top>0.&&pt.y<top+1.){ gl_Position=vec4(2.,2.,2.,1.); vA=0.; vP=vec2(0.); vLit=vec3(0.); return; }
+      }
     }
   }
   vLit=lightAtDrop(base);
@@ -1976,9 +2007,11 @@ void main(){
   float a=smoothstep(1.,.1,abs(vP.x))*sin(vP.y*3.14159)*vA*uRainAlpha*.45;
   if(a<.002) discard;
   float litK=clamp(dot(vLit,vec3(.3,.5,.2))*3.,0.,1.);
-  vec3 c=(uFogCol*1.5+uSkyCol*.25+uSunCol*.05+vec3(.006,.007,.009))*(1.-.3*litK)+vLit*.62+vec3(.74,.82,1.)*uRainFloor;
-  // At night, where nothing lights it, a streak is a shade darker. Anything lit, and all of the day, is left as it was.
-  c*=1.-.2*clamp(uRainFloor/.09,0.,1.)*(1.-litK);
+  float dark=1.-litK;
+  vec3 c=(uFogCol*1.5+uSkyCol*.25+uSunCol*.05+vec3(.006,.007,.009))*(1.-.3*litK)+vLit*.62+vec3(.74,.82,1.)*uRainFloor*mix(.45,1.,litK);
+  // At night, where nothing lights it, a streak is a good deal darker: barely there in the pitch black. Anything a lamp or a torch
+  // reaches, and all of the day, is left as it was.
+  c*=1.-.45*clamp(uRainFloor/.09,0.,1.)*dark*dark;
   // Lit, a streak is mostly light of its own. Unlit, it is a dark thread across whatever is behind it, there but quiet.
   float lum=dot(c,vec3(.3,.5,.2));
   float day=1.-clamp(uRainFloor/.09,0.,1.);

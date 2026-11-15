@@ -50,7 +50,7 @@ const DB_NAME = 'acez';
 // Where the title flight ends: out over the bay to the east-south-east of her, looking back west-north-west past her and the Landing to
 // Weston, the plateau and Albion on the skyline, with the edge of the map only far off in the haze.
 const MENU_SHOT = { angle: -.18, dist: 185, height: 88, turn: -.32, pitch: -.14, fov: 1.05, flight: 125, startHeight: 30, startOff: 44, startPitch: -.1 };
-export const VERSION = 'v0.94';
+export const VERSION = 'v0.95';
 const SAVE_KEY = 'slot15';  // bumped whenever the map changes: old voxel edits no longer line up
 export const SLOTS = 3;
 // Slot 1 keeps the plain key, so a save from before there were slots simply becomes the first character.
@@ -145,8 +145,8 @@ class Game {
   }
 
   defaultSettings() {
-    return { ...LOOKS.cinematic, quality: 'high', view: 320, scale: 1, cap: 24000, sens: 1, volume: .8, motion: false, dof: true, fpsCap: 0, muteSiren: false, clock24: false, drips: true, grassWave: false, sway: 1, minimap: true, chatterNoHud: true, hitmarker: false, crosshair: false,
-      brightness: 1, bob: 1, music: 1, adsSens: 1, invertY: false, toggleAim: false, toggleCrouch: false, showFps: false, defaultsV: 6 };
+    return { ...LOOKS.cinematic, quality: 'ultra', view: 416, scale: 1, cap: 24000, sens: 1, volume: .8, motion: false, dof: true, fpsCap: 0, muteSiren: false, clock24: false, drips: true, grassWave: false, sway: 1, minimap: true, chatterNoHud: true, hitmarker: false, crosshair: false,
+      brightness: 1, bob: 1, music: 1, adsSens: 1, invertY: false, toggleAim: false, toggleCrouch: false, showFps: false, defaultsV: 7 };
   }
 
   loadSettings() {
@@ -172,6 +172,8 @@ class Game {
         if ((mine.defaultsV ?? 0) < 5) { s.crosshair = false; s.defaultsV = 5; }
         // The Cinematic style is the default now, once, for everyone; pick Casual (or anything else) and it stays.
         if ((mine.defaultsV ?? 0) < 6) { Object.assign(s, LOOKS.cinematic); s.defaultsV = 6; }
+        // Ultra is the default now: anyone still on the old default (High) moves up once; anyone who chose something else keeps it.
+        if ((mine.defaultsV ?? 0) < 7) { if (s.quality === 'high' && s.view === 320) { s.quality = 'ultra'; s.view = 416; } s.defaultsV = 7; }
         return s;
       }
       // Older settings carry over, except motion blur, which now starts off for everyone.
@@ -237,7 +239,7 @@ class Game {
     this.renderer.setCityMap(map.rgba, map.w, map.h);
     const t2 = performance.now();
     this.far = new FarCity(gl, this.layout);
-    this.far.trees = new FarTrees(gl, this.layout);
+    this.far.trees = new FarTrees(gl, this.layout, this.far.skirt);
     const t3 = performance.now();
     this.makeMapCanvas();
     console.log(`city map ${(t2 - t1) | 0} ms, far ${(t3 - t2) | 0} ms, maps ${(performance.now() - t3) | 0} ms`);
@@ -1614,6 +1616,13 @@ class Game {
       if (top === y) continue;   // cut at the very top: nothing above it to fall
       const stack = [];
       let crown = 0;
+      // The other trees standing round it: a leaf nearer one of their trunks than this one is theirs, even where the crowns touch.
+      const others = [];
+      for (let dz = -9; dz <= 9; dz++) for (let dx = -9; dx <= 9; dx++) {
+        if (!dx && !dz) continue;
+        for (let yy = y - 3; yy <= top + 3; yy++) if (W.get(x + dx, yy, z + dz) === M.TRUNK) { others.push(x + dx, z + dz); break; }
+      }
+      const theirs = (a, c) => { const d0 = (a - x) ** 2 + (c - z) ** 2; for (let k = 0; k < others.length; k += 2) if ((a - others[k]) ** 2 + (c - others[k + 1]) ** 2 < d0) return true; return false; };
       for (let yy = y + 1; yy <= top; yy++) { seen.add(key(x, yy, z)); list.push(x, yy, z, M.TRUNK); stack.push(x, yy, z); }
       while (stack.length && list.length < 4 * 900) {
         const c = stack.pop(), b = stack.pop(), a = stack.pop();
@@ -1625,7 +1634,7 @@ class Game {
           seen.add(k);
           const id = W.get(nx, ny, nz);
           // Its own crown is all one kind of leaf: a neighbour's of another kind, touching it, stays on that tree.
-          if (!TREE.has(id) || (crown && id !== crown)) continue;
+          if (!TREE.has(id) || (crown && id !== crown) || theirs(nx, nz)) continue;
           crown = crown || id;
           list.push(nx, ny, nz, id);
           stack.push(nx, ny, nz);

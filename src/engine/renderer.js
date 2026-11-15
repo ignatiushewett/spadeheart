@@ -339,7 +339,7 @@ export class Renderer {
   paintCityLights(lights) {
     const d = this.lightData, W = this.lightW, H = this.lightH;
     d.fill(0);
-    const COL = [[1, .8, .56], [1, .62, .32], [.8, .85, 1], [.85, .4, .5]];
+    const COL = [[1, .74, .47], [1, .62, .32], [.8, .85, 1], [.85, .4, .5]];
     for (const l of lights) {
       const col = COL[l.k || 0];
       const R = l.r / 4, cx = l.x / 4, cz = l.z / 4;
@@ -768,8 +768,11 @@ export class Renderer {
       this.frameUniforms(pw);
       gl.activeTexture(gl.TEXTURE3);
       gl.bindTexture(gl.TEXTURE_2D, this.texCity);
+      gl.activeTexture(gl.TEXTURE2);
+      gl.bindTexture(gl.TEXTURE_2D, this.texMask);
       gl.activeTexture(gl.TEXTURE0);
       if (pw.u.uCityMap) gl.uniform1i(pw.u.uCityMap, 3);
+      if (pw.u.uLoadMask) gl.uniform1i(pw.u.uLoadMask, 2);
       if (pw.u.uWorldSize) gl.uniform2f(pw.u.uWorldSize, WX, WZ);
       // A hair under the level, so a block top at the waterline never fights the surface for the same place.
       gl.uniform1f(pw.u.uY, WATER_Y - .12);

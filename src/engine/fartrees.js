@@ -46,7 +46,7 @@ function drawSheet() {
 }
 
 export class FarTrees {
-  constructor(gl, L) {
+  constructor(gl, L, skirt) {
     this.gl = gl;
     const { props, terr, ground } = L;
     const inst = [];
@@ -70,6 +70,35 @@ export class FarTrees {
         ht = trunkH + 2 * r; w = 2 * r + 1; pic = seed % 2; leaf = seed % 7 === 0 ? 2 : seed % 2 ? 0 : 1;
       }
       inst.push(x + .5, base, z + .5, pic, w * 1.06, ht, leaf, (seed % 13) / 13);
+    }
+    // And past the edge of the map, the woods carry on over the country there: thick close to the edge, where you can see each tree,
+    // thinning and growing coarser further out, in clumps and clearings so it is not a lawn of them.
+    if (skirt) {
+      const h = (a, b) => { const v = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return v - Math.floor(v); };
+      const out = (x, z) => Math.hypot(x - Math.max(0, Math.min(WX - 1, x)), z - Math.max(0, Math.min(WZ - 1, z)));
+      const bands = [[0, 300, 8], [300, 1000, 13], [1000, 2200, 22]];
+      for (const [d0, d1, step] of bands) {
+        for (let z = -d1; z < WZ + d1; z += step) for (let x = -d1; x < WX; x += step) {
+          if (x >= -d0 && z >= -d0 && z < WZ + d0 && x >= 0) continue;
+          const jx = x + (h(x, z) - .5) * step * .9, jz = z + (h(z, x + 7) - .5) * step * .9;
+          const d = out(jx, jz);
+          if (d < Math.max(d0, 3) || d >= d1 || !skirt.land(jx, jz)) continue;
+          const clump = skirt.noise(jx / 160 + 9, jz / 160 - 4) + skirt.noise(jx / 47, jz / 47) * .35;
+          if (clump < .42 + h(jx, jz) * .2) continue;
+          const seed = Math.floor(h(jx * 3, jz * 5) * 1e4), size = 1 + seed % 3, base = STREET_Y - 1 + skirt.height(Math.round(jx), Math.round(jz));
+          let w, ht, pic, leaf;
+          if (seed % 5 < 2) {
+            const tall = 9 + size * 2 + seed % 4;
+            ht = tall + 2; w = 2 * Math.round((tall - 3) * .42) + 1; pic = 2 + (seed & 1); leaf = 0;
+          } else {
+            const trunkH = 3 + size + seed % 3, r = 2 + size;
+            ht = trunkH + 2 * r; w = 2 * r + 1; pic = seed % 2; leaf = seed % 7 === 0 ? 2 : seed % 2 ? 0 : 1;
+          }
+          // Further out a picture stands for a few trees, so it is drawn a little bigger.
+          const k = 1 + (step - 8) / 20;
+          inst.push(jx, base - .5, jz, pic, w * 1.06 * k, ht * k, leaf, (seed % 13) / 13);
+        }
+      }
     }
     this.count = inst.length / 8;
     const data = new Float32Array(inst);

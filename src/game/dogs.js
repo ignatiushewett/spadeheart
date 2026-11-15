@@ -200,11 +200,15 @@ export class Dogs {
   }
 
   draw(A) {
-    const cam = this.g.renderer.camPos;
+    const cam = this.g.renderer.camPos, w = this.g.weather, map = this.g.rainMap;
+    // Wet in the rain like everyone else, out under the sky.
+    const wetBits = w ? Math.min(7, Math.round(Math.min(1, Math.max(w.rain || 0, (w.wet || 0) * .5)) * 8)) * 4096 : 0;
     for (const d of this.list) {
       const dx = d.x - cam[0], dz = d.z - cam[2];
       if (dx * dx + dz * dz > 110 * 110) continue;
-      A.pushDog(d.x, d.y, d.z, d.ys, d.phase, d.state, d.variant, 0);
+      let wet = wetBits;
+      if (wet && map) { const top = map.at(d.x, d.z); if (top >= 0 && top >= d.y + 1.2) wet = 0; }
+      A.pushDog(d.x, d.y, d.z, d.ys, d.phase, d.state, d.variant, wet);
     }
   }
 }

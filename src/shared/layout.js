@@ -1110,7 +1110,8 @@ export function buildLayout(seed = 1609) {
         let ok = true;
         for (let z = cz - 12; z <= cz + 12 && ok; z += 2) for (let x = cx - 12; x <= cx + 12 && ok; x += 2) { const i = z * WX + x; if (land[i] !== 1 || mask[i] === 3) ok = false; }
         side = -side;
-        if (!ok) continue;
+        // None at the far end, down by the bay mouth, where one stood alone over the marina.
+        if (!ok || cz > 3400) continue;
         run = 0;
         fillGround({ x0: cx - 12, x1: cx + 12, z0: cz - 12, z1: cz + 12 }, G.PLAZA, (g) => g !== G.ROAD && g !== G.WALK);
         landmark('', { x0: cx - 9, x1: cx + 9, z0: cz - 9, z1: cz + 9 }, tr.pick(towerSt), [0, tr.int(10, 28)]);

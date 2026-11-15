@@ -6,6 +6,11 @@ import { ITEMS, RUMORS, randomName, buildStock, pickFocus, CITIZENSHIP, papersFo
 import { NPC_WEAPON, WARDROBE } from '../engine/actors.js';
 import { isGlass as isGlassId } from '../shared/materials.js';
 import { LORE, COMMON_BARKS, ACTIVITY_BARKS, CONVERSATIONS, CAMP_TALK } from './camplore.js';
+import { MORE_TALK, MORE_BARKS } from './chatter.js';
+for (const k in MORE_TALK) if (CONVERSATIONS[k]) CONVERSATIONS[k].push(...MORE_TALK[k]);
+for (const k in MORE_BARKS) if (COMMON_BARKS[k]) COMMON_BARKS[k].push(...MORE_BARKS[k]);
+// Lines that belong to one camp or one person: heard twice, they give the game away, so they come round rarely.
+const SPECIFIC = new Set([...Object.values(CAMP_TALK).flat(), ...Object.values(LORE).flatMap((l) => (l.barks ? Object.values(l.barks).flat() : []))]);
 import { makePersona } from './dialogue.js';
 
 const rand = Math.random;
@@ -327,7 +332,7 @@ export class NPCs {
     }
     // The gate watch. Every gate has someone on it, day and night.
     for (const s of c.sentries) {
-      add(new NPC('sentry', s.x, STREET_Y, s.z, { weapon: pickOf(c.guardWeapons), variant: row(['light']), hp: 400, yaw: s.yaw, title: 'Gate watch' }));
+      add(new NPC('sentry', s.x, s.outer ? this.g.world.terrainTop(Math.floor(s.x), Math.floor(s.z)) : STREET_Y, s.z, { weapon: pickOf(c.guardWeapons), variant: row(s.outer ? ['medium'] : ['light']), hp: 400, yaw: s.yaw, title: s.outer ? 'Outer watch' : 'Gate watch' }));
     }
     // The wall. Only those still alive stand their posts.
     st.guards = [];
@@ -846,7 +851,7 @@ export class NPCs {
       // Someone walking right up to you gets your attention, unless you are in the middle of something.
       // Not while you are talking to someone else: they get on with what they were doing.
       const talking = this.g.ui.modal === 'dialog' && this.g.ui.dlgNpc !== n;
-      if (dp < 3 && !talking && !n.alarmed && !(n.busyT > 0) && !n.threat && !n.inConvo && t.kind !== 'sleep' && t.kind !== 'sit' && t.kind !== 'class' && t.kind !== 'work' && t.kind !== 'farm') n.yaw = Math.atan2(P.x - n.x, P.z - n.z);
+      if (dp < 3 && !talking && !n.alarmed && !(n.busyT > 0) && !n.threat && !n.inConvo && t.kind !== 'sleep' && t.kind !== 'sit' && t.kind !== 'class' && t.kind !== 'work' && t.kind !== 'farm' && t.kind !== 'browse' && t.kind !== 'shop' && t.kind !== 'market' && t.kind !== 'talk' && t.kind !== 'mourn' && t.kind !== 'play') n.yaw = Math.atan2(P.x - n.x, P.z - n.z);
       // A dog has come over: they stop and give it a scratch.
       if (n.petT > 0 && n.petDog && panic < .3) {
         n.petT -= dt;
@@ -1028,14 +1033,26 @@ export class NPCs {
       const speed = Math.min(6.8, 2.4 + d, Math.max(1.4, d * 3));
       const ux = dx / d, uz = dz / d;
       const nx = n.x + ux * speed * dt, nz = n.z + uz * speed * dt;
-      const fy = Math.floor(n.y + .05);
-      if (!w.solid(Math.floor(nx), fy + 1, Math.floor(nz)) || d > 14) { n.x = nx; n.z = nz; }
+      // Only onto ground they could step up onto (a kerb, a stair) with room to stand there: never up the face of a wall or a cliff.
+      const gyN = w.groundBelow(nx, n.y + 1.2, nz, 8), sy = Math.floor(gyN + .05), cx = Math.floor(nx), cz = Math.floor(nz);
+      if (gyN - n.y <= 1.1 && !w.solid(cx, sy, cz) && !w.solid(cx, sy + 1, cz) && !w.solid(cx, sy + 2, cz)) { n.x = nx; n.z = nz; n.stuckT = 0; }
+      else n.stuckT = (n.stuckT || 0) + dt;
       if (n.aim <= 0) n.yaw = Math.atan2(ux, uz);
       n.phase += speed * dt * 2.1;
       n.state = n.aim > 0 ? 3 : .7;
-    } else n.state = n.aim > 0 ? 3 : 0;
+    } else { n.state = n.aim > 0 ? 3 : 0; n.stuckT = 0; }
+    // Stuck behind something and falling behind (you went up where they cannot follow): they catch up the way people do when nobody is
+    // looking, a few steps behind you, never while you can see them do it.
+    if ((n.stuckT || 0) > 2.5 && d > 6) {
+      const fx = Math.sin(P.yaw), fz = -Math.cos(P.yaw), ahead = (n.x - P.x) * fx + (n.z - P.z) * fz;
+      if (ahead < 0 || !w.los(P.x, P.y + 2.4, P.z, n.x, n.y + 2, n.z)) {
+        const bx = P.x - fx * 3, bz = P.z - fz * 3;
+        if (!w.solid(Math.floor(bx), Math.floor(P.y + .05) + 1, Math.floor(bz))) { n.x = bx; n.z = bz; n.y = P.y; n.stuckT = 0; }
+      }
+    }
     const gy = w.groundBelow(n.x, n.y + 1.2, n.z, 8);
-    n.y += Math.sign(gy - n.y) * Math.min(Math.abs(gy - n.y), dt * 14);
+    // Down any distance; up only by a step at a time.
+    if (gy > n.y) { if (gy - n.y <= 1.1) n.y += Math.min(gy - n.y, dt * 14); } else n.y -= Math.min(n.y - gy, dt * 14);
   }
 
   recruit(n) {
@@ -2456,8 +2473,8 @@ export class NPCs {
     }
     // Start another whenever there is room, with whoever happens to be standing together.
     this.chatT -= dt;
-    if (this.chatT > 0 || this.convos.length >= 4 || g.ui.modal) return;
-    this.chatT = 1 + rand() * 1.2;
+    if (this.chatT > 0 || this.convos.length >= 6 || g.ui.modal) return;
+    this.chatT = .5 + rand() * .8;
     for (let t = 0; t < 14; t++) {
       const n = this.list[Math.floor(rand() * this.list.length)];
       if (!n || n.dead || n.inConvo || n.kid || n.state === 7) continue;
@@ -2467,7 +2484,7 @@ export class NPCs {
       for (const m of this.list) {
         if (m === n || m.dead || m.inConvo || m.kid || m.state === 7 || (m.kind === 'guard') !== (n.kind === 'guard') || (!urgent && m.kind === 'resident' && !m.arrived)) continue;
         if (m.kind === 'raider' !== (n.kind === 'raider') || Math.abs(m.y - n.y) > 2) continue;
-        if ((m.x - n.x) ** 2 + (m.z - n.z) ** 2 < 42) { group.push(m); if (group.length >= 4) break; }
+        if ((m.x - n.x) ** 2 + (m.z - n.z) ** 2 < 72) { group.push(m); if (group.length >= 4) break; }
       }
       if (group.length < 2) continue;
       const job = n.task && n.task.kind;
@@ -2480,7 +2497,7 @@ export class NPCs {
         if (n.camp >= 0 && g.director.strength(g.layout.camps[n.camp]) < .62 && rand() < .4) pool = DECLINE_TALK;
         else if (g.weather.rain > .25 && rand() < .3) pool = CONVERSATIONS.rain;
         else if ((g.tod > .8 || g.tod < .22) && rand() < .35) pool = CONVERSATIONS.night;
-        else if (n.campKey && rand() < .35) pool = CAMP_TALK[n.campKey] || pool;
+        else if (n.campKey && rand() < .2) pool = CAMP_TALK[n.campKey] || pool;
       }
       const lines = this.freshLine(pool);
       if (kind === 'market' || kind === 'nightmarket') {
@@ -2495,12 +2512,17 @@ export class NPCs {
   }
 
   // Something nobody in earshot has just said.
+  // Each line rests a while once said: an ordinary one for six minutes, one that belongs to a particular camp or person for twenty-five.
+  // Picked from whatever is rested; if nothing is, the one said longest ago.
   freshLine(pool) {
-    const said = this.said || (this.said = []);
-    let line = pickOf(pool);
-    for (let t = 0; t < 6 && said.includes(line); t++) line = pickOf(pool);
-    said.push(line);
-    if (said.length > 40) said.shift();
+    const said = this.said instanceof Map ? this.said : (this.said = new Map()), now = performance.now() / 1000;
+    const rest = (l) => (SPECIFIC.has(l) ? 1500 : 360);
+    const ok = pool.filter((l) => !said.has(l) || now - said.get(l) > rest(l));
+    let line;
+    if (ok.length) line = pickOf(ok);
+    else { let best = Infinity; for (const l of pool) { const t = said.get(l) ?? -Infinity; if (t < best) { best = t; line = l; } } }
+    said.set(line, now);
+    if (said.size > 600) for (const [k, t] of said) if (now - t > 1500) said.delete(k);
     return line;
   }
 
@@ -3453,7 +3475,7 @@ export class NPCs {
     if (n.barkT <= 0 && dp < 24 && this.barkGlobal <= 0 && !talking && !g.ui.modal && n.state !== 7) {
       // The watch has more to say while there is a fight on.
       const fighting = this.defenderCamp(n) >= 0 && this.g.campSim.state[this.defenderCamp(n)].op;
-      n.barkT = fighting ? 7 + rand() * 12 : 12 + rand() * 20;
+      n.barkT = fighting ? 7 + rand() * 12 : 16 + rand() * 26;
       if (!n.inConvo) { if (n.kind === 'wanderer') this.bark(n, pickOf(WANDERER_BARKS), 30); else this.ambientBark(n); }
     }
 
@@ -3542,7 +3564,7 @@ export class NPCs {
       n.roundAt = n.roundAt === 'desk' || n.roundAt === undefined ? Math.floor(rand() * C.stops.length) : rand() < .4 ? 'desk' : Math.floor(rand() * C.stops.length);
     }
     const goal = n.roundAt === 'desk' || n.roundAt === undefined ? C.desk : C.stops[n.roundAt];
-    if (n.inConvo || (dp < 3.2 && P.alive)) { n.yaw = Math.atan2(P.x - n.x, P.z - n.z); n.state = 0; n.y = STREET_Y; return; }
+    if (n.inConvo || (dp < 2.2 && P.alive)) { n.yaw = Math.atan2(P.x - n.x, P.z - n.z); n.state = 0; n.y = STREET_Y; return; }
     // Along the aisle between the cots and the bench: out to it, along, and in.
     const aisle = C.stops[0].z, dx = goal.x - n.x, dz = goal.z - n.z, d = Math.hypot(dx, dz);
     if (d > .3) {
@@ -3568,8 +3590,10 @@ export class NPCs {
     let goal;
     if (night) goal = Y.bed;
     else {
-      if ((n.mechT = (n.mechT ?? 0) - dt) <= 0) { n.mechT = 22 + rand() * 30; n.mechAt = sale && !n.mechAt ? 1 : 0; }
-      if (!sale) n.mechAt = 0;
+      // From one job to the next every so often: the bike in pieces, the car, and the bike for sale while it is still there to sell.
+      const jobs = [0, ...(Y.work[2] ? [2] : []), ...(sale ? [1] : [])];
+      if ((n.mechT = (n.mechT ?? 0) - dt) <= 0) { n.mechT = 22 + rand() * 30; const k = jobs.indexOf(n.mechAt ?? 0); n.mechAt = jobs[(k + 1) % jobs.length]; }
+      if (!jobs.includes(n.mechAt)) n.mechAt = 0;
       goal = Y.work[n.mechAt || 0];
     }
     // The way there, round the stands rather than through them.
@@ -3586,7 +3610,7 @@ export class NPCs {
     if (d <= .3 && n.route.length > 1) { n.route.shift(); return; }
     // Someone at the yard to see them: a look round, and whatever they are doing waits.
     const asleep = night && d < .3 && to === goal;
-    if (!asleep && (n.inConvo || (dp < 3.2 && P.alive))) {
+    if (!asleep && (n.inConvo || (dp < 2.2 && P.alive))) {
       n.yaw = Math.atan2(P.x - n.x, P.z - n.z);
       n.state = 0; n.y = STREET_Y;
       return;
@@ -3931,7 +3955,7 @@ export class NPCs {
     g.horde.addBody(n.x, n.y, n.z, n.yaw, n.variant, !!n.headless, 0, n.kid);
     if (n.task && n.task.poi && n.task.poi.by === n) n.task.poi.by = null;
     const fi = this.followers.indexOf(n);
-    if (fi >= 0) { this.followers.splice(fi, 1); g.ui.toast(`${n.name} is dead.`, 'bad'); }
+    if (fi >= 0) { this.followers.splice(fi, 1); g.ui.toast(`Your companion ${n.name} is dead.`, 'bad', 7); }
     // The bitten get back up. In a camp under attack, this is how it comes apart.
     if (n.kind !== 'vendor' && !byPlayer && !n.kid && rand() < .65) {
       const i = g.horde.spawnOne(n.x, Math.max(n.y, STREET_Y), n.z, 1);
@@ -4328,8 +4352,8 @@ export class NPCs {
     let pool;
     if (n.kid) pool = ACTIVITY_BARKS.kid;
     else if (act && rand() < .6) pool = act;
-    else if (n.kind === 'guard') pool = lore ? lore.barks.guard.concat(COMMON_BARKS.guard) : COMMON_BARKS.guard;
-    else pool = lore ? lore.barks.folk.concat(COMMON_BARKS.folk) : COMMON_BARKS.folk;
+    else if (n.kind === 'guard') pool = lore && rand() < .25 ? lore.barks.guard : COMMON_BARKS.guard;
+    else pool = lore && rand() < .25 ? lore.barks.folk : COMMON_BARKS.folk;
     this.bark(n, this.freshLine(pool), 30);
   }
 
