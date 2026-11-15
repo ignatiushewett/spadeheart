@@ -734,11 +734,12 @@ void main(){
   vec4 t=texture(uTreeTex,vUV);
   if(t.a<.5) discard;
   vec3 leaf=vLeaf<.5?uLeaf[0]:vLeaf<1.5?uLeaf[1]:uLeaf[2];
-  vec3 albedo=(t.g>.5?uBark:leaf*(.88+vShade*.24))*(.35+t.r*1.25);
+  vec3 albedo=(t.g>.5?uBark:leaf*(.88+vShade*.24))*(.22+t.r*.82);
   float dist=length(vWorld-uCam);
-  // Lit as a crown is: mostly from above, a little towards you.
-  vec3 n=normalize(vec3(0.,.75,0.)+normalize(vec3(uCam.x-vWorld.x,0.,uCam.z-vWorld.z))*.65);
-  vec3 c=shade(albedo,vWorld,n,1.,.85,dist);
+  // Lit as the side of a crown is, not the top of one, and in its own shade: a stand of trees is darker than the sky over it, and as
+  // dark as the voxel trees it carries on from.
+  vec3 n=normalize(vec3(0.,.35,0.)+normalize(vec3(uCam.x-vWorld.x,0.,uCam.z-vWorld.z))*.9);
+  vec3 c=shade(albedo,vWorld,n,1.,.62,dist);
   outCol=vec4(applyFog(c,vWorld),1.);
 }`;
 
