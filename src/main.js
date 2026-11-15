@@ -49,7 +49,7 @@ const OLD_SETTINGS_KEY = 'acez.settings.v1';
 const DB_NAME = 'acez';
 // Where the title flight ends: out over the bay to the east-south-east of her, looking back west-north-west past her and the Landing to
 // Weston, the plateau and Albion on the skyline, with the edge of the map only far off in the haze.
-const MENU_SHOT = { angle: -.18, dist: 185, height: 88, turn: .1, pitch: -.14, fov: 1.05, flight: 125, startHeight: 30, startOff: 44, startPitch: -.1 };
+const MENU_SHOT = { angle: -.18, dist: 185, height: 88, turn: -.32, pitch: -.14, fov: 1.05, flight: 125, startHeight: 30, startOff: 44, startPitch: -.1 };
 export const VERSION = 'v0.94';
 const SAVE_KEY = 'slot15';  // bumped whenever the map changes: old voxel edits no longer line up
 export const SLOTS = 3;
@@ -1985,7 +1985,8 @@ class Game {
       let yawTo = Math.atan2(M0.lx - to.x, to.z - M0.lz) - MENU_SHOT.turn;
       while (yawTo >= yawFrom) yawTo -= Math.PI * 2;
       this.menuPath = { from, to, yawFrom, yawTo, bend: { x: mx + nx / nd * 40, z: mz + nz / nd * 40 } };
-      this.menuFlight = 0;
+      // No flight: the title holds the one shot, still, from the start.
+      this.menuFlight = 1;
     }
     this.horde.bankAll();
     // The crowd is around the Battery and a long way off. It does not have to be big, only there.

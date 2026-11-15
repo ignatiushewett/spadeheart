@@ -771,7 +771,8 @@ export class Renderer {
       gl.activeTexture(gl.TEXTURE0);
       if (pw.u.uCityMap) gl.uniform1i(pw.u.uCityMap, 3);
       if (pw.u.uWorldSize) gl.uniform2f(pw.u.uWorldSize, WX, WZ);
-      gl.uniform1f(pw.u.uY, WATER_Y);
+      // A hair under the level, so a block top at the waterline never fights the surface for the same place.
+      gl.uniform1f(pw.u.uY, WATER_Y - .12);
       gl.uniform1i(pw.u.uWaterBeamN, this.waterBeamN);
       if (this.waterBeamN) {
         gl.uniform4fv(pw.u.uWaterBeamA, this.waterBeamA);
