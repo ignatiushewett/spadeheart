@@ -64,6 +64,7 @@ export class Renderer {
     this.pShadow = P(SH.SHADOW_VS, SH.SHADOW_FS, 'shadow');
     this.pFarShadow = P(SH.FAR_SHADOW_VS, SH.SHADOW_FS, 'farShadow');
     this.pFar = P(SH.FAR_VS, SH.FAR_FS, 'far');
+    this.pTree = P(SH.TREE_VS, SH.TREE_FS, 'tree');
     this.pGround = P(SH.GROUND_VS, SH.GROUND_FS, 'ground');
     this.pWater = P(SH.WATER_VS, SH.WATER_FS, 'water');
     this.pSky = P(SH.FS_VS, SH.SKY_FS, 'sky');
@@ -721,6 +722,14 @@ export class Renderer {
       gl.uniform1i(pf.u.uLoadMask, 2);
       gl.uniform2f(pf.u.uWorldSize, WX, WZ);
       far.draw(gl, this.planes);
+      // The trees out there, as pictures, wherever the real ones are not built yet.
+      if (far.trees) {
+        const pt = this.pTree.use();
+        this.frameUniforms(pt);
+        gl.uniform1i(pt.u.uLoadMask, 2);
+        gl.uniform2f(pt.u.uWorldSize, WX, WZ);
+        far.trees.draw(gl, pt);
+      }
       const pg = this.pGround.use();
       this.frameUniforms(pg);
       gl.uniform1i(pg.u.uLoadMask, 2);

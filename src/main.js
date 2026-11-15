@@ -1,4 +1,5 @@
 // Game shell: boot, state machine, main loop, saving and the glue between systems.
+import { FarTrees } from './engine/fartrees.js';
 import { Renderer, QUALITY } from './engine/renderer.js';
 import { World } from './engine/world.js';
 import { FarCity, buildCityMap } from './engine/farcity.js';
@@ -236,6 +237,7 @@ class Game {
     this.renderer.setCityMap(map.rgba, map.w, map.h);
     const t2 = performance.now();
     this.far = new FarCity(gl, this.layout);
+    this.far.trees = new FarTrees(gl, this.layout);
     const t3 = performance.now();
     this.makeMapCanvas();
     console.log(`city map ${(t2 - t1) | 0} ms, far ${(t3 - t2) | 0} ms, maps ${(performance.now() - t3) | 0} ms`);

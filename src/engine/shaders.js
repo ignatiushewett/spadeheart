@@ -695,6 +695,53 @@ void main(){
 }`;
 
 // --- Ground proxy for unloaded city ---------------------------------------------------
+// --- Far trees: a picture of each tree, turned to face you, standing where the real one stands ------------------------------
+export const TREE_VS = COMMON + FRAME_UNIFORMS + /* glsl */`
+layout(location=0) in vec2 aCorner;   // across (-.5 to .5) and up (0 to 1)
+layout(location=1) in vec4 iPos;      // foot of the tree, and which picture
+layout(location=2) in vec4 iDim;      // width, height, which leaf colour, a little of its own shade
+uniform sampler2D uLoadMask;
+uniform vec2 uWorldSize;
+uniform float uCols;
+out vec3 vWorld;
+out vec2 vUV;
+flat out float vLeaf;
+flat out float vShade;
+void main(){
+  // Turned about its trunk to face you, upright whatever angle you look from.
+  vec3 to=uCam-iPos.xyz; to.y=0.;
+  float d=length(to)+1e-4;
+  vec3 right=vec3(to.z,0.,-to.x)/d;
+  vec3 wp=iPos.xyz+right*aCorner.x*iDim.x+vec3(0.,aCorner.y*iDim.y,0.);
+  vWorld=wp;
+  vUV=vec2((aCorner.x+.5+iPos.w)/uCols,1.-aCorner.y);
+  vLeaf=iDim.z; vShade=iDim.w;
+  gl_Position=uViewProj*vec4(wp,1.);
+  // The real tree is built here now: this one stands aside.
+  if(textureLod(uLoadMask,iPos.xz/uWorldSize,0.).r>.5) gl_Position=vec4(2.,2.,2.,1.);
+}`;
+
+export const TREE_FS = COMMON + FRAME_UNIFORMS + LIGHTING + /* glsl */`
+in vec3 vWorld;
+in vec2 vUV;
+flat in float vLeaf;
+flat in float vShade;
+uniform sampler2D uTreeTex;
+uniform vec3 uLeaf[3];
+uniform vec3 uBark;
+layout(location=0) out vec4 outCol;
+void main(){
+  vec4 t=texture(uTreeTex,vUV);
+  if(t.a<.5) discard;
+  vec3 leaf=vLeaf<.5?uLeaf[0]:vLeaf<1.5?uLeaf[1]:uLeaf[2];
+  vec3 albedo=(t.g>.5?uBark:leaf*(.88+vShade*.24))*(.35+t.r*1.25);
+  float dist=length(vWorld-uCam);
+  // Lit as a crown is: mostly from above, a little towards you.
+  vec3 n=normalize(vec3(0.,.75,0.)+normalize(vec3(uCam.x-vWorld.x,0.,uCam.z-vWorld.z))*.65);
+  vec3 c=shade(albedo,vWorld,n,1.,.85,dist);
+  outCol=vec4(applyFog(c,vWorld),1.);
+}`;
+
 export const GROUND_VS = COMMON + FRAME_UNIFORMS + /* glsl */`
 layout(location=0) in vec2 aPos;
 uniform float uY;

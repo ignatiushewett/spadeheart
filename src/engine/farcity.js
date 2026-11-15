@@ -31,18 +31,7 @@ export class FarCity {
         C[x + z * W] = 1 + buildings[lot[i] - 1].style;
       }
     }
-    // Trees make the parks read as canopy from afar.
-    for (let k = 0; k < L.props.length; k += PROP_STRIDE) {
-      if (L.props[k] !== P.PARKTREE || terr[L.props[k + 2] * WX + L.props[k + 1]] > 2) continue;
-      const x = L.props[k + 1] >> 2, z = L.props[k + 2] >> 2;
-      const i = x + z * W;
-      if (!H[i]) {
-        const y = STREET_Y + 9 + (L.props[k + 3] % 4) + Math.max(0, terr[L.props[k + 2] * WX + L.props[k + 1]]);
-        for (const [dx, dz] of [[0, 0], [1, 0], [0, 1], [1, 1]]) {
-          if (!H[i + dx + dz * W]) { H[i + dx + dz * W] = y; C[i + dx + dz * W] = 202 + (L.props[k + 3] % 2); }
-        }
-      }
-    }
+    // (Trees are drawn far off as pictures now, by FarTrees, not as boxes here.)
     const palette = (c) => {
       if (c === 200) return { col: srgb(M.COPPER, 1), glass: 0 };
       if (c === 201) return { col: srgb(M.SCHIST, 1), glass: 0, solid: true };
@@ -117,7 +106,8 @@ export class FarCity {
         const canopy = (cx, cz) => { const j = Math.min(WZ - 1, cz) * WX + Math.min(WX - 1, cx); return ground[j] === G.PARK ? 8 * Math.max(0, Math.min(1, (L.forestAt(cx, cz) - .3) / .25)) : 0; };
         const ta = canopy(x, z), tb = canopy(x + T, z), tc = canopy(x, z + T), te = canopy(x + T, z + T), trees = (ta + tb + tc + te) / 4;
         const col = g === G.ROCK ? rock : trees > 4 ? wood : patch(x, z);
-        const y = (t, k) => STREET_Y - 1 + Math.max(t, -1) + k;
+        // The ground only: the trees on it are drawn as pictures (FarTrees), so the forest floor is not raised into a slab.
+        const y = (t) => STREET_Y - 1 + Math.max(t, -1);
         const nx = (a + c - b - e) / 2, nz = (a + b - c - e) / 2, nl = Math.hypot(nx, T, nz);
         quad(tverts[Math.min(tverts.length - 1, Math.floor(z / BUCKET))], [[x, y(c, tc), z + T], [x + T, y(e, te), z + T], [x + T, y(b, tb), z], [x, y(a, ta), z]], [nx / nl, T / nl, nz / nl], col, .3);
       }
