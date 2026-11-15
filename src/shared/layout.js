@@ -1415,6 +1415,11 @@ export function buildLayout(seed = 1609) {
     return Math.max(0, Math.min(1, k));
   };
   const rowB = new Float32Array(QW), rowE = new Float32Array(QW);
+  // The road through the Weston Tunnel climbs evenly from the ground on the Weston side to the ground on the north side of the ridge,
+  // under the hill where it is high and in a cutting where it is not, so it meets the road outside level at both ends.
+  const TUN_N = 1840, TUN_S = 2236, TUN_LINE = [[2515, TUN_N], [2515, 1950], [2516, 2075], [2512, 2200], [2510, TUN_S]];
+  const tunHN = sampleQ(BQ, 2515, TUN_N), tunHS = sampleQ(BQ, 2510, TUN_S);
+  const tunLevel = (z) => Math.round(tunHN + (tunHS - tunHN) * Math.max(0, Math.min(1, (z - TUN_N) / (TUN_S - TUN_N))));
   for (let z = 0, i = 0; z < WZ; z++) {
     {
       const fz = Math.min(QD - 1.001, z / 4), iz = fz | 0, uz = fz - iz;
@@ -1429,14 +1434,15 @@ export function buildLayout(seed = 1609) {
       const fx = x / 4, ix = fx | 0, ux = fx - ix;
       const b = rowB[ix] * (1 - ux) + rowB[ix + 1] * ux, base = Math.round(b);
       if (tun[i]) {
-        // The road keeps the level it comes in at, all the way through. Where the hill stands well over it, the hill is its roof, at the
-        // height of the hillside either side, so the ridge goes on over the top unbroken; nearer the ends, where it is lower, the road
-        // runs in an open cutting between the banks.
-        const road = Math.min(base, 6);
+        // On the tunnel's own grade all the way through. Where the hill stands well over it, the hill is its roof, at the height of the
+        // hillside either side, so the ridge goes on over the top unbroken; nearer the ends, where it is lower, an open cutting.
+        const road = tunLevel(z);
         terr[i] = road - 1;
         if (b - road >= 10) { height[i] = Math.min(250, STREET_Y + Math.round(b)); mark[i] |= 32; }
         continue;
       }
+      // The approaches either end carry on at the same grade, in a cutting where the ground is higher.
+      if (g === G.ROAD && z >= TUN_N && z <= TUN_S && Math.abs(x - 2514) < 14 && lineDist(x, z, TUN_LINE) < 10) { terr[i] = tunLevel(z) - 1; continue; }
       if (g === G.ROAD) { terr[i] = base - 1; continue; }
       if (g === G.PLAZA) { terr[i] = mark[i] === 4 ? base - 1 : base; continue; }
       if (g === G.SAND) { terr[i] = Math.min(base, Math.round(-3 + dw[i] * .17)); continue; }
