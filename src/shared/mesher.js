@@ -1,7 +1,7 @@
 // Greedy voxel mesher with per-vertex ambient occlusion and a coarse sky-visibility term.
 // Vertex layout (8 bytes): x,y,z,normal | id,ao,sky,lift (bit 0 on a grass block's top edge: the shader raises it in the wind;
 // bit 1 on leaves meshed for distance, which hold still)
-import { CS, WX, WZ, STREET_Y } from './constants.js';
+import { CS, WX, WZ, STREET_Y, G } from './constants.js';
 import { FLAGS, F_GLASS, F_LEAF, F_CLOTH, M, PANE } from './materials.js';
 
 const P = CS + 2;
@@ -24,7 +24,7 @@ const WAVE = new Uint8Array(256);
 WAVE[M.GRASS] = WAVE[M.GRASS2] = WAVE[M.GRASS_DRY] = 1;
 
 export function makeMesher(L) {
-  const { height, terr, lot, edge } = L;
+  const { height, terr, lot, edge, ground } = L;
   const mask = new Int32Array(CS * CS);
   const opaque = { buf: new Uint8Array(1 << 21), n: 0 };
   const glass = { buf: new Uint8Array(1 << 19), n: 0 };
@@ -97,7 +97,9 @@ export function makeMesher(L) {
       let t = 0;
       if (wx >= 0 && wz >= 0 && wx < WX && wz < WZ) {
         const i = wz * WX + wx;
-        t = height[i] || (STREET_Y + terr[i]);
+        // Over water the map's ground height is not where the bed really is, and a far island's sides were being taken for buried
+        // faces and dropped, leaving it hollow at the waterline. Nothing stands in the water, so nothing beside it is hidden by it.
+        t = height[i] || (ground && ground[i] === G.WATER ? 0 : STREET_Y + terr[i]);
       }
       topCache[(x + 7) + (z + 7) * 46] = t;
     }

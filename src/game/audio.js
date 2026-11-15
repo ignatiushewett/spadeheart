@@ -68,7 +68,7 @@ export class Audio2 {
     this.uiLevel.gain.value = this.volume;
     this.uiLevel.connect(comp);
     if (this.wantMusic) this.music.play();
-    if (this.wantLament) this.lament.play(2.5);
+    if (this.wantLament) this.lament.play(1.2);
     // Long slapback impulse: the sound of gunfire between Albion towers.
     const len = ctx.sampleRate * 2.6;
     const ir = ctx.createBuffer(2, len, ctx.sampleRate);
@@ -226,7 +226,7 @@ export class Audio2 {
   deathMusic(on) {
     this.wantLament = on;
     if (!this.lament) return;
-    if (on) this.lament.play(2.5);
+    if (on) this.lament.play(1.2);
     else this.lament.stop(4);
   }
 

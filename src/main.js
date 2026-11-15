@@ -2323,14 +2323,15 @@ class Game {
     document.getElementById('death-restart').style.display = 'none';
     if (survival) {
       this.saveGame();
+      // The lament starts as they fall, not when the screen comes up.
+      this.audio.deathMusic(true);
       const days = Math.max(1, this.day - (P.bornDay || 1) + 1);
       setTimeout(() => {
         if (this.state !== 'play') return;
         document.getElementById('death-text').textContent = `${days === 1 ? 'One day' : `${days} days`} in the city, ${P.kills.toLocaleString('en-US')} infected down. Nobody is coming back from this one, but the city carries on without them.`;
         this.deathShown = true;
-        this.audio.deathMusic(true);
         this.ui.open('death', false);
-      }, 1800);
+      }, 700);
       return;
     }
     const lost = Math.floor(P.scrip * .25);
