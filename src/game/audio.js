@@ -511,6 +511,25 @@ export class Audio2 {
     if (impact > 30) this.noiseBurst(o, .22, 'bandpass', 1500, 420, 1.2, .8);
   }
 
+  // A settlement gate on the move: the winches clattering as the chain runs over them, link by link, under the deep grind of a heavy
+  // door in its frame. Loud, and it carries: you hear a gate going from well down the street.
+  gateRumble(x, y, z, secs) {
+    if (!this.ctx) return;
+    // Loud close to, and fading with distance like anything else, so you can tell which gate it is and how far: not the same everywhere.
+    const s = this.spatial(x, y, z, 45);
+    if (s.gain < .01) return;
+    const o = this.out(s.gain * 7, s.pan, .3);
+    // Eased in, so it starts as a grind and not a knock: the only thump is the one when it gets there.
+    this.noiseBurst(o, secs, 'lowpass', 200, 120, 1.1, .8, Math.min(.8, secs * .35));
+    // The chain: a quick ratchet of clicks, steady while it runs.
+    const n = Math.floor(secs / .15);
+    for (let k = 0; k < n; k++) setTimeout(() => { if (this.ctx) this.noiseBurst(o, .035, 'bandpass', 2200 + rand() * 900, 1600, 4, .4 + rand() * .2); }, k * 150 + rand() * 25);
+    // And when it gets there, the whole weight of it coming to a stop.
+    // Not as loud as the rest of it: the same thud it has always been.
+    const s2 = this.spatial(x, y, z, 160), o2 = this.out(Math.min(3.2, s2.gain * 4.5), s2.pan, .3);
+    setTimeout(() => { if (this.ctx) { this.noiseBurst(o2, .6, 'lowpass', 440, 70, 1.4, 1.8, .004); this.tone(o2, .55, 'sine', 78, 38, .9); } }, secs * 1000);
+  }
+
   simple(kind, x, y, z) {
     if (!this.ctx) return;
     const s = x === undefined ? { gain: 1, pan: 0 } : this.spatial(x, y, z, 20);

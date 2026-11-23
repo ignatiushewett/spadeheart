@@ -54,7 +54,7 @@ const DB_NAME = 'acez';
 const MENU_VIEW = 704;
 const MENU_VEIL_MAX = 45;   // seconds the title screen waits on black for the view to build, at most
 const MENU_SHOT = { angle: -.18, dist: 185, height: 88, turn: -.32, pitch: -.14, fov: 1.05, flight: 125, startHeight: 30, startOff: 44, startPitch: -.1 };
-export const VERSION = 'v0.96';
+export const VERSION = 'v0.97';
 const SAVE_KEY = 'slot15';  // bumped whenever the map changes: old voxel edits no longer line up
 export const SLOTS = 3;
 // Slot 1 keeps the plain key, so a save from before there were slots simply becomes the first character.
@@ -1206,6 +1206,16 @@ class Game {
 
   // --- Destruction ----------------------------------------------------------------------------------
   // `hostile` means someone else threw it: no salvage, no kills on your tally, and nobody blames you.
+  // Part of a settlement's wall or one of its gates: the line of the wall, a few blocks either side of it, up to the top of the gate gear.
+  // Built to keep the dead out, it takes a lot more than the average wall to get through.
+  campWall(x, y, z) {
+    for (const c of this.layout.camps) {
+      if (x < c.x0 - 3 || x > c.x1 + 3 || z < c.z0 - 3 || z > c.z1 + 3 || y < STREET_Y - 3 || y > STREET_Y + 2 * c.hc) continue;
+      if (z <= c.z0 + 2 || z >= c.z1 - 2 || x <= c.x0 + 2 || x >= c.x1 - 2) return true;
+    }
+    return false;
+  }
+
   explode(x, y, z, radius, strength, dmg, hostile = false, loud = false) {
     const P = this.player, H = this.horde, W = this.world;
     const removed = W.explode(x, y, z, radius, strength);
@@ -2728,6 +2738,13 @@ class Game {
     }
   }
 
+  // Up against a window: a splash or a drip here would look as if it were on the inside of the glass, so there is none.
+  byGlass(x, y, z) {
+    const W = this.world;
+    for (let k = 0; k < 2; k++) for (const [dx, dz] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) if (isGlass(W.get(x + dx, y + k, z + dz))) return true;
+    return false;
+  }
+
   updateWeather(dt) {
     const w = this.weather, r = this.renderer, fx = this.particles, cam = this.cam;
     w.update(dt);
@@ -2759,7 +2776,7 @@ class Game {
         if (x < 1 || z < 1 || x >= WX || z >= WZ || this.layout.lot[z * WX + x]) continue;
         // On whatever it hits first: the street, or a tent, an awning, a roof. Not on the one over your own head.
         const y = Math.max(this.world.terrainTop(x, z), map.at(x, z) + 1);
-        if (y > cam.y + 2) continue;
+        if (y > cam.y + 2 || this.byGlass(x, y, z)) continue;
         // A splash is as bright as whatever is shining on it: the sky, the camp's lamps and fires, and a little more in your own torch beam.
         const lit = r.spot && ((x - cam.x) * r.camForward[0] + (y - cam.y) * r.camForward[1] + (z - cam.z) * r.camForward[2]) / Math.hypot(x - cam.x, y - cam.y, z - cam.z) > .9;
         const L = r.lightAt(x, z), t = lit ? .45 : 0;
@@ -2774,7 +2791,7 @@ class Game {
           const x = Math.floor(cam.x + Math.cos(a) * d), z = Math.floor(cam.z + Math.sin(a) * d);
           if (x < 1 || z < 1 || x >= WX || z >= WZ || this.layout.lot[z * WX + x]) continue;
           const y = Math.max(this.world.terrainTop(x, z), map.at(x, z) + 1);
-          if (y > cam.y + 2) continue;
+          if (y > cam.y + 2 || this.byGlass(x, y, z)) continue;
           const ux = x + .5 - cam.x, uy = y - cam.y, uz = z + .5 - cam.z, ul = Math.hypot(ux, uy, uz) || 1;
           const lit = r.spot > 0 && (ux * r.camForward[0] + uy * r.camForward[1] + uz * r.camForward[2]) / ul > .9;
           const L = r.lightAt(x, z), k2 = 9;

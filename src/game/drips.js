@@ -147,6 +147,10 @@ export class Drips {
         if (nt < 0 || nt >= y - 2) continue;
         const land = nt + 1;
         if (y - land < 2 || y - land > 40) continue;
+        // Not down past a window, where it would look as if it ran down the inside of the glass.
+        let pane = false;
+        for (let yy = land; yy < y && !pane; yy++) pane = isGlass(g.world.get(x, yy, z)) || isGlass(g.world.get(x + dx, yy, z + dz));
+        if (pane) continue;
         // A line just outside the face, running along it: start corner and direction.
         const sx = dx > 0 ? x + 1.03 : dx < 0 ? x - .03 : x, sz = dz > 0 ? z + 1.03 : dz < 0 ? z - .03 : z;
         out.push({ x: sx, z: sz, ax: dx ? 0 : 1, az: dz ? 0 : 1, y, land, k: .35 + rand() * 1.1 });

@@ -1426,7 +1426,7 @@ export function buildLayout(seed = 1609) {
   const forestAt = (x, z) => {
     const n = fbm2(x * .0045 + 3, z * .0045 + 8, 3);
     const esp = sstep((z - 2600) / 500) * sstep((1700 - x) / 700) * (.55 + .45 * Math.max(sstep((700 - x) / 500), sstep((z - 3500) / 450)));
-    let k = (n - .46) * 2.2 + 1.8 * trinityK(x, z) + .8 * sstep((420 - x) / 420) + .7 * sstep((380 - z) / 380) + 1.15 * esp + .45 * pageK(x, z) - 1.1 * farmK(x, z);
+    let k = (n - .46) * 2.2 + 1.8 * trinityK(x, z) + .8 * sstep((420 - x) / 420) + .7 * sstep((380 - z) / 380) + 1.15 * esp + .45 * pageK(x, z) + .6 * sstep(1 - Math.hypot(x - MT.x, z - MT.z) / 520) - 1.1 * farmK(x, z);
     // Past the edges of the map the country goes on in woods and clearings: big stands of forest with open ground between, carrying on
     // from whatever the edge was doing.
     const out = Math.max(0, -x, -z, z - WZ);
@@ -1478,7 +1478,8 @@ export function buildLayout(seed = 1609) {
       if (dw[i] < 6 && !townId[i]) t = Math.min(t, -3 + (dw[i] >> 1));
       terr[i] = t;
       // Bare rock along the tops, on the peak, and wherever the stone breaks through.
-      if (g === G.PARK && t > 70 && (t > 128 + noise2(x * .02, z * .02) * 30 || noise2(x * .03, z * .03) > .9)) ground[i] = G.ROCK;
+      // Mt. Page is wooded right up to its summit: only its outcrops are bare, never a line drawn round it at some height.
+      if (g === G.PARK && t > 70 && ((t > 128 + noise2(x * .02, z * .02) * 30 && Math.hypot(x - MT.x, z - MT.z) > 780) || noise2(x * .03, z * .03) > .9)) ground[i] = G.ROCK;
     }
   }
   for (const [i, d] of slump) terr[i] = -d;
@@ -1504,7 +1505,9 @@ export function buildLayout(seed = 1609) {
   // Cliffs: wherever the hillside is too steep to hold soil. The plateau's edges are lined with them.
   for (let z = 2; z < WZ - 2; z++) for (let x = 2, i = z * WX + 2; x < WX - 2; x++, i++) {
     if (ground[i] !== G.PARK || terr[i] < 12) continue;
-    if (Math.abs(terr[i + 2] - terr[i - 2]) + Math.abs(terr[i + 2 * WX] - terr[i - 2 * WX]) > 7) ground[i] = G.ROCK;
+    // High on Mt. Page the soil holds on steeper ground, so the trees go all the way up and only the real faces are bare.
+    const steep = Math.hypot(x - MT.x, z - MT.z) < 420 ? 12 : 7;
+    if (Math.abs(terr[i + 2] - terr[i - 2]) + Math.abs(terr[i + 2 * WX] - terr[i - 2 * WX]) > steep) ground[i] = G.ROCK;
   }
 
   tick('terrain');

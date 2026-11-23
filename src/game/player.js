@@ -841,7 +841,7 @@ export class Player {
       g.particles.dust(px, py, pz, 1, .5);
       g.audio.simple('block', px, py, pz);
       if (it.blockDmg) {
-        const broke = w.hit(hit.x, hit.y, hit.z, it.blockDmg);
+        const broke = w.hit(hit.x, hit.y, hit.z, it.blockDmg * (g.campWall(hit.x, hit.y, hit.z) ? .3 : 1));
         if (broke) { g.onVoxelBroken(hit.x, hit.y, hit.z, broke); }
       }
     }
@@ -929,7 +929,8 @@ export class Player {
       g.particles.dust(px, py, pz, 1, .4);
       g.audio.simple('block', px, py, pz);
       // Boards come away from a frame far easier than they give to teeth.
-      const broke = w.hit(hit.x, hit.y, hit.z, it.blockDmg * (hit.id === M.BARRICADE || hit.id === M.BARRICADE2 ? 2 : 1));
+      // A settlement's wall and gates are built to hold: a good deal harder going than anything else.
+      const broke = w.hit(hit.x, hit.y, hit.z, it.blockDmg * (hit.id === M.BARRICADE || hit.id === M.BARRICADE2 ? 2 : 1) * (g.campWall(hit.x, hit.y, hit.z) ? .3 : 1));
       if (broke) { g.onVoxelBroken(hit.x, hit.y, hit.z, broke); g.salvage(broke, 1); }
       g.horde.noise(this.x, this.z, 18, .5);
     }

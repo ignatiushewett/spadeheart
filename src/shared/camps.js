@@ -59,6 +59,7 @@ const ROLE_SIGN = { general: M.AWN_G, arms: M.AWN_R, medic: M.AWN_B, junk: M.CAN
 // Nobody built these from the same plan. Each trade tends towards what suits it, and what they could get hold of.
 const STALL_STYLES = { general: ['awning', 'kiosk', 'tarp', 'awning'], arms: ['container', 'kiosk', 'container'], medic: ['awning', 'kiosk'], junk: ['tarp', 'container', 'tarp'], food: ['cart', 'awning', 'cart', 'kiosk'], builder: ['yard', 'tarp', 'yard'], mechanic: ['garage'] };
 const WARM = 0, FIRE = 1, COOL = 2;
+const GATE_WINCH = 2;   // how far either side of a gate's middle its two winches stand, on the platform over it
 const WORK_KINDS = new Set(['work', 'shop', 'class', 'teach']);
 const HOMES = new Set(['shack', 'tenement', 'tent', 'shelter']);   // plots whose doors are all on the alleys   // spots tucked in against a building, which a divider could shut off
 
@@ -158,7 +159,7 @@ export function planCamp(def, id, r, ground) {
     const g = horiz
       ? { side, x0: tc - gateHalf, x1: tc + gateHalf, z0: base, z1: base + 1 }
       : { side, x0: base, x1: base + 1, z0: tc - gateHalf, z1: tc + gateHalf };
-    g.y0 = YB; g.y1 = YB + hc - 2; g.mat = def.door; g.horiz = horiz; g.tc = tc;
+    g.y0 = YB; g.y1 = YB + hc - 2; g.mat = def.wall === 'stone' ? def.door : M.WOOD_D; g.horiz = horiz; g.tc = tc;
     g.cx = (g.x0 + g.x1) >> 1; g.cz = (g.z0 + g.z1) >> 1;
     c.gates.push(g);
     const inX = horiz ? 0 : (side === 'W' ? 1 : -1), inZ = horiz ? (side === 'N' ? 1 : -1) : 0;
@@ -175,7 +176,7 @@ export function planCamp(def, id, r, ground) {
       // Floodlights on the gate towers, aimed out across the approach.
       const outX = -inX, outZ = -inZ;
       // The watch stands a step back from the lamp housing, so nobody has their head in the light.
-      c.guards.push({ x: tx + .5 - outX * 1.2, y: YB + def.H + 6, z: tz + .5 - outZ * 1.2, yaw, gate: true });
+      c.guards.push({ x: tx + .5 + outX * 2, y: YB + def.H + 6, z: tz + .5 + outZ * 2, yaw, gate: true });   // up at the outer rail
       // Up on the roof's outer edge, over the heads of the watch and out of the way of the view.
       c.parts.push({ t: 'flood', x0: tx + outX * 3 - 1, z0: tz + outZ * 3 - 1, x1: tx + outX * 3 + 1, z1: tz + outZ * 3 + 1, h: def.H + 11, dx: outX, dz: outZ, roof: true });
       c.floods.push({ x: tx + outX * 4 + .5, y: YB + def.H + 11, z: tz + outZ * 4 + .5, dx: outX, dz: outZ });
@@ -189,6 +190,16 @@ export function planCamp(def, id, r, ground) {
       });
     }
     light(g.cx + inX * 6, g.cz + inZ * 6, 18);
+    // The two who work the gate: up on the platform over it, each at a winch.
+    const fixedLine = side === 'N' ? r.z0 : side === 'S' ? r.z1 : side === 'W' ? r.x0 : r.x1;
+    for (const s of [-1, 1]) {
+      c.guards.push({
+        // The one facing in stands at the back of the platform; the one facing out two rows forward, at the edge of the door's slot.
+        x: (horiz ? tc + s * GATE_WINCH : fixedLine + inX * (s < 0 ? 5 : 3)) + .5, y: YB + hc, z: (horiz ? fixedLine + inZ * (s < 0 ? 5 : 3) : tc + s * GATE_WINCH) + .5,
+        // One watches the camp side, the other the road outside.
+        yaw: s < 0 ? inYaw : inYaw + Math.PI, winch: { side, tc },
+      });
+    }
   };
   for (const s of def.gates) mkGate(s);
   // Corner towers sit outside the corner, so the walkways on either side join up behind them.
@@ -203,7 +214,7 @@ export function planCamp(def, id, r, ground) {
       const tw = { t: 'tower', x0: lx - 2, z0: lz - 2, x1: lx + 2, z1: lz + 2, h: def.H + 5, mat: def.wall, big: true };
       cornerClimb(tw);
       c.parts.push(tw);
-      c.guards.push({ x: lx + .5, y: YB + def.H + 6, z: lz + .5, yaw: Math.atan2(lx - c.cx, lz - c.cz), sniper: true });
+      c.guards.push({ x: lx + .5 + Math.sign(lx - c.cx) * 1.6, y: YB + def.H + 6, z: lz + .5 + Math.sign(lz - c.cz) * 1.6, yaw: Math.atan2(lx - c.cx, lz - c.cz), sniper: true });
       light(lx, lz, 16);
       continue;
     }
@@ -211,7 +222,7 @@ export function planCamp(def, id, r, ground) {
     cornerClimb(tw);
     c.parts.push(tw);
     reserve(tx - 4, tz - 4, tx + 4, tz + 4);
-    c.guards.push({ x: tx + .5, y: YB + def.H + 9, z: tz + .5, yaw: Math.atan2(tx - c.cx, tz - c.cz), sniper: true });
+    c.guards.push({ x: tx + .5 + Math.sign(tx - c.cx) * 2.4, y: YB + def.H + 9, z: tz + .5 + Math.sign(tz - c.cz) * 2.4, yaw: Math.atan2(tx - c.cx, tz - c.cz), sniper: true });
     light(tx, tz, 22);
   }
   c.maxY = Math.max(c.maxY, YB + def.H + 14);
@@ -1108,6 +1119,9 @@ export function stampCamp(c, ctx) {
           if (y < oy || y >= oy + CS) continue;
           const h = y - YB;
           if (gate && y >= YB && h <= hc - 2) { P(t, y, row, wall === 'stone' ? c.door : M.WOOD_D); continue; }
+          // Over the door, its slot: open from the top of the doorway to the top of the wall, so the door goes up through it and
+          // nothing else, between the steel guides either side.
+          if (gate && wall !== 'stone' && h > hc - 2) continue;
           if (y < YB) { P(t, y, row, M.CONCRETE_D); continue; }
           // The top band is set a block out (see below), so on the inside it gives way to the walkway: boards at its foot, open above.
           if (row === 1 && h >= H - 2) { if (h === H - 2) P(t, y, row, M.PLANK); continue; }
@@ -1147,6 +1161,16 @@ export function stampCamp(c, ctx) {
       }
     };
     for (const g of gates) {
+      // The gatehouse platform over it: a steel rail along its inner edge from one stair head to the other, and a winch either side,
+      // each a drum on an iron frame, that the gate hands wind it up and down by.
+      // The hand on the one side faces in over the camp, with the winch in front of them on the rail; the other faces out over the road,
+      // with theirs in front of them on that side.
+      for (let t = g.tc - 7; t <= g.tc + 7; t++) if (t >= lo && t <= hi) {
+        const inner = t === g.tc - GATE_WINCH, outer = t === g.tc + GATE_WINCH;
+        P(t, YB + hc, 6, inner ? M.IRON : M.STEEL_D);
+        if (inner) P(t, YB + hc + 1, 6, M.WOOD_D);
+        if (outer) { P(t, YB + hc, 2, M.IRON); P(t, YB + hc + 1, 2, M.WOOD_D); }
+      }
       flight(g.tc + 8, 1); flight(g.tc - 8, -1);
       // Over the gate, the two flights meet: planks across from the top of one to the top of the other, so you can cross at the
       // height you came up at instead of stepping back onto the walkway. Nothing holds it up in the gateway itself.
@@ -1162,6 +1186,19 @@ export function stampCamp(c, ctx) {
   for (const p of c.parts) {
     if (p.x1 + 2 < ox || p.x0 - 2 >= ox + CS || p.z1 + 2 < oz || p.z0 - 2 >= oz + CS) continue;
     stampPart(p, c, box, put, car, letterAt);
+  }
+  // The gates' steel, last of all, so nothing else built there (a tower's braces) ends up through it: a frame up each side of the
+  // opening, standing a little proud of the wall on both faces, the door running in it; above the wall, the guides carried on as high as
+  // the door goes, all the way up; and a rail along both faces of it at that height, from one guide to the other.
+  if (wall !== 'stone') for (const g of c.gates) {
+    const fixed = g.side === 'N' ? z0 : g.side === 'S' ? z1 : g.side === 'W' ? x0 : x1, inward = g.side === 'N' || g.side === 'W' ? 1 : -1;
+    const S = (t, y, row, id) => (g.horiz ? put(t, y, fixed + inward * row, id) : put(fixed + inward * row, y, t, id));
+    const peak = YB + 2 * hc - 3;
+    for (const t of [g.tc - 6, g.tc + 6]) {
+      for (let row = -1; row <= 2; row++) for (let y = YB; y <= YB + hc - 1; y++) S(t, y, row, M.STEEL_D);
+      for (let y = YB + hc; y <= peak; y++) for (const row of [-1, 2]) S(t, y, row, M.STEEL_D);
+    }
+    for (let t = g.tc - 5; t <= g.tc + 5; t++) for (const row of [-1, 2]) S(t, peak, row, M.STEEL_D);
   }
 }
 
@@ -1215,6 +1252,11 @@ function stampPart(p, c, box, put, car, letterAt) {
         // In the open frames, a post up the middle so there is no drop down the well to the ground.
         if (frame) for (const [x, z] of inner) for (let y = fy; y < top; y++) put(x, y, z, M.WOOD_D);
         for (const [x, z] of entry) { put(x, fy, z, M.PLANK); for (let y = fy + 1; y <= fy + 3; y++) put(x, y, z, 0); }
+        // In a frame tower the way in is the whole width of that face between its corner posts at that height, not a gap cut in a brace.
+        if (frame) for (const [x, z] of entry) {
+          if (x === x0 || x === x1) { for (let b = z0 + 1; b < z1; b++) for (let y = fy + 1; y <= fy + 3; y++) put(x, y, b, 0); }
+          else if (z === z0 || z === z1) { for (let a = x0 + 1; a < x1; a++) for (let y = fy + 1; y <= fy + 3; y++) put(a, y, z, 0); }
+        }
       }
       break;
     }

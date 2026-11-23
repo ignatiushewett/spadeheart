@@ -451,7 +451,9 @@ export class NPCs {
       n.beat = s.beat;
       n.spot = (rand() - .5) * 46;
       n.pauseT = rand() * 8;
-      const along = s.beat.lo + rand() * (s.beat.hi - s.beat.lo);
+      let along = s.beat.lo + rand() * (s.beat.hi - s.beat.lo);
+      const gt = c.gates.find((q) => q.side === s.beat.side && Math.abs(along - q.tc) < 10);
+      if (gt) along = gt.tc + (along < gt.tc ? -1 : 1) * (11 + rand() * 4);
       if (s.beat.axis === 'x') n.x = along; else n.z = along;
     }
     return n;
@@ -1871,6 +1873,41 @@ export class NPCs {
     g.ui.floatSay(n, pickOf(['Rocket out!', 'Backblast clear!', 'Heads down, rocket!', 'Eat this!']), 2);
   }
 
+  // A settlement's own people coming home: a few of them back from a supply run or a scavenging trip, walking up the road to a gate,
+  // which opens for them, and in. Only round the settlement you are at or near, now and then, and never while anything is going on there.
+  spawnRunParty() {
+    const g = this.g, w = g.world, P = g.player, sim = g.campSim;
+    const c = g.layout.camps.find((k) => Math.max(k.x0 - P.x, P.x - k.x1, k.z0 - P.z, P.z - k.z1) < 120);
+    if (!c || !c.gates.length) return;
+    const S = sim.state[c.id], st = this.camps[c.id];
+    if (!st.active || S.status !== 'holding' || S.locked || S.op || S.evac || S.breaches.length || (S.inside || 0) > 0) return;
+    const q = pickOf(c.gates), gate = st.gates.find((k) => k.def === q);
+    if (!gate || gate.broken || gate.shutT > 0 || gate.coming) return;
+    const ox = q.side === 'W' ? -1 : q.side === 'E' ? 1 : 0, oz = q.side === 'N' ? -1 : q.side === 'S' ? 1 : 0;
+    // A little way down the road outside it, somewhere you are not looking straight at.
+    for (let t = 0; t < 12; t++) {
+      const out = 30 + rand() * 16, x = Math.floor(q.cx + ox * out + (oz ? 0 : 0) + (rand() - .5) * 8 * (ox ? 0 : 1)), z = Math.floor(q.cz + oz * out + (rand() - .5) * 8 * (oz ? 0 : 1));
+      if (x < 2 || z < 2 || x >= WX - 2 || z >= WZ - 2 || g.layout.ground[z * WX + x] === G.WATER) continue;
+      if (!w.isLoaded(x, STREET_Y, z)) continue;
+      const y = w.groundBelow(x + .5, STREET_Y + 10, z + .5, 30);
+      if (Math.abs(y - STREET_Y) > 6) continue;
+      if (Math.hypot(P.x - x, P.z - z) < 25) continue;
+      let dead = 0;
+      g.horde.forRadius(x, z, 25, () => { dead++; });
+      if (dead) continue;
+      const squad = { members: [] }, count = 2 + Math.floor(rand() * 3);
+      for (let i = 0; i < count; i++) {
+        const nx = x + .5 + (rand() - .5) * 4, nz = z + .5 + (rand() - .5) * 4;
+        const m = new NPC('wanderer', nx, w.groundBelow(nx, y + 2, nz, 8), nz, { weapon: pickOf(c.folkWeapons), variant: wardrobeRow(c.wardrobe), hp: 220, title: `${c.name}, back from a run` });
+        m.dest = c.id; m.squad = squad; m.flank = rand() * 6.283; m.fromCamp = -1; m.runParty = true; m.gateTo = { camp: c.id, def: q };
+        squad.members.push(m);
+        this.list.push(m);
+      }
+      if (rand() < .5) sim.radio(c, pickOf([`Supply run coming up on the ${q.side === 'N' ? 'north' : q.side === 'S' ? 'south' : q.side === 'E' ? 'east' : 'west'} gate. Open up for them.`, `Our people on the road, ${q.side === 'N' ? 'north' : q.side === 'S' ? 'south' : q.side === 'E' ? 'east' : 'west'} side. Let them in.`]), c.name, false);
+      return;
+    }
+  }
+
   // --- People on the road -----------------------------------------------------------------------------
   // Nobody's patrol and nobody's problem. Some are making for a wall they have heard is still up. Some have given up on walls.
   spawnWanderers() {
@@ -2055,7 +2092,7 @@ export class NPCs {
         if (lead.restT > 0) n.restT = lead.restT + rand();
       } else if (n.dest >= 0 && g.campSim.state[n.dest].status === 'holding') {
         const c = g.layout.camps[n.dest];
-        if (this.road && this.road.id === n.dest) n.gateTo = { camp: n.dest, def: this.road.def };
+        if (this.road && this.road.id === n.dest && !n.runParty) n.gateTo = { camp: n.dest, def: this.road.def };
         // Make for the nearest gate. It opens for them, and in they go.
         if (!n.gateTo || n.gateTo.camp !== n.dest) {
           let bg = null, bd = 1e12;
@@ -2068,7 +2105,7 @@ export class NPCs {
         if (!q && n.x > c.x0 - 10 && n.x < c.x1 + 10 && n.z > c.z0 - 10 && n.z < c.z1 + 10) { n.dead = true; return; }
         // All going the same way, but a crowd and not a queue: everyone drifts across the street at their own angle and their own
         // pace, peels off the wall when they reach it, and heads back across.
-        const route = this.road && this.road.id === n.dest ? H.roadAt(n.x, n.z) : null;
+        const route = this.road && this.road.id === n.dest && !n.runParty ? H.roadAt(n.x, n.z) : null;
         if (route && (!lead || lead === n || (n.x - tx) ** 2 + (n.z - tz) ** 2 > 100)) {
           if (n.lean === undefined || (n.leanT = (n.leanT || 0) - dt) <= 0) {
             n.lean = (rand() - .5) * .9;
@@ -2681,6 +2718,7 @@ export class NPCs {
     }
     if ((this.bailT = (this.bailT ?? 2) - dt) <= 0) { this.bailT = 4; this.bailCrew(); }
     if ((this.wanderT = (this.wanderT ?? 30) - dt) <= 0) { this.wanderT = 28 + rand() * 40; this.spawnWanderers(); }
+    if ((this.runT = (this.runT ?? 50) - dt) <= 0) { this.runT = 70 + rand() * 90; if (rand() < .55) this.spawnRunParty(); }
     if ((this.roadT = (this.roadT ?? 0) - dt) <= 0) { this.roadT = 2.5; this.pickRoad(); this.journeyStep(); }
 
     this.coolGrudges(dt);
@@ -3531,13 +3569,22 @@ export class NPCs {
       }
       if (gate.open === gate.target) continue;
       const before = gate.open;
-      gate.open += Math.sign(gate.target - gate.open) * dt * 3;
+      // Heavy: a couple of seconds to drag open, a little less to haul shut, grinding the whole way.
+      // Heard only at the gate you are at: from anywhere further off there is no telling which one it was, so there is nothing.
+      const atThis = Math.hypot(P.x - d.cx, P.z - d.cz) < 40;
+      if (atThis && (before === 0 || before === 1)) g.audio.gateRumble(d.cx, STREET_Y + 2, d.cz, gate.target > before ? 2.3 : 1.8);
+      // The same with the dead on the way: it is as heavy as it is. The watch knows that, which is why they shut it early.
+      gate.open += Math.sign(gate.target - gate.open) * dt * (gate.target > gate.open ? .44 : .56);
       if (gate.target === 1 && gate.open > 1) gate.open = 1;
       if (gate.target === 0 && gate.open < 0) gate.open = 0;
-      // The door splits down the middle and slides into the wall, a column at a time.
-      const half = 5;
-      const wasCols = Math.ceil(before * (half + 1)), cols = Math.ceil(gate.open * (half + 1));
-      if (wasCols !== cols) {
+      // The door rises into the gatehouse over it, a row at a time from the bottom, and comes down the same way: open is how many rows of
+      // it have gone up. Anyone stood in the opening when it is coming down past head height is pushed out of its way.
+      const half = 5, hgt = d.y1 - d.y0 + 1;
+      const wasCols = Math.ceil(before * hgt) < 2 ? 0 : 99, cols = Math.ceil(gate.open * hgt) < 2 ? 0 : 99;
+      const wasRows = Math.ceil(before * hgt), rows = Math.ceil(gate.open * hgt);
+      // The two at the winches work it as long as it is moving.
+      for (const n of st.guards) if (n.post && n.post.winch && n.post.winch.side === d.side && n.post.winch.tc === d.tc && !n.dead) n.crankT = g.time + .4;
+      if (wasRows !== rows) {
         // Anyone standing where the door is about to be gets shoved out of its way, back the side they were on. Nobody ends up inside it,
         // or stood on top of it. With no room to be shoved into, they are crushed.
         if (cols < wasCols) H.forRadius(d.cx, d.cz, 8, (i) => {
@@ -3561,15 +3608,24 @@ export class NPCs {
             cs[o8 + 1] = STREET_Y;
           }
         }
-        for (let t = -half; t <= half; t++) {
-          const openHere = Math.abs(t) < cols;
-          for (let row = 0; row < 2; row++) for (let y = d.y0; y <= d.y1; y++) {
-            const x = d.horiz ? d.tc + t : d.x0 + row;
-            const z = d.horiz ? d.z0 + row : d.tc + t;
-            W.set(x, y, z, openHere ? 0 : d.mat, false);
+        // The door itself goes up: as it rises out of the opening its top comes up out of the wall above it, and over the top. Whatever
+        // it passes through up there is remembered the first time, and put back as it comes down again.
+        if (!gate.above) {
+          gate.above = new Map();
+          for (let t = -half; t <= half; t++) for (let row = 0; row < 2; row++) for (let y = d.y1 + 1; y <= d.y1 + hgt; y++) {
+            const x = d.horiz ? d.tc + t : d.x0 + row, z = d.horiz ? d.z0 + row : d.tc + t;
+            gate.above.set(`${t},${row},${y}`, W.get(x, y, z));
           }
         }
-        if (before === 0 || gate.open === 0) g.audio.simple('gate', d.cx, STREET_Y + 2, d.cz);
+        for (let t = -half; t <= half; t++) {
+          for (let row = 0; row < 2; row++) for (let y = d.y0; y <= d.y1 + hgt; y++) {
+            const x = d.horiz ? d.tc + t : d.x0 + row;
+            const z = d.horiz ? d.z0 + row : d.tc + t;
+            const door = y >= d.y0 + rows && y <= d.y1 + rows;
+            W.set(x, y, z, door ? d.mat : y <= d.y1 ? 0 : gate.above.get(`${t},${row},${y}`) || 0, false);
+          }
+        }
+        if (atThis && (gate.open === 0 || gate.open === 1)) g.audio.simple('gate', d.cx, STREET_Y + 2, d.cz);
       }
     }
     S.openGates = openGates;
@@ -4208,7 +4264,10 @@ export class NPCs {
           let pick = along, score = -1;
           for (let k = 0; k < 8; k++) {
             const c2 = k < 4 ? along + (rand() < .5 ? -1 : 1) * (8 + rand() * 40) : b.lo + rand() * (b.hi - b.lo);
-            const cand = Math.max(b.lo, Math.min(b.hi, c2));
+            let cand = Math.max(b.lo, Math.min(b.hi, c2));
+            // Not over a gate: that is the gate hands' platform. They walk past it, they do not stop there.
+            const gt = this.g.layout.camps[n.camp].gates.find((q) => q.side === b.side && Math.abs(cand - q.tc) < 10);
+            if (gt) cand = Math.max(b.lo, Math.min(b.hi, gt.tc + (cand < gt.tc ? -1 : 1) * (10 + rand() * 4)));
             let m2 = 1e9;
             for (const m of mates) {
               m2 = Math.min(m2, Math.abs(cand - pos(m)));
@@ -4864,13 +4923,14 @@ export class NPCs {
       }
       // Put away: in bed, at work round the settlement (the bench, the garden, the class, a seat by the fire), or behind a counter, as
       // long as nothing is happening. The moment there is trouble, or they have just been shooting, it is back in their hands.
-      const job = n.arrived && n.task && STOW_TASKS[n.task.kind];
+      const cranking = n.crankT > now;
+      const job = (n.arrived && n.task && STOW_TASKS[n.task.kind]) || cranking;
       const calm = !n.alarmed && !n.threat && !n.flee && !n.fighting && !(n.busyT > 0) && !ready && !lit && n.state !== 3;
-      const stowed = abed || (calm && n.camp >= 0 && (n.kind === 'resident' ? !!job : n.kind === 'vendor' || n.kind === 'clerk'));
+      const stowed = abed || cranking || (calm && n.camp >= 0 && (n.kind === 'resident' ? !!job : n.kind === 'vendor' || n.kind === 'clerk'));
       const wid = stowed ? 0 : n.weaponId;
       const extra = wid * 2 + (n.kid ? 32 : 0) + faction * 64 + lit + Math.min(7, Math.round(n.wet * 8)) * 4096 + q * 32768 + (ready ? 2097152 : 0);
       // A blade or a bat is swung, not pointed: from the moment of the blow, the shader is told how far through the swing they are.
-      let st = n.state || 0;
+      let st = cranking && n.aim <= 0 ? 6 : n.state || 0;
       if (wid >= 8 && (st === 3 || n.swingAt !== undefined) && st !== 7 && st !== 5) {
         const s = n.swingAt !== undefined ? .22 + (now - n.swingAt) / .5 : 1;   // the blow lands as the swing comes down
         if (s >= 0 && s < 1) st = 9 + s * .99;
