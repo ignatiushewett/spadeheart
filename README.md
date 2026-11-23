@@ -10,7 +10,7 @@ Or download repository (Windows, needs [Node.js](https://nodejs.org)):
 `Run in Browser.bat` - Run in browser
 
 <img src="previews/shpreview.png" alt="Preview">
-<img src="previews/shpreview2.png" alt="Preview">
+<img src="previews/shpreview8.png" alt="Preview">
 <img src="previews/shpreview6.png" alt="Preview">
 <img src="previews/shpreview4.png" alt="Preview">
 <img src="previews/shpreview7.png" alt="Preview">
