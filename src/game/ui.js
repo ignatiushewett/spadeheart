@@ -4,7 +4,8 @@ import { ROLES } from '../shared/layout.js';
 import { ITEMS, WEAPON_ORDER, KITS, CAMP_START, TRUST_LOCK, START_CAMP, startingGear } from './items.js';
 import { DIFFICULTY } from './horde.js';
 import { standingName, LORE } from './dialogue.js';
-import { OP_PAY } from './npcs.js';
+import { OP_PAY, CREW_ARMOUR, CREW_GUNS, CREW_GUN_NAMES, crewArmourTier, crewGunStats } from './npcs.js';
+import { WEAPON_TALK } from './camplore.js';
 import { OUTBREAK_DAYS } from './campsim.js';
 import { opBanner } from './opbanner.js';
 import { MODELS as VM_MODELS, LMG_COVER, LMG_BOX } from './viewmodel.js';
@@ -99,9 +100,23 @@ function playedAgo(at) {
 
 // The two styles of play the settings offer, each a set of display and interface values. Casual is how the game used to start.
 export const LOOKS = {
-  cinematic: { fov: 95, shake: 1.5, grain: .4, uiScale: .9, uiAlpha: .75 },
-  casual: { fov: 105, shake: 1, grain: .3, uiScale: 1, uiAlpha: 1 },
+  cinematic: { fov: 95, shake: 1.5, grain: .4, uiScale: .9, uiAlpha: .75, brightness: .85 },
+  casual: { fov: 105, shake: 1, grain: .3, uiScale: 1, uiAlpha: 1, brightness: 1 },
 };
+
+const CREW_AWAY = 40;   // blocks: further than this, a companion shows greyed out
+
+// A companion on a map: the player's arrow, smaller and green, with a dark edge so it reads over anything.
+function companionArrow(x, px, pz, ang, k) {
+  x.save();
+  x.translate(px, pz);
+  x.rotate(ang);
+  x.scale(k, k);
+  x.beginPath(); x.moveTo(0, -11); x.lineTo(7, 8); x.lineTo(0, 4); x.lineTo(-7, 8); x.closePath();
+  x.lineWidth = 2.5; x.strokeStyle = 'rgba(8,14,8,.85)'; x.stroke();
+  x.fillStyle = '#8fd27a'; x.fill();
+  x.restore();
+}
 
 export class UI {
   constructor(game) {
@@ -711,6 +726,7 @@ export class UI {
     if (this.hudT > 0) return;
     this.hudT = .1;
     $('hp-num').textContent = Math.max(0, Math.ceil(P.health));
+    this.updateCrew();
     $('bar-hp').firstElementChild.style.width = `${Math.max(0, P.health)}%`;
     $('bar-hp').classList.toggle('low', P.health < 30);
     $('bar-st').firstElementChild.style.width = `${P.stamina}%`;
@@ -904,6 +920,22 @@ export class UI {
     return `${fmt(j.kills)} kills, ${SP} ${fmt(g.jobs.opPay(j))} if it succeeds`;
   }
 
+  // Who is travelling with you: a first name each. Greyed when they are out of sight of you, so you know to look for them.
+  updateCrew() {
+    const g = this.g, P = g.player, el = $('crew');
+    let key = '';
+    for (const f of g.npcs.followers) key += `${f.name}|${Math.hypot(f.x - P.x, f.z - P.z) > CREW_AWAY ? 1 : 0};`;
+    if (key === this.crewKey) return;
+    this.crewKey = key;
+    el.textContent = '';
+    for (const f of g.npcs.followers) {
+      const s = document.createElement('span');
+      s.textContent = f.name ? f.name.split(' ')[0] : 'Companion';
+      if (Math.hypot(f.x - P.x, f.z - P.z) > CREW_AWAY) s.className = 'away';
+      el.appendChild(s);
+    }
+  }
+
   drawCompass() {
     const c = $('compass'), x = c.getContext('2d'), P = this.g.player;
     // The strip itself is the top 52; how far things are is written underneath it, under each mark.
@@ -1054,6 +1086,7 @@ export class UI {
     for (const v of c2.vendors) if (v.doctor) pin(v.x, v.z, '+', '#ff8a7a', 'Doctor');
     for (const v of c2.vendors) if (v.role === 'arms') pin(v.x, v.z, 'W', '#f0b35a', 'Weapons');
     for (const v of c2.vendors) if (v.role === 'mechanic') pin(v.x, v.z, 'M', '#c9d27a', 'Mechanic');
+    for (const v of c2.vendors) if (v.role === 'bar') pin(v.x, v.z, 'B', '#e0a868', 'Bar');
     // A leader with a favour still to ask of you.
     const lead = LORE[c2.key].cast.find((m) => m.role === 'leader');
     if (lead && lead.favours && !g.campSim.dead[lead.id] && Object.keys(lead.favours).some((k) => !P.dlg.flags[`${k}_paid`])) pin(c2.boss.x + .5, c2.boss.z + .5, '!', '#6ec6ff', lead.name);
@@ -1094,7 +1127,7 @@ export class UI {
     }
     for (const n of g.npcs.list) {
       const dx = n.x - P.x, dz = n.z - P.z;
-      if (Math.abs(dx) > range || Math.abs(dz) > range) continue;
+      if (Math.abs(dx) > range || Math.abs(dz) > range || n.kind === 'follower') continue;
       if (n.kind === 'raider' && !n.aggro && Math.hypot(dx, dz) > 45) continue;
       x.fillStyle = n.kind === 'raider' ? '#f0963c' : n.kind === 'wanderer' ? '#d8d2a0' : '#8fd27a';
       x.fillRect(dx - .65, dz - .65, 1.3, 1.3);
@@ -1126,6 +1159,16 @@ export class UI {
     if (top.width !== W || top.height !== W) { top.width = W; top.height = W; }
     x = top.getContext('2d');
     x.clearRect(0, 0, W, W);
+    // Your companions, the same arrow as yours in green, pointing the way they face.
+    {
+      const cY = Math.cos(-P.yaw), sY = Math.sin(-P.yaw);
+      for (const f of g.npcs.followers) {
+        const dx = (f.x - P.x) * scale, dz = (f.z - P.z) * scale;
+        if (dx * dx + dz * dz > (cx - 14) * (cx - 14)) continue;
+        const fx = Math.sin(f.ys), fz = Math.cos(f.ys);
+        companionArrow(x, cx + dx * cY - dz * sY, cx + dx * sY + dz * cY, Math.atan2(fx * cY - fz * sY, -(fx * sY + fz * cY)), .8);
+      }
+    }
     x.fillStyle = '#e8b04a';
     x.beginPath(); x.moveTo(cx, cx - 11); x.lineTo(cx + 7, cx + 8); x.lineTo(cx, cx + 4); x.lineTo(cx - 7, cx + 8); x.closePath(); x.fill();
     const na = -P.yaw;
@@ -1203,6 +1246,93 @@ export class UI {
     const f = $('fps');
     f.style.display = on ? 'block' : 'none';
     if (on) f.textContent = text;
+  }
+
+  // --- Crew (Caps Lock) -------------------------------------------------------------------------------
+  openCrew() {
+    this.open('crewpanel', false);
+    this.renderCrew();
+  }
+
+  // Where a companion is from: the settlement they left to come with you, or the road.
+  crewFaction(n) {
+    const camps = this.g.layout.camps, id = n.home ?? n.camp;
+    const c = id >= 0 ? camps[id] : n.campKey ? camps.find((q) => q.key === n.campKey) : null;
+    if (c) return { name: c.name, col: c.faction };
+    const m = /^From (.+)$/.exec(n.title || ''), c2 = m && camps.find((q) => q.name === m[1]);
+    if (c2) return { name: c2.name, col: c2.faction, left: true };
+    return { name: 'No settlement', col: null };
+  }
+
+  crewStory(n, fac) {
+    const day = n.joined ?? this.g.day, when = `day ${OUTBREAK_DAYS + day}`;
+    if (n.hired) return `A gun for hire, found waiting at the ${fac.name} bar. Took your money on ${when}.`;
+    if (fac.left) return `Was on the road out of ${fac.name} when you met, and threw in with you on ${when}.`;
+    if (fac.col) return `Left ${fac.name} to come with you on ${when}.`;
+    return `Met out on the road, with nowhere in particular to be. With you since ${when}.`;
+  }
+
+  renderCrew() {
+    const g = this.g, P = g.player, N = g.npcs, crew = N.followers.filter((f) => !f.dead);
+    if (!crew.includes(this.crewSel)) this.crewSel = crew[0] || null;
+    const n = this.crewSel;
+    const list = $('crew-list');
+    list.innerHTML = '';
+    if (!crew.length) list.innerHTML = '<div class="empty">Nobody is with you.<br><br>People in the settlements will come along once they know you well enough, people on the road more readily, and a settlement\'s bar always has someone who will come for a fee.</div>';
+    for (const f of crew) {
+      const hp = Math.max(0, Math.min(1, f.hp / f.maxHp)), d = Math.hypot(f.x - P.x, f.z - P.z);
+      const b = document.createElement('button');
+      b.className = `mate${f === n ? ' sel' : ''}`;
+      b.innerHTML = `<span class="nm">${f.name}</span><small>${f.hired ? 'Hired gun' : 'Companion'}, ${CREW_GUN_NAMES[f.weaponName] || 'unarmed'}${d > 40 ? `, ${fmt(d)} m away` : ''}</small><div class="hpbar${hp < .35 ? ' low' : ''}"><i style="width:${(hp * 100).toFixed(1)}%"></i></div>`;
+      b.addEventListener('click', () => { this.crewSel = f; g.audio.simple('ui'); this.renderCrew(); });
+      list.appendChild(b);
+    }
+    $('crew-sum').textContent = `${crew.length} of 3    ${SP} ${fmt(P.scrip)} yours`;
+    const shop = N.crewShop(null);
+    $('crew-where').textContent = shop.camp ? `Kit for sale in ${shop.camp.name}.` : 'Kit is sold only in settlements.';
+    const box = $('crew-detail');
+    if (!n) { box.innerHTML = ''; return; }
+    const first = n.name.split(' ')[0], fac = this.crewFaction(n), tier = crewArmourTier(n), A = CREW_ARMOUR[tier];
+    const days = g.day - (n.joined ?? g.day);
+    const gun = n.weaponName, gunNote = n.gunFrom ? `You kitted ${first} out with this in ${n.gunFrom}.` : WEAPON_TALK[gun] ? `"${WEAPON_TALK[gun]}"` : '';
+    const rows = [
+      ['With you', days < 1 ? 'Since today' : `${days} day${days === 1 ? '' : 's'}`],
+      ['Health', `${Math.ceil(Math.max(0, n.hp))} / ${Math.round(n.maxHp)}`],
+      ['Kills', fmt(n.kills || 0)],
+      ['Their spades', `${SP} ${fmt(n.purse || 0)}`],
+      ['Weapon', CREW_GUN_NAMES[gun] || 'Unarmed'],
+      ['Armour', `${A.name}${A.cut ? `, ${Math.round(A.cut * 100)}% less harm` : ''}`],
+    ];
+    let html = `<div class="dt">${n.name}</div><div class="fac">${fac.col ? `<i style="background:rgb(${fac.col.map((v) => Math.round(v * 255)).join(',')})"></i>` : ''}${fac.name}</div>`;
+    html += `<p class="story">${this.crewStory(n, fac)}${n.persona && n.persona.before ? `<br><br>"${n.persona.before}"` : ''}</p>`;
+    html += `<table>${rows.map(([a, b]) => `<tr><td>${a}</td><td>${b}</td></tr>`).join('')}</table>`;
+    if (gunNote) html += `<p class="gearnote">${gunNote}</p>`;
+    // Kit: what is better than what they have, and who pays what for it.
+    const why = N.crewShop(n).why;
+    const buy = (what, id, name, sub, cost) => {
+      const { yours } = N.crewSplit(n, cost);
+      return `<button class="buy" data-what="${what}" data-id="${id}"${why || P.scrip < yours ? ' disabled' : ''}><span>${name}</span><b>${SP} ${fmt(cost)}</b><small>${sub}</small></button>`;
+    };
+    // Said once, not on every row: what they put in, or why nothing can be bought here.
+    html += `<div class="shop-why">${why || (n.purse ? `${first} puts in ${SP} ${fmt(n.purse)}; you pay the rest.` : 'You pay for all of it.')}</div>`;
+    html += '<div class="list-title">Armour</div>';
+    const better = CREW_ARMOUR.map((a, t) => [a, t]).filter(([, t]) => t > tier);
+    html += better.length ? better.map(([a, t]) => buy('armour', t, a.name, `${Math.round(a.cut * 100)}% less harm`, a.cost)).join('') : '<div class="shop-why">Best there is.</div>';
+    html += '<div class="list-title">Weapons</div>';
+    html += Object.keys(CREW_GUNS).filter((w) => w !== gun).sort((a, b) => CREW_GUNS[a] - CREW_GUNS[b]).map((w) => {
+      const st = crewGunStats(w);
+      return buy('gun', w, CREW_GUN_NAMES[w], `${st.dmg} dmg, ${st.range} m`, CREW_GUNS[w]);
+    }).join('');
+    box.innerHTML = html;
+    box.querySelectorAll('.buy').forEach((b) => b.addEventListener('click', () => {
+      const what = b.dataset.what, id = what === 'armour' ? +b.dataset.id : b.dataset.id;
+      if (!N.crewBuy(n, what, id)) return;
+      g.audio.simple('coin');
+      this.toast(what === 'armour' ? `${first} is wearing a ${CREW_ARMOUR[id].name.toLowerCase()} now.` : `${first} has the ${CREW_GUN_NAMES[id]} now.`, 'good');
+      const top = box.scrollTop;
+      this.renderCrew();
+      box.scrollTop = top;
+    }));
   }
 
   // --- Inventory ---------------------------------------------------------------------------------
@@ -1303,11 +1433,15 @@ export class UI {
     if (sel) this.itemDetail('inv-detail', sel); else $('inv-detail').innerHTML = '';
     $('inv-sum').textContent = `${P.carryWeight().toFixed(1)} / ${P.carryCap()} kg    ${SP} ${fmt(P.scrip)}`;
     const A = P.armor ? ITEMS[P.armor] : null;
-    $('inv-stats').innerHTML = [
-      ['Health', `${Math.ceil(P.health)} / 100`], ['Infection', `${Math.round(P.infection)}%`], ['Armour', A ? `${A.name}, ${Math.round(A.armor * 100)}%` : 'None'],
-      ['Reputation', P.rep <= -30 ? 'Marked' : P.rep < 0 ? 'Distrusted' : P.rep < 25 ? 'Neutral' : P.rep < 60 ? 'Respected' : 'Well known'],
-      ['Zombies killed', fmt(P.kills)], ['Headshots', fmt(P.headshots)], ['Voxels broken', fmt(P.voxelsBroken)], ['Commissions', fmt(this.g.stats.jobs)], ['Time played', playTime(this.g.stats.playSecs || 0)], ['Operations', fmt(this.g.stats.ops || 0)],
-    ].map(([a, b]) => `${a.padEnd(16, ' ')}<b>${b}</b>`).join('<br>');
+    // You, as a figure: white when you are well, going red as you are hurt and sickly green as the infection takes hold. Armour shows as
+    // an outline round it.
+    const hurt = Math.pow(Math.min(1, Math.max(0, (70 - P.health) / 60)), 1.3), sick = Math.min(1, Math.max(0, P.infection / 100));
+    const mix = (a, b, k) => a.map((v, i) => Math.round(v + (b[i] - v) * k));
+    const col = mix(mix([236, 232, 222], [128, 196, 92], sick), [214, 58, 46], hurt);
+    const fill = `rgb(${col.join(',')})`, edge = A ? '#e8b04a' : 'none';
+    // Head, body, the arms the length of the body, and the legs: the same two-unit gap between every part of it.
+    const parts = [[14, 2, 12, 12], [11, 16, 18, 24], [3, 16, 6, 24], [31, 16, 6, 24], [11, 42, 8, 30], [21, 42, 8, 30]];
+    $('inv-stats').innerHTML = `<svg viewBox="1 0 38 74" class="figure" aria-hidden="true">${parts.map(([x, y, w, h]) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${fill}" stroke="${edge}" stroke-width="${A ? 1 : 0}"/>`).join('')}</svg>`;
   }
 
   itemDetail(host, id) {
@@ -1573,7 +1707,7 @@ export class UI {
 
     const topics = g.dialogue.topics(n);
     const isWork = (t) => t.job || t.pay;
-    const isDeed = (t) => t.recruit || t.dismiss || t.food || t.give || t.scrip || t.rest;
+    const isDeed = (t) => t.recruit || t.hire || t.dismiss || t.food || t.give || t.scrip || t.rest;
     // What they are for comes first, one key away. Chatting is what is left after that.
     const root = this.actionsFor(n, topics.filter(isDeed), topics.some(isWork));
     root.push({ label: 'There is something I wanted to ask you.', fn: () => this.talkMenu() });
@@ -1700,11 +1834,11 @@ export class UI {
   topicChoice(n, t, after) {
     const g = this.g, P = g.player;
     const seen = n.part && P.dlg.flags[`seen_${n.part.id}_${t.id}`];
-    return { label: t.ask, cls: t.recruit || t.food || t.dismiss ? 'quest' : seen ? 'seen' : (t.job || t.pay ? 'quest' : ''), fn: () => {
+    return { label: t.ask, cls: t.recruit || t.hire || t.food || t.dismiss ? 'quest' : seen ? 'seen' : (t.job || t.pay ? 'quest' : ''), fn: () => {
       const r = g.dialogue.choose(n, t);
       this.say(r.text);
       // Said yes to coming along, or agreed to head home: that is the conversation over. One key and you are on your way.
-      if ((t.recruit && n.kind === 'follower') || t.dismiss) {
+      if (((t.recruit || t.hire) && n.kind === 'follower') || t.dismiss) {
         this.setChoices([{ label: t.dismiss ? 'Take care.' : 'Let\'s go.', cls: 'primary', fn: () => g.resume() }], null);
         return;
       }
@@ -1714,7 +1848,7 @@ export class UI {
 
   talkMenu(thread) {
     const g = this.g, n = this.dlgNpc;
-    const isDeed = (t) => t.recruit || t.dismiss || t.food || t.give || t.scrip || t.rest;
+    const isDeed = (t) => t.recruit || t.hire || t.dismiss || t.food || t.give || t.scrip || t.rest;
     const topics = g.dialogue.topics(n, thread).filter((t) => thread || !(t.job || t.pay || isDeed(t)));
     const list = topics.map((t) => this.topicChoice(n, t, () => this.talkMenu()));
     if (!thread) {
@@ -1911,8 +2045,14 @@ export class UI {
     box.innerHTML = '';
     const d = document.createElement('div');
     d.className = 'job';
-    d.innerHTML = `<b>${job.title}</b><p>${job.desc}</p><span class="pay">${SP} ${job.reward}${job.bonus ? ` + ${ITEMS[job.bonus].name}` : ''}</span>`;
+    const need = job.crewNeed || 0, have = g.npcs.followers.length;
+    d.innerHTML = `<b>${job.title}</b><p>${job.desc}</p><span class="pay">${SP} ${job.reward}${job.bonus ? ` + ${ITEMS[job.bonus].name}` : ''}</span>${need ? `<span class="pay" style="display:block;margin-top:4px;color:${have >= need ? 'var(--green)' : 'var(--red)'}">Needs ${need} ${need === 1 ? 'companion' : 'companions'} (you have ${have})</span>` : ''}`;
     box.appendChild(d);
+    // A hard job is only handed to someone who has people with them.
+    if (have < need) {
+      this.setChoices([{ label: `Come back with ${need === 1 ? 'someone' : `${need} people`} to watch your back.`, cls: 'seen', fn: () => this.workMenu() }], { label: 'Let us talk about something else.', fn: () => this.workMenu() });
+      return;
+    }
     this.setChoices([{ label: 'I will take it', cls: 'quest', fn: () => { g.jobs.accept(job); this.workMenu(); } }], { label: 'Let us talk about something else.', fn: () => this.workMenu() });
   }
 
@@ -1930,6 +2070,12 @@ export class UI {
     const b = document.createElement('b');
     // Someone by name speaks for themself; the station's own calls come from its operator, with the place, so you know where.
     b.textContent = station ? (who && who !== station ? `${who}: ` : `${station} operator: `) : `${who}: `;
+    // Each voice in its own shade of the radio's blue, a little warmer or cooler, so you can tell who is talking at a glance.
+    let hh = 7;
+    for (const ch of String(who || station || '')) hh = (hh * 31 + ch.charCodeAt(0)) >>> 0;
+    const hue = 190 + (hh % 60) - 20, tint = `hsl(${hue}, ${42 + (hh >> 6) % 20}%, ${66 + (hh >> 11) % 10}%)`;
+    b.style.color = tint;
+    d.style.borderLeftColor = tint;
     d.appendChild(b);
     d.appendChild(document.createTextNode(text));
     box.appendChild(d);
@@ -2229,7 +2375,7 @@ export class UI {
       x.fillRect(tx(H.px[i]) - size / 2, tz(H.pz[i]) - size / 2, size, size);
     }
     for (const n of g.npcs.list) {
-      if (n.dead || !seen(n.x, n.z)) continue;
+      if (n.dead || !seen(n.x, n.z) || n.kind === 'follower') continue;
       if (n.kind === 'raider' && !n.aggro && Math.hypot(n.x - P.x, n.z - P.z) > 45) continue;
       x.fillStyle = n.kind === 'raider' ? '#f0963c' : n.kind === 'wanderer' ? '#d8d2a0' : '#8fd27a';
       // People shrink with the map: a speck each when the whole island is on screen, a proper marker close in. Raiders stay a little
@@ -2257,6 +2403,7 @@ export class UI {
       x.fillStyle = '#9fd4ff'; x.font = '700 11px Quantico, Bahnschrift, Segoe UI, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
       x.fillText('B', bx, bz + .5);
     }
+    for (const f of g.npcs.followers) if (!f.dead) companionArrow(x, tx(f.x), tz(f.z), Math.atan2(Math.sin(f.ys), -Math.cos(f.ys)), .85);
     const ax = tx(P.x), az = tz(P.z);
     x.save();
     x.translate(ax, az);
@@ -2475,7 +2622,7 @@ export class UI {
     if (last) {
       html += `<div class="list-title">${last.op ? 'Latest operation report' : 'Latest report'}</div><div class="job"><b>${last.title}</b><p>${last.camp ? `${last.camp}<br>` : ''}${last.sub ? `${last.sub}<br>` : ''}${last.rows.map(([k, v]) => `${k}: ${v}`).join('<br>')}</p></div>`;
     }
-    html += '<div class="list-title">Key</div><div class="map-key"><i style="background:#fff"></i><span>You</span><i style="background:#8fd27a"></i><span>Friendly</span><i style="background:#d8d2a0"></i><span>Wanderers</span><i style="background:#f0963c"></i><span>Raiders</span><i style="background:#6ec6ff"></i><span>Commission</span><i style="background:none;color:#6ec6ff;font-style:normal;text-align:center;line-height:10px">!</i><span>Work, zoomed in</span><i style="background:none;color:#f0b35a;font-style:normal;text-align:center;line-height:10px">W</i><span>Weapons, zoomed in</span><i style="background:none;color:#ff8a7a;font-style:normal;text-align:center;line-height:10px">+</i><span>Doctor, zoomed in</span></div>';
+    html += '<div class="list-title">Key</div><div class="map-key"><i style="background:#fff"></i><span>You</span><i style="background:#8fd27a"></i><span>Companions (arrows)</span><i style="background:#8fd27a"></i><span>Friendly</span><i style="background:#d8d2a0"></i><span>Wanderers</span><i style="background:#f0963c"></i><span>Raiders</span><i style="background:#6ec6ff"></i><span>Commission</span><i style="background:none;color:#6ec6ff;font-style:normal;text-align:center;line-height:10px">!</i><span>Work, zoomed in</span><i style="background:none;color:#f0b35a;font-style:normal;text-align:center;line-height:10px">W</i><span>Weapons, zoomed in</span><i style="background:none;color:#ff8a7a;font-style:normal;text-align:center;line-height:10px">+</i><span>Doctor, zoomed in</span><i style="background:none;color:#e0a868;font-style:normal;text-align:center;line-height:10px">B</i><span>Bar, zoomed in</span></div>';
     html += '<div class="list-title">Settlements</div>';
     for (const c of g.layout.camps) {
       const known = P.discovered[c.id];

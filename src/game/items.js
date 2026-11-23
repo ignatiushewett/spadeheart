@@ -123,6 +123,7 @@ export const VENDOR_STOCK = {
   arms: [['ammo_pistol', 1, 80, 200], ['ammo_shell', 1, 24, 60], ['ammo_rifle', 1, 60, 180], ['ammo_rocket', .5, 1, 3], ['grenade', 1, 3, 8], ['dynamite', .9, 2, 5], ['pistol', 1, 1, 1], ['revolver', .8, 1, 1], ['shotgun', .9, 1, 1], ['smg', .7, 1, 1], ['rifle', .7, 1, 1], ['deer', .7, 1, 1], ['hunting', .6, 1, 1], ['lmg', .25, 1, 1], ['rocket', .2, 1, 1], ['riot', .6, 1, 1], ['tactical', .25, 1, 1], ['axe', .7, 1, 1], ['sledge', .7, 1, 1], ['block_steel', .7, 36, 120]],
   medic: [['sleeping_pills', .9, 2, 5], ['bandage', 1, 6, 14], ['medkit', 1, 2, 6], ['antibiotic', 1, 2, 6], ['stim', .8, 1, 4], ['water', 1, 4, 8], ['beans', .7, 2, 6]],
   food: [['beans', 1, 8, 24], ['water', 1, 8, 24], ['whiskey', .7, 2, 6], ['smokes', .6, 2, 8], ['bandage', .4, 2, 5]],
+  bar: [['whiskey', 1, 6, 16], ['water', 1, 6, 14], ['smokes', .9, 4, 12], ['beans', .6, 3, 8]],
   builder: [['flashlight', .5, 1, 2], ['block_wood', 1, 240, 540], ['block_conc', 1, 180, 420], ['block_steel', 1, 60, 180], ['sledge', .7, 1, 1], ['axe', .7, 1, 1], ['crowbar', 1, 1, 2], ['dynamite', .5, 1, 3]],
   mechanic: [['bike_keys', 1, 1, 1], ['flashlight', .8, 1, 2], ['scrap', .7, 4, 12], ['parts', .7, 2, 6], ['crowbar', .7, 1, 1], ['sledge', .4, 1, 1]],
   junk: [['flashlight', .7, 1, 2], ['block_wood', 1, 120, 300], ['block_conc', 1, 90, 240], ['block_steel', .8, 24, 72], ['sledge', .6, 1, 1], ['axe', .6, 1, 1], ['dynamite', .5, 1, 3], ['scrap', .7, 4, 12], ['parts', .5, 2, 6], ['backpack', .4, 1, 1]],

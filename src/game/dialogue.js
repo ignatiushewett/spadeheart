@@ -3,6 +3,11 @@
 import { LORE, BEFORE, WEAPON_TALK, STATUS_TALK, ACTIVITY_TALK, KID_BEFORE } from './camplore.js';
 import { ITEMS } from './items.js';
 
+// Who will come with you. Standing thresholds match the names in STANDING (Trusted, Family).
+const JOIN_TRUSTED = 25, JOIN_FAMILY = 60;
+const JOIN_TRUSTED_ODDS = .15, JOIN_FAMILY_ODDS = .4;   // camp people, asked once a day
+const JOIN_WANDERER = .35, JOIN_WANDERER_MAX = .6;      // people on the road, plus a little for your name
+
 export const STANDING = [[60, 'Family'], [25, 'Trusted'], [10, 'Known'], [-5, 'Stranger'], [-30, 'Distrusted'], [-999, 'Marked']];
 export const standingName = (v) => STANDING.find(([min]) => v >= min)[1];
 
@@ -16,6 +21,25 @@ export class Dialogue {
   standing(campId) {
     const P = this.g.player;
     return (P.campRep[campId] || 0) + Math.min(0, P.rep);
+  }
+
+  // Someone with a post or a trade here does not walk off with you, however well you know them, and says why.
+  dutyRefusal(npc) {
+    const k = npc.kind, task = npc.task && npc.task.kind;
+    if (k === 'guard' || k === 'sentry') return pick(['I am on watch. Nobody walks off a post.', 'Not while I am holding this wall.', 'If I leave my post, somebody dies. No.']);
+    if (k === 'roamer') return pick(['I am on patrol. Talk to the camp if you want people.', 'We have our orders. No.']);
+    if (k === 'boss' || k === 'clerk' || k === 'named') return pick(['Somebody has to run this place. It is me.', 'I cannot leave. Not now, not with things the way they are.']);
+    if (k === 'vendor' || npc.mech || npc.doctor) return pick(['And who keeps this going while I am gone? No.', 'I have a trade here. People need it.']);
+    if (task === 'work' || task === 'farm' || task === 'teach') return pick(['I have work to do. This does not get done by itself.', 'Not today. This place does not run without us.', 'Ask someone who is not busy.']);
+    return null;
+  }
+
+  // The chance someone says yes when asked to come along: nothing to a near stranger, better the better this camp knows you, and best
+  // with people on the road, who have nowhere they need to be.
+  joinChance(npc) {
+    if (npc.kind === 'wanderer') return Math.min(JOIN_WANDERER_MAX, JOIN_WANDERER + Math.max(0, this.g.player.rep) / 200);
+    const v = this.standing(npc.camp);
+    return v >= JOIN_FAMILY ? JOIN_FAMILY_ODDS : v >= JOIN_TRUSTED ? JOIN_TRUSTED_ODDS : 0;
   }
 
   addStanding(campId, n) {
@@ -131,9 +155,12 @@ export class Dialogue {
     const food = ['beans', 'water', 'whiskey'].find((id) => P.count(id));
     if (food && !npc.fed) list.push({ id: 'share', ask: `Here, take this. (${ITEMS[food].name})`, say: pick(['Oh. Thank you. You do not know what that means.', 'I will not forget that. People say that a lot. I mean it.', 'You are all right, you know that?']), food, standing: 1 });
     if (npc.kind === 'roamer' && npc.factionId && !g.npcs.admitted(npc.factionId - 1)) list.push({ id: 'papers', ask: `How does anyone get into ${npc.campName}?`, say: `They don't, not without papers. ${g.npcs.citizenFee(npc.factionId - 1).toLocaleString('en-US')} spades, one time, and any of us out here can sign you up. It's good until you die. Don't try the wall, either. They'll shoot you and they'll remember you.` });
+    const room = g.npcs.followers.length < 3;
     if (npc.kind === 'follower') list.push({ id: 'dismiss', ask: 'Head on home. I will be all right from here.', say: 'If you are sure. Watch yourself out there.', dismiss: true });
-    else if (npc.kind === 'wanderer' && npc.armed && !npc.kid && !npc.role && g.npcs.followers.length < 3) list.push({ id: 'recruit', ask: 'Walk with me for a while.', say: pick(['Safer in numbers. All right, for now.', 'Why not. I was not getting anywhere on my own.', 'You look like you know how to stay alive. I will take that.']), recruit: true });
-    else if (npc.armed && !npc.kid && npc.kind !== 'vendor' && npc.camp >= 0 && g.npcs.followers.length < 3 && this.standing(npc.camp) >= 10) list.push({ id: 'recruit', ask: 'I could use someone watching my back out there.', say: pick(['You know what? Let me grab my things. I am tired of looking at these walls.', 'All right. But I shoot first and you owe me a drink.', 'I have been waiting for someone to ask.']), recruit: true });
+    // A gun for hire, at the bar: they come for money, not for friendship, and anyone can pay.
+    else if (npc.hire && room) list.push({ id: 'hire', ask: `[Hire] I need a gun out there. (${npc.hire.fee.toLocaleString('en-US')} spades)`, say: pick(['Money first. Then I go where you go.', 'Paid up front, and I do not do suicide runs. Deal.', 'You pay, I shoot. Lead the way.']), hire: true });
+    else if (npc.kind === 'wanderer' && npc.armed && !npc.kid && !npc.role && room) list.push({ id: 'recruit', ask: 'Walk with me for a while.', say: pick(['Safer in numbers. All right, for now.', 'Why not. I was not getting anywhere on my own.', 'You look like you know how to stay alive. I will take that.']), recruit: true });
+    else if (npc.armed && !npc.kid && npc.camp >= 0 && room && this.standing(npc.camp) >= 10) list.push({ id: 'recruit', ask: 'I could use someone watching my back out there.', say: pick(['You know what? Let me grab my things. I am tired of looking at these walls.', 'All right. But I shoot first and you owe me a drink.', 'I have been waiting for someone to ask.']), recruit: true });
     return list;
   }
 
@@ -169,13 +196,24 @@ export class Dialogue {
       P.dlg.flags[`seen_${part.id}_${t.id}`] = 1;
       if (t.daily) P.dlg.day[`${part.id}_${t.id}`] = g.day;
     }
-    // Asked to come along, half of them would rather not. They make up their mind once a day; asking again does not change it.
+    // Asked to come along, most say no. Anyone with a post or a job here always does; for everyone else it comes down to how well this
+    // place knows you, and someone already on the road is the easiest to talk round. They make up their mind once a day.
     if (t.recruit) {
+      const duty = this.dutyRefusal(npc);
+      if (duty) return { text: duty, then: null };
       if (npc.refusedDay === g.day) return { text: pick(['I already told you. No.', 'Still no. Ask me another day.', 'Same answer as before.']), then: null };
-      if (Math.random() < .5) {
+      if (Math.random() >= this.joinChance(npc)) {
         npc.refusedDay = g.day;
-        return { text: pick(['No. I have got people here who need me.', 'Not a chance. I have seen what is out there.', 'Thanks, but no. I am staying put.', 'Maybe another time. Not today.', 'I do not know you well enough for that.']), then: null };
+        const stranger = npc.kind !== 'wanderer' && this.standing(npc.camp) < JOIN_TRUSTED;
+        return { text: pick(stranger ? ['I do not know you well enough for that.', 'You want me to walk out of here with someone I barely know? No.', 'Ask me again when people here vouch for you.']
+          : ['No. I have got people here who need me.', 'Not a chance. I have seen what is out there.', 'Thanks, but no. I am staying put.', 'Maybe another time. Not today.']), then: null };
       }
+    }
+    if (t.hire) {
+      if (P.scrip < npc.hire.fee) return { text: pick(['Come back when you have the money.', 'That is not enough. I do not work on credit.', 'Short. Count it again and come back.']), then: null };
+      P.scrip -= npc.hire.fee;
+      g.ui.toast(`Paid ${npc.hire.fee.toLocaleString('en-US')} spades`);
+      g.npcs.hire(npc);
     }
     if (t.food) { P.remove(t.food, 1); npc.fed = true; }
     if (t.reveal) this.reveal(npc);

@@ -259,8 +259,12 @@ export class Renderer {
     // A minimised window reports no size at all, and the post chain still needs something to work with.
     const cw = Math.max(64, Math.floor(this.canvas.clientWidth * dpr));
     const ch = Math.max(64, Math.floor(this.canvas.clientHeight * dpr));
-    const sw = Math.max(64, Math.floor(cw * this.quality.scale));
-    const sh = Math.max(64, Math.floor(ch * this.quality.scale));
+    // Supersampled when asked (the title screen): drawn at twice the size and averaged down on the way to the screen, which smooths every
+    // edge far better than FXAA can alone. Exactly twice, so the last pass's filtering is a clean average of four. Held back on a screen
+    // big enough that it would be more than the card could take.
+    const ssk = this.superK > 1 ? (cw * ch * 4 <= 1e7 ? 2 : cw * ch * 2.25 <= 1e7 ? 1.5 : 1) : 1;
+    const sw = Math.max(64, Math.floor(cw * this.quality.scale * ssk));
+    const sh = Math.max(64, Math.floor(ch * this.quality.scale * ssk));
     if (this.canvas.width !== cw || this.canvas.height !== ch) { this.canvas.width = cw; this.canvas.height = ch; }
     if (sw === this.width && sh === this.height) return;
     this.width = sw; this.height = sh;
@@ -686,6 +690,9 @@ export class Renderer {
     this.grassLast = this.time;
     this.grassT = ((this.grassT || 0) + gdt * Math.max(.3, sway)) % 6283.18;
     if (p.u.uGrassT) gl.uniform1f(p.u.uGrassT, this.grassT);
+    // Leaves and cloth sway on a clock of their own too: a little quicker than real time, and quicker still in a downpour.
+    this.swayT = ((this.swayT || 0) + gdt * (1.15 + (this.rain || 0) * .75 + Math.min(.4, Math.hypot(this.windX || 0, this.windZ || 0) * .08))) % 6283.18;
+    if (p.u.uSwayT) gl.uniform1f(p.u.uSwayT, this.swayT);
     if (p.u.uGrassWave) gl.uniform1f(p.u.uGrassWave, this.grassWave ? 1 : 0);
     gl.uniform1i(p.u.uGlassPass, 0);
     this.bindRainMap(p); this.bindBlood(p);

@@ -269,6 +269,7 @@ layout(location=1) in uvec4 aInfo;
 uniform vec3 uOrigin;
 uniform sampler2D uPalette;
 uniform float uSway;
+uniform float uSwayT;   // the sway's own clock, which runs faster the harder the weather
 uniform float uGrassT;
 uniform float uGrassWave;   // 1 with grass moving in the wind (a setting), 0 for it standing still
 out vec3 vWorld;
@@ -283,19 +284,19 @@ void main(){
   // corner move together and nothing opens up between them. Harder in a wind.
   int flags=int(texelFetch(uPalette,ivec2(int(aInfo.x),0),0).a*255.+.5);
   if((flags&8)!=0&&uSway>0.&&(aInfo.w&2u)==0u){
-    float t=uTime,k=uSway;
-    p.x+=(sin(t*.85+p.x*.31+p.y*.19+p.z*.13)*.65+sin(t*1.45+p.z*.53)*.35)*.13*k;
-    p.z+=(cos(t*.7+p.z*.29+p.y*.23+p.x*.11)*.65+sin(t*1.6+p.x*.47)*.35)*.13*k;
-    p.y+=sin(t*1.05+p.x*.4+p.z*.4)*.035*k;
+    float t=uSwayT,k=uSway;
+    p.x+=(sin(t*.85+p.x*.31+p.y*.19+p.z*.13)*.65+sin(t*1.45+p.z*.53)*.35)*.2*k;
+    p.z+=(cos(t*.7+p.z*.29+p.y*.23+p.x*.11)*.65+sin(t*1.6+p.x*.47)*.35)*.2*k;
+    p.y+=sin(t*1.05+p.x*.4+p.z*.4)*.05*k;
   }
   // Canvas, awnings and flags: a quicker, smaller ripple running through the cloth, every corner on the same pattern so it stays in
   // one piece. Only what is drawn moves; it is as solid as ever to walk into.
   // Broad waves, so the corners of any one face move almost together and the face stays flat; half as much a block from where it is
   // fixed, so it bends there gently instead of folding.
   if((flags&32)!=0&&uSway>0.&&(aInfo.w&2u)==0u){
-    float t=uTime,k=min(uSway,1.6)*((aInfo.w&4u)!=0u?.45:1.);
+    float t=uSwayT,k=min(uSway,1.6)*((aInfo.w&4u)!=0u?.45:1.);
     float r=sin(t*2.1+p.x*.33+p.y*.22+p.z*.29)*.6+sin(t*3.1+p.z*.41-p.x*.19)*.4;
-    p.x+=r*.04*k; p.z+=cos(t*1.9+p.z*.31+p.y*.24)*.04*k; p.y+=r*.018*k;
+    p.x+=r*.05*k; p.z+=cos(t*1.9+p.z*.31+p.y*.24)*.05*k; p.y+=r*.022*k;
   }
   // Grass in the wind: the top edge of each grass block lifted up to a fifth of a block and let down again, in long waves running
   // across the ground on the diagonal. Only what is drawn moves; nothing anyone stands on or bumps into does.
@@ -863,10 +864,25 @@ vec3 beamsOnWater(vec3 o,vec3 r,float h){
   if(any(isnan(sum))||any(isinf(sum))) return vec3(0.);
   return min(sum,vec3(3.));
 }
-float wave(vec2 p){
-  float chop=vn(p*.11+uTime*vec2(.15,.07))*.6+vn(p*.31-uTime*vec2(.08,.19))*.3+vn(p*.9+uTime*.28)*.1;
-  float swell=sin(dot(p,vec2(.17,.11))+uTime*.45+vn(p*.03)*3.)*.5+sin(dot(p,vec2(-.09,.23))+uTime*.34+vn(p*.02+7.)*4.)*.32;
-  return chop+swell*.14*nearWater;
+// The sea's surface: layers of noise, broad to fine, each turned its own way and drifting two ways at once so the water keeps changing
+// shape instead of sliding past, with the old long swell under it. Nothing in it repeats, so there are no stripes. A layer is drawn only
+// while its ripples are wider than a few pixels on screen: past that they would break up into a shimmer, so far off only the broad ones are
+// left, and the water lies calm under the horizon.
+const float SEA_F[4]=float[4](.09,.21,.45,.95);
+const float SEA_A[4]=float[4](.5,.27,.15,.08);
+float seaH(vec2 p,float fw){
+  float t=uTime,h=0.;
+  for(int i=0;i<4;i++){
+    float aa=1.-smoothstep(.12,.4,fw*SEA_F[i]);
+    if(aa<=0.)break;
+    float an=float(i)*1.31+.4,cs=cos(an),sn=sin(an);
+    vec2 q=vec2(cs*p.x-sn*p.y,sn*p.x+cs*p.y)*SEA_F[i];
+    float sp=.22+float(i)*.16;
+    float a=vn(q+vec2(t*sp,t*sp*.45))*.5+vn(q*1.07+vec2(-t*sp*.6,t*sp*.8)+17.3)*.5;
+    h+=SEA_A[i]*aa*a;
+  }
+  float swell=sin(dot(p,vec2(.17,.11))+t*.45+vn(p*.03)*3.)*.5+sin(dot(p,vec2(-.09,.23))+t*.34+vn(p*.02+7.)*4.)*.32;
+  return h+swell*.1*(1.-smoothstep(.15,.5,fw*.03));
 }
 void main(){
   vec3 v=uCam-vWorld;
@@ -875,16 +891,27 @@ void main(){
   // Only where the far scenery stands in for the land, though: where the real blocks are built, their own shore keeps the water out, and
   // the map's coarser coastline would cut holes in the sea beside it down to the bed.
   if(dist>300.&&all(greaterThan(vWorld.xz,vec2(0.)))&&all(lessThan(vWorld.xz,uWorldSize))&&texture(uCityMap,vWorld.xz/uWorldSize).a>.5&&textureLod(uLoadMask,vWorld.xz/uWorldSize,0.).r<.5&&!coastal(uCityMap,vWorld.xz,uWorldSize)) discard;
-  float e=.35+dist*.002;
   vec2 p=vWorld.xz;
   nearWater=1.-smoothstep(120.,420.,dist);
-  float h=wave(p);
-  float rough=.25+.05*nearWater;
-  vec3 n=normalize(vec3((h-wave(p+vec2(e,0.)))*2.2/e*rough,1.,(h-wave(p+vec2(0.,e)))*2.2/e*rough));
+  // How much water one pixel covers here, for keeping every wave wider than the pixels it is drawn in.
+  float fw=max(max(fwidth(p.x),fwidth(p.y)),.001);
+  // The slope, measured across a step no smaller than a pixel or so: far off that smooths it the way the eye would.
+  float e=max(.3,fw*1.2);
+  float h0=seaH(p,fw);
+  vec2 g=vec2(seaH(p+vec2(e,0.),fw)-h0,seaH(p+vec2(0.,e),fw)-h0)/e;
+  float h=clamp(h0*1.05,0.,1.);
+  // Far out, what is left lies flatter, so the water settles into a calm band under the horizon rather than a busy one.
+  float farK=smoothstep(90.,600.,dist);
+  g*=mix(.95,.34,farK);
+  vec3 n=normalize(vec3(-g.x,1.,-g.y));
   float f=.03+.97*pow(1.-max(dot(n,v),0.),5.);
   vec3 r=reflect(-v,n);
+  // Never reflecting the ground: a wave tilted far enough to look under the horizon shows the horizon instead.
+  r.y=max(r.y,.002);
   vec3 skyR=mix(uHorizon,uSkyCol,clamp(r.y*1.3,0.,1.));
-  float sun=pow(max(dot(r,uSunDir),0.),320.)*18.+pow(max(dot(r,uSunDir),0.),40.)*.25;
+  // The sun's glitter: a tight point close in, spread into a softer path far off where the waves are too small to carry it.
+  float sp=mix(320.,70.,farK);
+  float sun=pow(max(dot(r,uSunDir),0.),sp)*mix(18.,5.,farK)+pow(max(dot(r,uSunDir),0.),40.)*.25;
   float sh=sampleShadow(vWorld,vec3(0.,1.,0.),dist);
   vec3 deep=vec3(.012,.035,.045)*(uSkyCol*2.+uSunCol*max(uSunDir.y,0.)*.6);
   vec3 c=mix(deep,skyR,f)+uSunCol*sun*sh;
@@ -1074,11 +1101,16 @@ void main(){
     } else if(upper){
       float sway=human?(walking?(limb==2?-swing:swing)*(weapon>0?.16:.42):sin(uTime*1.1+seed)*.018):(limb==2?-swing:swing)*.22;
       if(held) sway*=.15;
+      // A pistol up on aim is held out in both hands, steady: walking or not, neither arm swings with the stride.
+      bool aimArms=human&&(state==3.||(aiming&&weapon>0&&weapon<8));
+      // A pistol is aimed one-handed: the gun arm up and steady, the free arm down by the side, swinging only a little as they walk.
+      bool freeArm=aimArms&&weapon==1&&limb==2;
+      if(aimArms) sway=freeArm?(walking?-swing*.07:sin(uTime*1.1+seed)*.018):sin(uTime*1.3+seed)*.012;
       float raise;
       if(human){
         if(asleep) raise=.0;
         else if(sitting) raise=-.55;
-        else if(state==3.||(aiming&&weapon>0&&weapon<8)) raise=-1.5;
+        else if((state==3.||(aiming&&weapon>0&&weapon<8))&&!freeArm) raise=-1.5;
         else if(state==4.&&limb==2) raise=-.7+sin(uTime*2.6+seed)*.36;
         else if((state==6.||kneel)&&limb==3) raise=(kneel?-.75:-1.05)+sin(uTime*6.+seed)*.5;
         else if(limb==3) raise=weapon>0?(twoHand?-.62:-.3):-.1;
@@ -1088,7 +1120,7 @@ void main(){
       }
       // Arms thrown up and out, clawing at the air.
       if(falling) raise=-2.35+sin(uTime*8.3+seed+float(limb)*1.7)*.3;
-      float inward=falling?(limb==2?.42:-.42):(human&&limb==2&&(state==3.||(aiming&&weapon>0&&weapon<8)||(twoHand&&state!=4.)))?.42:(limb==2?.08:-.08);
+      float inward=falling?(limb==2?.42:-.42):(human&&limb==2&&!freeArm&&(state==3.||(aiming&&weapon>0&&weapon<8)||(twoHand&&state!=4.)))?.42:(limb==2?.08:-.08);
       if(held){
         if(limb==3){ raise=aiming?.3:0.; inward=aiming?-1.3:-.08; }
         else { raise=lh.x; inward=lh.y; }
@@ -1104,6 +1136,7 @@ void main(){
         if(held) joint=limb==3?(aiming?1.1:.4):lh.z;
         else if(chop) joint=limb==3?.9*wind+.15:1.1;
         else if(limb==3&&weapon>0) joint=0.;
+        else if(aimArms&&!freeArm) joint=.12;
         else if(asleep) joint=.1;
         else if(sitting) joint=.75;
         else if(state==4.) joint=limb==2?.95+sin(uTime*3.3+seed)*.3:.22;

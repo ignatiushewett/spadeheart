@@ -35,15 +35,15 @@ const E = {
 };
 
 export const CAMP_DEFS = [
-  { key: 'bryant', name: 'Lakeshore Market', blurb: 'A trade town behind a wall of stacked taxis, where the river runs into the lake. No shooting on the market floor.', wall: 'cabs', H: 9, door: M.TAXI, gates: 'NSEW', flag: [M.PAINT_Y, M.PAINT_K], emblem: 'dollar', faction: [.78, .62, .14], wardrobe: ['civ', 'scrap', 'civ'], stalls: ['general', 'arms', 'medic', 'junk', 'food', 'builder'], stallCount: 44, guardWeapons: ['rifle', 'shotgun', 'smg', 'rifle', 'sniper'], folkWeapons: ['pistol', 'shotgun', 'smg', 'bat', 'machete', 'pistol'], folk: 330, mix: { shack: 5, tent: 2, shelter: 3, fire: 2, table: 3, kitchen: 1, workshop: 2, garden: 0, laundry: 1, well: 1, school: .4 } },
-  { key: 'battery', name: 'Severn Landing', blurb: 'Containers, ferries and people still watching the bay for a ship.', wall: 'containers', H: 10, door: M.RUST, gates: 'NW', flag: [M.AWN_B, M.TENT_W], emblem: 'anchor', faction: [.2, .42, .72], wardrobe: ['scrap', 'civ'], stalls: ['general', 'junk', 'food', 'builder'], stallCount: 26, guardWeapons: ['rifle', 'shotgun', 'lmg', 'rifle'], folkWeapons: ['shotgun', 'pistol', 'axe', 'machete'], folk: 240, shackMats: [M.CONT_R, M.CONT_B, M.CONT_O, M.CONT_G], mix: { shack: 7, tent: 1, shelter: 3, fire: 2, table: 2, kitchen: 1, workshop: 2, garden: 0, laundry: 2, well: 1, school: .3 } },
-  { key: 'wash', name: 'Weston Grange', blurb: 'A log palisade around the old fairground and its arch. Everything here is decided by vote.', wall: 'palisade', H: 9, door: M.LOG, gates: 'NSE', flag: [M.BARN_R, M.TENT_W], emblem: 'arch', faction: [.52, .27, .2], wardrobe: ['civ', 'civ', 'med'], stalls: ['general', 'medic', 'food', 'builder'], stallCount: 24, guardWeapons: ['rifle', 'crossbow', 'shotgun', 'crossbow'], folkWeapons: ['crossbow', 'bat', 'machete', 'pistol', 'spear'], folk: 280, mix: { shack: 2, tent: 5, shelter: 3, fire: 3, table: 3, kitchen: 1, workshop: 1, garden: 3, laundry: 1, well: 1, school: 1 } },
-  { key: 'union', name: 'Fort Westpoint', blurb: 'National Guard who stopped taking orders. Sandbags, drills and a straight flagpole.', wall: 'hesco', H: 9, door: M.STEEL_D, gates: 'NSE', flag: [M.CONT_G, M.TENT_W], emblem: 'star', faction: [.82, .82, .78], wardrobe: ['mil', 'mil', 'mil', 'civ'], stalls: ['arms', 'junk', 'food', 'builder'], stallCount: 20, guardWeapons: ['rifle', 'rifle', 'lmg', 'sniper', 'rifle'], folkWeapons: ['rifle', 'rifle', 'smg', 'pistol'], folk: 300, tentCols: [M.TENT_G, M.TENT_G, M.CANVAS], shackMats: [M.CONT_G, M.CONCRETE_D], mix: { shack: 1, tent: 7, shelter: 1, fire: 1, table: 2, kitchen: 1, workshop: 2, garden: 0, laundry: .5, well: 1, school: .2 } },
-  { key: 'sheep', name: 'Arnhem Bastion', blurb: 'Sheet steel, crops and rules. The closest thing left to a town.', wall: 'sheet', H: 10, door: M.STEEL, gates: 'NSE', flag: [M.AWN_G, M.PAINT_Y], emblem: 'leaf', faction: [.26, .55, .24], wardrobe: ['civ', 'civ', 'mil'], stalls: ['general', 'arms', 'medic', 'food', 'builder'], stallCount: 28, guardWeapons: ['rifle', 'sniper', 'shotgun', 'rifle'], folkWeapons: ['shotgun', 'pistol', 'rifle', 'axe', 'bat'], folk: 380, shackMats: [M.PLANK, M.WOOD, M.TENT_W], mix: { shack: 7, tent: 1, shelter: 2, fire: 2, table: 3, kitchen: 1, workshop: 1, garden: 5, laundry: 2, well: 1, school: 1 } },
-  { key: 'tompkins', name: 'Cannery Collective', blurb: 'Punks, squatters and a wall they painted themselves, in the old cannery sheds back of Dayton. They were ready for this.', wall: 'scrap', H: 8, door: M.RUST, gates: 'SW', flag: [M.PAINT_K, M.RUST], emblem: 'anarchy', faction: [.27, .25, .25], wardrobe: ['scrap', 'scrap', 'civ'], stalls: ['junk', 'general', 'food', 'builder'], stallCount: 22, guardWeapons: ['shotgun', 'smg', 'crossbow', 'rifle'], folkWeapons: ['bat', 'machete', 'axe', 'crossbow', 'pistol', 'spear'], folk: 240, shackMats: [M.RUST, M.CONT_R, M.PLANK, M.RUST, M.PAINT_K, M.BRICK_B], mix: { shack: 6, tent: 2, shelter: 4, fire: 4, table: 2, kitchen: 1, workshop: 3, garden: 1, laundry: 1, well: 1, school: .2 } },
-  { key: 'morning', name: 'Gibson Redoubt', blurb: 'The last working clinic this side of the mountain, ringed by ambulances and white tents.', wall: 'white', H: 9, door: M.CAR_W, gates: 'NS', flag: [M.TENT_W, M.AWN_R], emblem: 'cross', faction: [.72, .14, .12], wardrobe: ['med', 'med', 'civ'], stalls: ['medic', 'general', 'food', 'builder'], stallCount: 24, guardWeapons: ['rifle', 'shotgun', 'smg', 'rifle'], folkWeapons: ['pistol', 'pistol', 'smg', 'bat'], folk: 280, tentCols: [M.TENT_W], shackMats: [M.TENT_W, M.CAR_W], mix: { shack: 2, tent: 7, shelter: 2, fire: 1, table: 2, kitchen: 1, workshop: 1, garden: 1, laundry: 3, well: 1, school: .4 } },
-  { key: 'garvey', lowCorners: true, clearCorners: 30, name: 'Carver Yard', blurb: 'Block captains, a church and a basketball court, in the old mill village down the valley from Esperance. The valley looks after its own.', wall: 'brick', H: 9, door: M.TAXI, gates: 'NSE', flag: [M.AWN_R, M.AWN_G], emblem: 'fist', faction: [.72, .42, .12], wardrobe: ['civ', 'civ', 'scrap'], stalls: ['arms', 'junk', 'general', 'food', 'builder'], stallCount: 28, guardWeapons: ['rifle', 'shotgun', 'sniper', 'lmg'], folkWeapons: ['shotgun', 'pistol', 'bat', 'rifle', 'smg'], folk: 430, shackMats: [M.BRICK_R, M.BRICK_B, M.PLANK, M.RUST], tentCols: [M.TENT_G, M.CANVAS, M.TENT_W, M.CANVAS], mix: { tenement: 5, wreck: .8, shack: 4, tent: 1, shelter: 2, fire: 4, table: 5, kitchen: 2, workshop: 1, garden: 1, laundry: 2, well: 1, school: 1 } },
-  { key: 'tryon', name: 'Abbey Keep', blurb: 'The museum staff held the old abbey in Westmoor, on Albion\'s west side, and built out from its stone. Crossbows, because gunfire carries.', wall: 'stone', H: 13, door: M.WOOD_D, gates: 'SW', flag: [M.STAINED, M.PAINT_Y], emblem: 'tower', faction: [.38, .33, .42], wardrobe: ['civ', 'mil', 'civ'], stalls: ['general', 'arms', 'food', 'builder'], stallCount: 22, guardWeapons: ['crossbow', 'rifle', 'sniper', 'rifle'], folkWeapons: ['crossbow', 'spear', 'crossbow', 'axe', 'machete'], folk: 270, shackMats: [M.GRANITE, M.WOOD_D, M.SCHIST], mix: { shack: 5, tent: 2, shelter: 2, fire: 3, table: 3, kitchen: 1, workshop: 2, garden: 2, laundry: 1, well: 1, school: .4 } },
+  { key: 'bryant', name: 'Lakeshore Market', blurb: 'A trade town behind a wall of stacked taxis, where the river runs into the lake. No shooting on the market floor.', wall: 'cabs', H: 7, door: M.TAXI, gates: 'NSEW', flag: [M.PAINT_Y, M.PAINT_K], emblem: 'dollar', faction: [.78, .62, .14], wardrobe: ['civ', 'scrap', 'civ'], stalls: ['general', 'arms', 'medic', 'junk', 'food', 'builder'], stallCount: 44, guardWeapons: ['rifle', 'shotgun', 'smg', 'rifle', 'sniper'], folkWeapons: ['pistol', 'shotgun', 'smg', 'bat', 'machete', 'pistol'], folk: 330, mix: { shack: 5, tent: 2, shelter: 3, fire: 2, table: 3, kitchen: 1, workshop: 2, garden: 0, laundry: 1, well: 1, school: .4 } },
+  { key: 'battery', name: 'Severn Landing', blurb: 'Containers, ferries and people still watching the bay for a ship.', wall: 'containers', H: 8, door: M.RUST, gates: 'NW', flag: [M.AWN_B, M.TENT_W], emblem: 'anchor', faction: [.2, .42, .72], wardrobe: ['scrap', 'civ'], stalls: ['general', 'junk', 'food', 'builder'], stallCount: 26, guardWeapons: ['rifle', 'shotgun', 'lmg', 'rifle'], folkWeapons: ['shotgun', 'pistol', 'axe', 'machete'], folk: 240, shackMats: [M.CONT_R, M.CONT_B, M.CONT_O, M.CONT_G], mix: { shack: 7, tent: 1, shelter: 3, fire: 2, table: 2, kitchen: 1, workshop: 2, garden: 0, laundry: 2, well: 1, school: .3 } },
+  { key: 'wash', name: 'Weston Grange', blurb: 'A log palisade around the old fairground and its arch. Everything here is decided by vote.', wall: 'palisade', H: 7, door: M.LOG, gates: 'NSE', flag: [M.BARN_R, M.TENT_W], emblem: 'arch', faction: [.52, .27, .2], wardrobe: ['civ', 'civ', 'med'], stalls: ['general', 'medic', 'food', 'builder'], stallCount: 24, guardWeapons: ['rifle', 'crossbow', 'shotgun', 'crossbow'], folkWeapons: ['crossbow', 'bat', 'machete', 'pistol', 'spear'], folk: 280, mix: { shack: 2, tent: 5, shelter: 3, fire: 3, table: 3, kitchen: 1, workshop: 1, garden: 3, laundry: 1, well: 1, school: 1 } },
+  { key: 'union', name: 'Fort Westpoint', blurb: 'National Guard who stopped taking orders. Sandbags, drills and a straight flagpole.', wall: 'hesco', H: 7, door: M.STEEL_D, gates: 'NSE', flag: [M.CONT_G, M.TENT_W], emblem: 'star', faction: [.82, .82, .78], wardrobe: ['mil', 'mil', 'mil', 'civ'], stalls: ['arms', 'junk', 'food', 'builder'], stallCount: 20, guardWeapons: ['rifle', 'rifle', 'lmg', 'sniper', 'rifle'], folkWeapons: ['rifle', 'rifle', 'smg', 'pistol'], folk: 300, tentCols: [M.TENT_G, M.TENT_G, M.CANVAS], shackMats: [M.CONT_G, M.CONCRETE_D], mix: { shack: 1, tent: 7, shelter: 1, fire: 1, table: 2, kitchen: 1, workshop: 2, garden: 0, laundry: .5, well: 1, school: .2 } },
+  { key: 'sheep', name: 'Arnhem Bastion', blurb: 'Sheet steel, crops and rules. The closest thing left to a town.', wall: 'sheet', H: 8, door: M.STEEL, gates: 'NSE', flag: [M.AWN_G, M.PAINT_Y], emblem: 'leaf', faction: [.26, .55, .24], wardrobe: ['civ', 'civ', 'mil'], stalls: ['general', 'arms', 'medic', 'food', 'builder'], stallCount: 28, guardWeapons: ['rifle', 'sniper', 'shotgun', 'rifle'], folkWeapons: ['shotgun', 'pistol', 'rifle', 'axe', 'bat'], folk: 380, shackMats: [M.PLANK, M.WOOD, M.TENT_W], mix: { shack: 7, tent: 1, shelter: 2, fire: 2, table: 3, kitchen: 1, workshop: 1, garden: 5, laundry: 2, well: 1, school: 1 } },
+  { key: 'tompkins', name: 'Cannery Collective', blurb: 'Punks, squatters and a wall they painted themselves, in the old cannery sheds back of Dayton. They were ready for this.', wall: 'scrap', H: 7, door: M.RUST, gates: 'SW', flag: [M.PAINT_K, M.RUST], emblem: 'anarchy', faction: [.27, .25, .25], wardrobe: ['scrap', 'scrap', 'civ'], stalls: ['junk', 'general', 'food', 'builder'], stallCount: 22, guardWeapons: ['shotgun', 'smg', 'crossbow', 'rifle'], folkWeapons: ['bat', 'machete', 'axe', 'crossbow', 'pistol', 'spear'], folk: 240, shackMats: [M.RUST, M.CONT_R, M.PLANK, M.RUST, M.PAINT_K, M.BRICK_B], mix: { shack: 6, tent: 2, shelter: 4, fire: 4, table: 2, kitchen: 1, workshop: 3, garden: 1, laundry: 1, well: 1, school: .2 } },
+  { key: 'morning', name: 'Gibson Redoubt', blurb: 'The last working clinic this side of the mountain, ringed by ambulances and white tents.', wall: 'white', H: 7, door: M.CAR_W, gates: 'NS', flag: [M.TENT_W, M.AWN_R], emblem: 'cross', faction: [.72, .14, .12], wardrobe: ['med', 'med', 'civ'], stalls: ['medic', 'general', 'food', 'builder'], stallCount: 24, guardWeapons: ['rifle', 'shotgun', 'smg', 'rifle'], folkWeapons: ['pistol', 'pistol', 'smg', 'bat'], folk: 280, tentCols: [M.TENT_W], shackMats: [M.TENT_W, M.CAR_W], mix: { shack: 2, tent: 7, shelter: 2, fire: 1, table: 2, kitchen: 1, workshop: 1, garden: 1, laundry: 3, well: 1, school: .4 } },
+  { key: 'garvey', lowCorners: true, clearCorners: 30, name: 'Carver Yard', blurb: 'Block captains, a church and a basketball court, in the old mill village down the valley from Esperance. The valley looks after its own.', wall: 'brick', H: 7, door: M.TAXI, gates: 'NSE', flag: [M.AWN_R, M.AWN_G], emblem: 'fist', faction: [.72, .42, .12], wardrobe: ['civ', 'civ', 'scrap'], stalls: ['arms', 'junk', 'general', 'food', 'builder'], stallCount: 28, guardWeapons: ['rifle', 'shotgun', 'sniper', 'lmg'], folkWeapons: ['shotgun', 'pistol', 'bat', 'rifle', 'smg'], folk: 430, shackMats: [M.BRICK_R, M.BRICK_B, M.PLANK, M.RUST], tentCols: [M.TENT_G, M.CANVAS, M.TENT_W, M.CANVAS], mix: { tenement: 5, wreck: .8, shack: 4, tent: 1, shelter: 2, fire: 4, table: 5, kitchen: 2, workshop: 1, garden: 1, laundry: 2, well: 1, school: 1 } },
+  { key: 'tryon', name: 'Abbey Keep', blurb: 'The museum staff held the old abbey in Westmoor, on Albion\'s west side, and built out from its stone. Crossbows, because gunfire carries.', wall: 'stone', H: 11, door: M.WOOD_D, gates: 'SW', flag: [M.STAINED, M.PAINT_Y], emblem: 'tower', faction: [.38, .33, .42], wardrobe: ['civ', 'mil', 'civ'], stalls: ['general', 'arms', 'food', 'builder'], stallCount: 22, guardWeapons: ['crossbow', 'rifle', 'sniper', 'rifle'], folkWeapons: ['crossbow', 'spear', 'crossbow', 'axe', 'machete'], folk: 270, shackMats: [M.GRANITE, M.WOOD_D, M.SCHIST], mix: { shack: 5, tent: 2, shelter: 2, fire: 3, table: 3, kitchen: 1, workshop: 2, garden: 2, laundry: 1, well: 1, school: .4 } },
 ];
 
 // Uptown's brick, the same as the blocks outside the wall. These ones are lived in and patched up with whatever came to hand.
@@ -59,6 +59,29 @@ const ROLE_SIGN = { general: M.AWN_G, arms: M.AWN_R, medic: M.AWN_B, junk: M.CAN
 // Nobody built these from the same plan. Each trade tends towards what suits it, and what they could get hold of.
 const STALL_STYLES = { general: ['awning', 'kiosk', 'tarp', 'awning'], arms: ['container', 'kiosk', 'container'], medic: ['awning', 'kiosk'], junk: ['tarp', 'container', 'tarp'], food: ['cart', 'awning', 'cart', 'kiosk'], builder: ['yard', 'tarp', 'yard'], mechanic: ['garage'] };
 const WARM = 0, FIRE = 1, COOL = 2;
+const WORK_KINDS = new Set(['work', 'shop', 'class', 'teach']);
+const HOMES = new Set(['shack', 'tenement', 'tent', 'shelter']);   // plots whose doors are all on the alleys   // spots tucked in against a building, which a divider could shut off
+
+// The bar, in its own terms (u along the front, v from the back wall out to the yard). It is lined up with the camp's 2x2 nav cells,
+// which pair u and v as (0,1), (2,3) and so on, so the doorway and the gaps between things leave whole cells free.
+const BAR_W = 20, BAR_D = 18;              // footprint, building and yard together
+const BAR_PAD = 3;                         // blocks kept clear of other buildings all round
+const BAR_FRONT = 10;                      // v of the front wall; the porch is the two rows past it, the yard beyond
+const BAR_WALL_H = 6;                      // wall height; the roof starts on top
+const BAR_ROOF_STEP = 3;                   // rows of roof to each step up: a low pitch
+const BAR_DOOR = [8, 11], BAR_DOOR_H = 4;  // u range and height of the doorway
+const BAR_WINDOWS = [[2, 5], [14, 17]];    // u ranges of the front windows
+const BAR_COUNTER = [3, 16];               // u range of the counter, at v = 3
+const BAR_STOOLS = [4, 6, 8, 10, 12, 14, 16]; // u of each stool, at v = 5: the length of the counter
+const BAR_TABLES = [1];                    // u of each standing table, at v = 6, against a side wall
+const BAR_HIGH_TABLES = [[5, 8], [14, 8], [10, 7]]; // u, v of the high tables in the room, clear of the row along the stools
+const BAR_HEARTH_V = 7;                    // v of the fire, in the right-hand wall
+const BAR_BEAMS = [3, 6, 9];               // v of the beams across under the roof
+const BAR_LAMPS = [[5, 6], [14, 6]]; // u, v of the lamps hung under the beams
+const BAR_POSTS = [1, 6, 13, 18];          // u of the porch posts, at v = BAR_FRONT + 2
+const BAR_BENCHES = [[2, 5], [14, 17]];    // u ranges of the porch benches, at v = BAR_FRONT + 1
+const BAR_YARD_V = 15;                     // v of the yard tables
+const BAR_YARD_TABLES = [2, 16];           // u of the left end of each two-long yard table, a nav cell each
 
 export function planCamp(def, id, r, ground) {
   const rng = makeRng(9000 + id * 77);
@@ -86,7 +109,7 @@ export function planCamp(def, id, r, ground) {
     return true;
   };
   // Parts you can walk under or across say so; everything else is solid to the people who live here.
-  const OPEN = { hallchurch: 1, crops: 1, court: 1, graves: 1, bigtent: 1, cloister: 1, firepit: 1, table: 1, mechyard: 1, clinic: 1, lamp: 1, lights: 1, flag: 1, school: 1, range: 1, laundry: 1, garden: 1, kitchen: 1, nest: 1, well: 1 };
+  const OPEN = { hallchurch: 1, crops: 1, court: 1, graves: 1, bigtent: 1, cloister: 1, firepit: 1, table: 1, mechyard: 1, clinic: 1, bar: 1, lamp: 1, lights: 1, flag: 1, school: 1, range: 1, laundry: 1, garden: 1, kitchen: 1, nest: 1, well: 1 };
   const add = (t, x0, z0, x1, z1, h, extra = {}) => {
     c.parts.push({ t, x0, z0, x1, z1, h, ...extra });
     reserve(x0, z0, x1, z1);
@@ -108,7 +131,11 @@ export function planCamp(def, id, r, ground) {
   const hc = def.H - 1;
   c.hc = hc;
   const gateHalf = 5;
-  const px = r.plazaX ?? c.cx, pz = r.plazaZ ?? c.cz;
+  // The gates stand where the roads outside meet the wall. The square is off to one side of that line, a different side in each camp,
+  // so nobody walks in at a gate and sees straight through to the bonfire: the market lanes bend on their way in to it.
+  const gx = r.plazaX ?? c.cx, gz = r.plazaZ ?? c.cz, orng = makeRng(5150 + id * 37);
+  const off = () => (orng() < .5 ? -1 : 1) * (12 + Math.floor(orng() * 6) * 2);
+  const px = gx + off(), pz = gz + off();
   // Carver Yard keeps its books in the old church, on the edge of the square.
   const harlem = def.key === 'garvey';
   // The way up into a watchtower: in off the wall walk, round and up a stair inside the shaft, and out through a hatch in the lookout
@@ -126,7 +153,7 @@ export function planCamp(def, id, r, ground) {
   };
   const mkGate = (side) => {
     const horiz = side === 'N' || side === 'S';
-    const tc = horiz ? px : pz;
+    const tc = horiz ? gx : gz;
     const base = side === 'N' ? r.z0 : side === 'S' ? r.z1 - 1 : side === 'W' ? r.x0 : r.x1 - 1;
     const g = horiz
       ? { side, x0: tc - gateHalf, x1: tc + gateHalf, z0: base, z1: base + 1 }
@@ -251,11 +278,32 @@ export function planCamp(def, id, r, ground) {
   block(r.x0, r.z0, r.x1, r.z0 + 6); block(r.x0, r.z1 - 6, r.x1, r.z1);
   block(r.x0, r.z0, r.x0 + 6, r.z1); block(r.x1 - 6, r.z0, r.x1, r.z1);
   for (const [a, b, e, f] of wallLanes) for (let z = b; z <= f; z++) for (let x = a; x <= e; x++) if (inR(x, z)) solid[(x - r.x0) + (z - r.z0) * W] = 0;
-  const AV = 4;
-  reserve(px - AV, r.z0, px + AV, r.z1); reserve(harlem ? px : r.x0, pz - AV, r.x1, pz + AV);
+  const AV = 4, PW = 24, PD = 20;
+  // The market lanes, one in from each side to the square. From a gate it runs in straight, then a dog-leg across, partway, onto the
+  // square's own line, and on in to it. A side with no gate has a lane straight out from the square to the road round the inside of the
+  // wall. Each lane is a list of straight runs, nine wide.
+  const lanes = [];
+  const lane = (ax, az, bx, bz) => {
+    const l = { x0: Math.min(ax, bx), z0: Math.min(az, bz), x1: Math.max(ax, bx), z1: Math.max(az, bz), along: ax === bx ? 'z' : 'x' };
+    lanes.push(l);
+    reserve(l.x0 - AV, l.z0 - AV, l.x1 + AV, l.z1 + AV);
+  };
+  for (const side of ['N', 'S', 'W', 'E']) {
+    if (harlem && side === 'W') continue;
+    const ns = side === 'N' || side === 'S', g = c.gates.find((q) => q.side === side);
+    const edge = side === 'N' ? r.z0 : side === 'S' ? r.z1 : side === 'W' ? r.x0 : r.x1;
+    const inner = side === 'N' ? pz - PD : side === 'S' ? pz + PD : side === 'W' ? px - PW : px + PW;
+    const at = ns ? px : pz;
+    if (!g || g.tc === at) { if (ns) lane(at, edge, at, inner); else lane(edge, at, inner, at); continue; }
+    const bend = Math.round(edge + (inner - edge) * (.35 + orng() * .25));
+    if (ns) { lane(g.tc, edge, g.tc, bend); lane(g.tc, bend, at, bend); lane(at, bend, at, inner); }
+    else { lane(edge, g.tc, bend, g.tc); lane(bend, g.tc, bend, at); lane(bend, at, inner, at); }
+  }
+
+  c.lanes = lanes;
+  c.square = { x: px, z: pz, w: PW, d: PD };
 
   // --- Plaza: the heart of the place --------------------------------------------------------------
-  const PW = 24, PD = 20;
   reserve(px - PW, pz - PD, px + PW, pz + PD);
   c.boss = { x: px, z: pz - 13 };
   light(px, pz - 14, 12);
@@ -263,8 +311,27 @@ export function planCamp(def, id, r, ground) {
   c.fires.push({ x: px, z: pz, big: true });
   light(px, pz, 30, FIRE);
   // Long benches around the bonfire: this is where a camp sits together at night.
+  // One of the benches north or south of it has given way to something else: a long table with a lamp on it, or a cook station where
+  // the square gets fed.
+  const swapZ = orng() < .5 ? -8 : 8, swapKind = orng() < .5 ? 'table' : 'kitchen';
   for (const [dx, dz, yaw] of [[-8, 0, Math.PI / 2], [8, 0, -Math.PI / 2], [0, -8, 0], [0, 8, Math.PI]]) {
     const hz = dx === 0;
+    if (dz === swapZ && swapKind === 'table') {
+      const z = pz + dz - 2;
+      add('table', px - 4, z, px + 4, z + 4, 4, { lamp: true });
+      light(px, z + 2, 9);
+      for (let k = 1; k < 8; k += 2) { c.pois.push({ x: px - 4 + k + .5, z: z + .5, kind: 'sit', yaw: 0, seat: true }, { x: px - 4 + k + .5, z: z + 4.5, kind: 'sit', yaw: Math.PI, seat: true }); }
+      continue;
+    }
+    if (dz === swapZ) {
+      const z = dz < 0 ? pz - 11 : pz + 6, z1 = z + 5;
+      add('kitchen', px - 4, z, px + 4, z1, 5);
+      light(px, z + 2, 13, FIRE);
+      c.fires.push({ x: px, z: z + 2, small: true });
+      c.pois.push({ x: px - 1.5, z: z + 4.5, kind: 'work', yaw: Math.PI }, { x: px + 2, z: z + 4.5, kind: 'work', yaw: Math.PI });
+      for (let k = 0; k < 4; k++) c.pois.push({ x: px - 2 + k * 2, z: z1 + 1.5, kind: 'shop', yaw: Math.PI });
+      continue;
+    }
     add('bench', px + dx - (hz ? 4 : 0), pz + dz - (hz ? 0 : 4), px + dx + (hz ? 4 : 0), pz + dz + (hz ? 0 : 4), 1);
     for (let k = -3; k <= 3; k += 1.5) c.pois.push({ x: px + dx + (hz ? k : 0) + .5, z: pz + dz + (hz ? 0 : k) + .5, kind: 'sit', yaw, seat: true });
   }
@@ -298,6 +365,8 @@ export function planCamp(def, id, r, ground) {
     block(x1 - 3, z0, x1 - 3, pz - 3); block(x1 - 3, pz + 3, x1 - 3, z1);
     block(x1 - 1, z0, x1, pz - 4); block(x1 - 1, pz + 4, x1, z1);
     block(x1 - (D - 6), pz - 3, x1 - (D - 7), pz + 3);
+    // The sides of the tower over the door come down to the floor now: a short passage in under it.
+    block(x1 - 8, pz - 3, x1 - 4, pz - 3); block(x1 - 8, pz + 3, x1 - 4, pz + 3);
     // A queue down the aisle for the clerk, people waiting along what is left of the pews, and knots of them arguing by the walls.
     c.hallPois = [];
     const hallPoi = (v, u, kind, yaw, seat) => { const q = { x: x1 - v + .5, z: z0 + u + .5, kind, yaw, hall: true }; if (seat) q.seat = true; c.hallPois.push(q); };
@@ -319,12 +388,42 @@ export function planCamp(def, id, r, ground) {
     }
   }
 
+  // --- Where the bar goes, before the market fills the lanes --------------------------------------------
+  // On the square or a market lane, its yard opening straight onto it, as close to the bonfire as there is room: the first place anyone
+  // passes on their way across town. Only the spot is chosen here; it is built further down, with everything in it.
+  // The doctor's tent goes the same way, on whatever frontage the bar left: its open side onto the way, so you walk straight in off it.
+  // A block of BW by BD, its front (the far end of v) opening onto the square's north or south edge or an east-west run of a lane, as close
+  // to the bonfire as there is room. Lined up with the 2x2 cells people find their way by.
+  const frontOnto = (BW, BD, PAD) => {
+    const lines = [{ x0: px - PW, x1: px + PW, z: pz - PD, half: 0 }, { x0: px - PW, x1: px + PW, z: pz + PD, half: 0 }];
+    for (const l of lanes) if (l.along === 'x') lines.push({ x0: l.x0, x1: l.x1, z: l.z0, half: AV });
+    let best = Infinity, at = null;
+    for (const ln of lines) for (const north of [true, false]) {
+      // North of the line the front faces south onto it (fz 0); south of it, north (fz 1).
+      let z0 = north ? ln.z - ln.half - 1 - (BD - 1) : ln.z + ln.half + 1;
+      z0 += north ? -((z0 - r.z0) & 1) : ((z0 - r.z0) & 1);
+      const z1 = z0 + BD - 1;
+      for (let x0 = ln.x0 - BW + 4; x0 <= ln.x1 - 4; x0 += 2) {
+        const ax = x0 + ((x0 - r.x0) & 1), ax1 = ax + BW - 1;
+        // Clear all round but the front, which opens onto the way.
+        if (!isFree(ax - PAD, north ? z0 - PAD : z0, ax1 + PAD, north ? z1 : z1 + PAD)) continue;
+        const d = Math.hypot(ax + BW / 2 - px, (z0 + z1) / 2 - pz);
+        if (d < best) { best = d; at = { x: ax, z: z0, fx: ((ax + BW / 2) < px) ? 1 : 0, fz: north ? 0 : 1 }; }
+      }
+    }
+    if (at) reserve(at.x - PAD, at.z - PAD, at.x + BW - 1 + PAD, at.z + BD - 1 + PAD);
+    return at;
+  };
+  const barAt = frontOnto(BAR_W, BAR_D, BAR_PAD);
+  const clinicAt = frontOnto(16, 12, 2);
+
   // --- Market: stalls shoulder to shoulder along the avenues ------------------------------------------
+  // Stalls face onto the lanes from both sides, all along each run, round the bends as well.
   const stallSlots = [];
-  for (let d = PD + 3; pz - d > r.z0 + 16; d += 11) for (const s of [-1, 1]) stallSlots.push({ x: px + s * (AV + 1), z: pz - d, face: s < 0 ? 'E' : 'W' });
-  for (let d = PD + 3; pz + d < r.z1 - 16; d += 11) for (const s of [-1, 1]) stallSlots.push({ x: px + s * (AV + 1), z: pz + d, face: s < 0 ? 'E' : 'W' });
-  for (let d = PW + 3; px - d > r.x0 + 16; d += 11) for (const s of [-1, 1]) stallSlots.push({ x: px - d, z: pz + s * (AV + 1), face: s < 0 ? 'S' : 'N' });
-  for (let d = PW + 3; px + d < r.x1 - 16; d += 11) for (const s of [-1, 1]) stallSlots.push({ x: px + d, z: pz + s * (AV + 1), face: s < 0 ? 'S' : 'N' });
+  for (const l of lanes) {
+    if (l.along === 'z') { for (let z = l.z0 + 5; z <= l.z1 - 5; z += 11) for (const s of [-1, 1]) stallSlots.push({ x: l.x0 + s * (AV + 1), z, face: s < 0 ? 'E' : 'W' }); }
+    else for (let x = l.x0 + 5; x <= l.x1 - 5; x += 11) for (const s of [-1, 1]) stallSlots.push({ x, z: l.z0 + s * (AV + 1), face: s < 0 ? 'S' : 'N' });
+  }
   stallSlots.sort((a, b) => Math.hypot(a.x - px, a.z - pz) - Math.hypot(b.x - px, b.z - pz));
   let stalls = 0, hasDoctor = true;
   for (const s of stallSlots) {
@@ -371,10 +470,10 @@ export function planCamp(def, id, r, ground) {
     light(lx, lz, 11);
   };
   // Each string crosses in a gap between two stalls, its poles in line with the stall fronts: nothing stands in the walkway or at a counter.
-  for (let d = PD + 9; pz - d > r.z0 + 13; d += 22) string(px - AV - 1, pz - d, px + AV + 1, pz - d, px, pz - d);
-  for (let d = PD + 9; pz + d < r.z1 - 13; d += 22) string(px - AV - 1, pz + d, px + AV + 1, pz + d, px, pz + d);
-  for (let d = PW + 9; px - d > r.x0 + 13; d += 22) string(px - d, pz - AV - 1, px - d, pz + AV + 1, px - d, pz);
-  for (let d = PW + 9; px + d < r.x1 - 13; d += 22) string(px + d, pz - AV - 1, px + d, pz + AV + 1, px + d, pz);
+  for (const l of lanes) {
+    if (l.along === 'z') { for (let z = l.z0 + 10; z <= l.z1 - 8; z += 22) if (z > r.z0 + 13 && z < r.z1 - 13) string(l.x0 - AV - 1, z, l.x0 + AV + 1, z, l.x0, z); }
+    else for (let x = l.x0 + 10; x <= l.x1 - 8; x += 22) if (x > r.x0 + 13 && x < r.x1 - 13) string(x, l.z0 - AV - 1, x, l.z0 + AV + 1, x, l.z0);
+  }
 
   // --- Signature buildings --------------------------------------------------------------------------
   const sig = (t, w, d, ox, oz, h, extra = {}, pad = 2) => {
@@ -523,6 +622,7 @@ export function planCamp(def, id, r, ground) {
       yard.work.push(carSpot);
       yard.chain.push(carSpot);
       c.mechYard = yard;
+      c.spots.yard = { x: wx(YW + 1.5), z: wz(7) };
       // Where the curious stand and talk bikes with whoever is working: by the open side, looking in.
       const browse = [];
       for (const [u, v] of [[12.2, 5.6], [12.4, 7.4], [11.2, 9.2]]) {
@@ -543,8 +643,8 @@ export function planCamp(def, id, r, ground) {
   {
     const CW2 = 16, CD = 12;
     // As near the middle of the town as there is clear ground, before the houses fill in round it: nothing that matters is moved.
-    let at = null;
-    const s0 = placeNear(CW2, CD, px - (CW2 >> 1), pz - (CD >> 1), 1);
+    let at = clinicAt;
+    const s0 = at ? null : placeNear(CW2, CD, px - (CW2 >> 1), pz - (CD >> 1), 1);
     if (s0) {
       // The way in faces the square; the red cross end faces whichever way it is away from the middle.
       const tx = s0.x + CW2 / 2, tz = s0.z + CD / 2;
@@ -570,13 +670,14 @@ export function planCamp(def, id, r, ground) {
         x0, z0, x1, z1,
         // Who is laid up (some of the cots), and who sits waiting on the bench.
         lie: [cots[0], cots[1], cots[3], cots[5]],
-        sit: [{ x: wx(13.9), z: wz(5.5), yaw: ang(-1, 0) }, { x: wx(13.9), z: wz(7.5), yaw: ang(-1, 0) }],
+        sit: [{ x: wx(14.5), z: wz(5.5), yaw: ang(-1, 0) }, { x: wx(14.5), z: wz(7.5), yaw: ang(-1, 0) }],
         // The doctor's rounds: the foot of each occupied cot, and the table.
         desk: { x: wx(11.5), z: wz(8.1), yaw: ang(0, 1) },
         stops: [2, 4, 8, 12].map((u) => ({ x: wx(u + .5), z: wz(4.4), yaw: ang(0, -1) })),
       };
       clinic.stops.push({ x: wx(12.6), z: wz(6.5), yaw: ang(1, 0) });
       c.clinic = clinic;
+      c.spots.clinic = { x: wx(8), z: wz(CD + 1.5) };
       const browse = [];
       for (const [u, v] of [[7.5, 10.1], [8.6, 10.2]]) {
         const p = { x: wx(u), z: wz(v), kind: 'browse', yaw: ang(0, -1) };
@@ -589,6 +690,82 @@ export function planCamp(def, id, r, ground) {
   }
   // Nowhere for a tent: the doctor takes the first stall on the market, the way it used to be.
   if (!c.clinic) { const v = c.vendors.find((q) => q.role !== 'mechanic'); if (v) { v.role = 'medic'; v.doctor = true; } }
+
+  // --- The bar: a timber pub in a corner the yard did not take -----------------------------------------
+  // Somewhere to drink and sit out the evening. A long counter with the barkeep behind it and bottles on the back wall, stools along it,
+  // a pitched tin roof, lit windows either side of the door, a covered porch with benches, and a yard out front with barrels to stand at.
+  // The hired guns drink here, and wait for someone to pay them. Nothing is built right up against it, so it stands in a bit of space.
+  // Its own random numbers, so that building it moves nothing that was planned with the camp's.
+  {
+    const BW = BAR_W, BD = BAR_D, PAD = BAR_PAD, brng = makeRng(31337 + id * 131);
+    // Well in from its corner, over towards the square and the lanes, where people pass it.
+    const inward = (cx, cz) => [Math.round(cx + (px - cx) * .6), Math.round(cz + (pz - cz) * .6)];
+    const corners = [[...inward(r.x0 + 11, r.z0 + 11), 0, 0], [...inward(r.x1 - 11 - BW, r.z0 + 11), 1, 0], [...inward(r.x0 + 11, r.z1 - 11 - BD), 0, 1], [...inward(r.x1 - 11 - BW, r.z1 - 11 - BD), 1, 1]]
+      .filter(([, , fx, fz]) => `${fx}${fz}` !== c.yardCorner);
+    for (let i = corners.length - 1; i > 0; i--) { const j = Math.floor(brng() * (i + 1)); [corners[i], corners[j]] = [corners[j], corners[i]]; }
+    let at = barAt;
+    // Nowhere on the square or a lane: a corner of the town, as it used to be. A block bigger than it needs: room for the margin round it,
+    // and to line it up with the 2x2 cells people find their way by, so every doorway and gap inside is a whole cell.
+    if (!at) for (const [tx, tz, fx, fz] of corners) {
+      const s = placeNear(BW + 1 + PAD * 2, BD + 1 + PAD * 2, tx - PAD, tz - PAD, 1);
+      if (!s || Math.hypot(s.x - tx, s.z - tz) >= 40) continue;
+      const ax = s.x + PAD, az = s.z + PAD;
+      at = { x: ax + ((ax - r.x0) & 1), z: az + ((az - r.z0) & 1), fx, fz };
+      break;
+    }
+    if (at) {
+      const x0 = at.x, z0 = at.z, x1 = x0 + BW - 1, z1 = z0 + BD - 1, fx = at.fx, fz = at.fz;
+      // Local u along the front and v from the back wall (v = 0, towards the camp wall) out to the yard.
+      const wx = (u) => (fx ? x1 + 1 - u : x0 + u), wz = (v) => (fz ? z1 + 1 - v : z0 + v);
+      const cell = (u, v) => [Math.floor(wx(u + .5)), Math.floor(wz(v + .5))];
+      add('bar', x0, z0, x1, z1, BAR_WALL_H + 7, { fx, fz });
+      reserve(x0 - PAD, z0 - PAD, x1 + PAD, z1 + PAD);
+      const solidCell = (u, v) => { const [a, b] = cell(u, v); block(a, b, a, b); };
+      const F = BAR_FRONT;
+      for (let v = 0; v <= F; v++) { solidCell(0, v); solidCell(BW - 1, v); }
+      for (let u = 0; u < BW; u++) { solidCell(u, 0); if (u < BAR_DOOR[0] || u > BAR_DOOR[1]) solidCell(u, F); }
+      for (let u = BAR_COUNTER[0]; u <= BAR_COUNTER[1]; u++) solidCell(u, 3);
+      for (const u of BAR_STOOLS) solidCell(u, 5);
+      for (const u of BAR_TABLES) solidCell(u, 6);
+      for (const u of BAR_POSTS) solidCell(u, F + 2);
+      for (const [a, b] of BAR_BENCHES) for (let u = a; u <= b; u++) solidCell(u, F + 1);
+      for (const u of BAR_YARD_TABLES) { solidCell(u, BAR_YARD_V); solidCell(u + 1, BAR_YARD_V); }
+      for (const [u, v] of BAR_HIGH_TABLES) solidCell(u, v);
+      for (let v = BAR_HEARTH_V - 1; v <= BAR_HEARTH_V + 1; v++) solidCell(BW - 2, v);
+      const ang = (du, dv) => Math.atan2(fx ? -du : du, fz ? -dv : dv);
+      const bar = { x0, z0, x1, z1, fx, fz, pois: [] };
+      const spot = (u, v, kind, du, dv) => { const p = { x: wx(u), z: wz(v), kind, yaw: ang(du, dv), bar: true }; bar.pois.push(p); return p; };
+      // Sat on a stool at the counter, facing it, the way people sit on the benches at the camp's tables.
+      for (const u of BAR_STOOLS) spot(u + .5, 5.5, 'sit', 0, -1).seat = true;
+      // Leaning on the tables against the side walls, and stood about in the room with a drink.
+      for (const u of BAR_TABLES) { const side = u < BW / 2 ? 1 : -1; spot(u + .5 + side * 1.1, 6.3, 'talk', -side, 0); spot(u + .5 + side * 1.1, 7.6, 'talk', -side, 0); }
+      // Round the high tables in the room, and stood by the fire.
+      for (const [u, v] of BAR_HIGH_TABLES) { spot(u - .6, v + .5, 'talk', 1, 0); spot(u + 1.6, v + .5, 'talk', -1, 0); spot(u + .5, v + 1.6, 'talk', 0, -1); }
+      spot(BW - 3.4, BAR_HEARTH_V - 1.4, 'talk', 1, 0); spot(BW - 3.4, BAR_HEARTH_V + 2.2, 'talk', 1, 0);
+      // On the porch benches, back to the wall, looking out over the yard.
+      for (const [a, b] of BAR_BENCHES) for (let u = a; u <= b; u += 2) spot(u + .5, F + 1.5, 'sit', 0, 1).seat = true;
+      // At the tables in the yard.
+      // At the tables in the yard: one at each end. Most of the drinking goes on indoors.
+      for (const u of BAR_YARD_TABLES) { spot(u - .6, BAR_YARD_V + .5, 'talk', 1, 0); spot(u + 2.6, BAR_YARD_V + .5, 'talk', -1, 0); }
+      // At the counter, being served, in the gaps between the stools: two bartenders, each with their own end of it.
+      const browseA = [spot(5.5, 4.15, 'browse', 0, -1), spot(7.5, 4.15, 'browse', 0, -1)];
+      const browseB = [spot(13.5, 4.15, 'browse', 0, -1), spot(15.5, 4.15, 'browse', 0, -1)];
+      c.pois.push(...bar.pois);
+      bar.keep = { x: wx(6.5), z: wz(1.9), yaw: ang(0, 1) };
+      bar.keep2 = { x: wx(13.5), z: wz(1.9), yaw: ang(0, 1) };
+      c.vendors.push({ role: 'bar', x: bar.keep.x, z: bar.keep.z, yaw: bar.keep.yaw, browse: browseA });
+      c.vendors.push({ role: 'bar', x: bar.keep2.x, z: bar.keep2.z, yaw: bar.keep2.yaw, browse: browseB });
+      c.bar = bar;
+      c.spots.bar = { x: wx(BW / 2), z: wz(BAR_FRONT + 3.5) };
+      c.spots.barYard = { x: wx(BW / 2), z: wz(BD + 1.5) };
+      // The room takes its colour from the fire: firelight across it, strongest at the hearth, warm lamplight out in the yard.
+      light(Math.floor(wx(BW / 2)), Math.floor(wz(5)), 17, FIRE);
+      light(Math.floor(wx(BW / 2)), Math.floor(wz(BAR_YARD_V)), 12);
+      light(Math.floor(wx(BW - 2)), Math.floor(wz(BAR_HEARTH_V)), 14, FIRE);
+      // The fire in the hearth burns like any other in the camp, flames and all; it is under a roof, so the rain never gets it.
+      c.fires.push({ x: Math.floor(wx(BW - 1.5)), z: Math.floor(wz(BAR_HEARTH_V + .5)), hearth: true });
+    }
+  }
 
   // --- The town itself: plot after plot, with alleys just wide enough to push through -------------------
   const shackMats = def.shackMats || [M.PLANK, M.RUST, M.CONT_O, M.BRICK_B, M.WOOD_D];
@@ -720,16 +897,47 @@ export function planCamp(def, id, r, ground) {
       }
   };
 
+  // A side street from each of them to the nearest market lane, held open before the houses go up: the way people actually walk there.
+  for (const k of ['clinic', 'barYard', 'yard']) {
+    const sp = c.spots[k];
+    if (!sp) continue;
+    const x = Math.floor(sp.x), z = Math.floor(sp.z);
+    let best = null, bd = 1e9;
+    for (const l of lanes) {
+      const lx = Math.max(l.x0, Math.min(l.x1, x)), lz = Math.max(l.z0, Math.min(l.z1, z)), d = Math.abs(lx - x) + Math.abs(lz - z);
+      if (d < bd) { bd = d; best = [lx, lz]; }
+    }
+    if (!best) continue;
+    reserve(Math.min(x, best[0]) - 2, z - 2, Math.max(x, best[0]) + 2, z + 2);
+    reserve(best[0] - 2, Math.min(z, best[1]) - 2, best[0] + 2, Math.max(z, best[1]) + 2);
+  }
+  // Sheets of metal stood on end between one plot and the next, three high: somebody's idea of a property line.
+  const frng = makeRng(4242 + id * 53);
   for (let z = r.z0 + 11; z < r.z1 - 18; ) {
     const rowD = harlem ? 10 + Math.floor(rng() * 3) : 9 + Math.floor(rng() * 3);
+    let prevPlot = null;
     for (let x = r.x0 + 11; x < r.x1 - 14; ) {
       const w = 8 + Math.floor(rng() * 6);
       if (!isFree(x, z, x + w - 1, z + rowD - 1)) { x += 2; continue; }
-      placeModule(pickModule(), x, z, w, rowD);
+      const kind = pickModule();
+      placeModule(kind, x, z, w, rowD);
+      const fence = (fx) => { if (isFree(fx, z, fx, z + rowD - 1)) add('divider', fx, z, fx, z + rowD - 1, 3, { seed: fx * 7 + z * 3 }); };
+      // Between two homes side by side, a sheet wall the whole depth of the plot: their doors are on the alleys, so the gap between them
+      // is nobody's way anywhere. And a garden is fenced in down both sides, open front and back.
+      if (prevPlot && prevPlot.x1 + 4 === x && HOMES.has(prevPlot.kind) && HOMES.has(kind) && frng() < .6) fence(x - 2);
+      if (kind === 'garden') { fence(x - 2); fence(x + w + 1); }
+      prevPlot = { kind, x1: x + w - 1 };
       x += w + 3;
     }
     z += rowD + 3;
   }
+
+  // A divider that ended up against somewhere people work (the plot beside it was filled in after it went up) comes down again.
+  c.parts = c.parts.filter((q) => {
+    if (q.t !== 'divider' || !c.pois.some((p) => WORK_KINDS.has(p.kind) && Math.abs(p.x - q.x0 - .5) < 6 && p.z > q.z0 - 3 && p.z < q.z1 + 4)) return true;
+    for (let z = q.z0; z <= q.z1; z++) solid[(q.x0 - r.x0) + (z - r.z0) * W] = 0;
+    return false;
+  });
 
   // Nothing has driven through here in weeks. The old roads have gone the same colour as everything else.
   if (harlem) {
@@ -794,7 +1002,14 @@ export function planCamp(def, id, r, ground) {
 }
 
 // --- Voxels ---------------------------------------------------------------------------------------------------
+// Every camp builds its wall the same way now, out of what there is: upright timbers, two blocks to a column, in whatever shade of wood each one
+// happened to be, under a band of grey concrete along the top. Abbey Keep alone still has its old stone.
+const WALL_WOOD = [M.PLANK, M.WOOD, M.WOOD_D, M.PLANK, M.WOOD, M.WOOD_D, M.WOOD];
 function wallVoxel(style, t, h, row, H) {
+  if (style !== 'stone') {
+    if (h >= H - 2) return ((t >> 2) + h) % 4 ? M.CONCRETE : M.CONCRETE_D;
+    return WALL_WOOD[((Math.imul(t >> 1, 2654435761) >>> 0) >>> 7) % WALL_WOOD.length];
+  }
   const seg = (n) => Math.floor(t / n);
   switch (style) {
     case 'cabs': {
@@ -892,18 +1107,16 @@ export function stampCamp(c, ctx) {
         for (let y = by; y < YB + H; y++) {
           if (y < oy || y >= oy + CS) continue;
           const h = y - YB;
-          if (gate && y >= YB && h <= hc - 2) { P(t, y, row, c.door); continue; }
+          if (gate && y >= YB && h <= hc - 2) { P(t, y, row, wall === 'stone' ? c.door : M.WOOD_D); continue; }
           if (y < YB) { P(t, y, row, M.CONCRETE_D); continue; }
           // The top band is set a block out (see below), so on the inside it gives way to the walkway: boards at its foot, open above.
           if (row === 1 && h >= H - 2) { if (h === H - 2) P(t, y, row, M.PLANK); continue; }
-          // Patched where it gave way: a square of plank, rusted sheet or tin put in over the hole, here and there along both faces.
-          const ph = (((Math.floor(t / 2) * 73856093) ^ (Math.floor(h / 2) * 19349663) ^ (row * 83492791) ^ (fixed * 2654435761)) >>> 0) % 100;
-          P(t, y, row, h >= 1 && h < H - 2 && ph < 11 ? [M.PLANK, M.RUST, M.WOOD_D, M.ROOF_TIN, M.PLANK][ph % 5] : wallVoxel(wall, t, h, row, H));
+          P(t, y, row, wallVoxel(wall, t + fixed * 7, h, row, H));
         }
       }
       // The top of the wall stands out a block past the face below it, all the way along and over the gates: a coping two blocks wide,
       // set a block further out than the wall it sits on, which you can see from the road.
-      for (let h = H - 2; h < H; h++) if (YB + h >= oy && YB + h < oy + CS) P(t, YB + h, -1, wallVoxel(wall, t, h, 0, H));
+      for (let h = H - 2; h < H; h++) if (YB + h >= oy && YB + h < oy + CS) P(t, YB + h, -1, wallVoxel(wall, t + fixed * 7, h, 0, H));
       for (let row = 2; row <= 4; row++) P(t, YB + hc - 1, row, M.PLANK);
       if (t % 8 === 0) for (let y = YB; y < YB + hc - 1; y++) P(t, y, 4, M.WOOD_D);
       const clearOfGate = !c.gates.some((g) => g.side === sideKey && Math.abs(t - g.tc) < 9);
@@ -967,13 +1180,19 @@ function stampPart(p, c, box, put, car, letterAt) {
       }
       break;
     }
+    case 'divider': {
+      // One sheet thick and three high, dull steel with the odd darker panel.
+      for (let z = z0; z <= z1; z++) for (let x = x0; x <= x1; x++) for (let y = 0; y < 3; y++) put(x, YB + y, z, (z + x + p.seed) % 5 === 0 ? M.STEEL_D : M.STEEL);
+      break;
+    }
     case 'tower': {
-      const mat = { cabs: M.TAXI, containers: M.CONT_R, palisade: M.LOG, hesco: M.CONT_G, sheet: M.STEEL, scrap: M.RUST, white: M.CAR_W, brick: M.BRICK_R, stone: M.GRANITE }[p.mat] || M.STEEL;
-      if (p.mat === 'stone' || p.mat === 'brick') {
+      // Timber towers on log legs, braced every few blocks, to go with the timber walls; the Keep's are stone.
+      const mat = p.mat === 'stone' ? M.GRANITE : M.WOOD_D;
+      if (p.mat === 'stone') {
         box(x0, YB, z0, x1, YB + h - 1, z1, mat);
       } else {
-        for (const [a, b] of [[x0, z0], [x1, z0], [x0, z1], [x1, z1]]) box(a, YB, b, a, YB + h - 1, b, M.IRON);
-        for (let y = 4; y < h - 1; y += 4) { box(x0, YB + y, z0, x1, YB + y, z0, M.IRON); box(x0, YB + y, z1, x1, YB + y, z1, M.IRON); box(x0, YB + y, z0, x0, YB + y, z1, M.IRON); box(x1, YB + y, z0, x1, YB + y, z1, M.IRON); }
+        for (const [a, b] of [[x0, z0], [x1, z0], [x0, z1], [x1, z1]]) box(a, YB, b, a, YB + h - 1, b, M.LOG);
+        for (let y = 4; y < h - 1; y += 4) { box(x0, YB + y, z0, x1, YB + y, z0, M.WOOD_D); box(x0, YB + y, z1, x1, YB + y, z1, M.WOOD_D); box(x0, YB + y, z0, x0, YB + y, z1, M.WOOD_D); box(x1, YB + y, z0, x1, YB + y, z1, M.WOOD_D); }
       }
       box(x0 - 1, YB + h, z0 - 1, x1 + 1, YB + h, z1 + 1, M.PLANK);
       for (let a = x0 - 1; a <= x1 + 1; a++) { put(a, YB + h + 1, z0 - 1, mat); put(a, YB + h + 1, z1 + 1, mat); }
@@ -985,7 +1204,7 @@ function stampPart(p, c, box, put, car, letterAt) {
       if (p.climb) {
         // The stair inside: a step a block higher every cell round the shaft from the walk to the lookout floor, each one built solid
         // down to the walk so nobody goes under it, and the floor left open over the last few so you come up through it.
-        const fy = YB + c.hc - 1, top = YB + h, N = top - fy, frame = !(p.mat === 'stone' || p.mat === 'brick');
+        const fy = YB + c.hc - 1, top = YB + h, N = top - fy, frame = p.mat !== 'stone';
         const { ring, entry, inner } = p.climb;
         ring.forEach(([x, z], k) => {
           const col = k <= N ? k : 0;
@@ -1045,6 +1264,75 @@ function stampPart(p, c, box, put, car, letterAt) {
       // A lamp on a pole on the patch of grass in front of the lean-to, for working late.
       for (let y = 0; y < 3; y++) T(2, y, 10, M.WOOD_D);
       T(2, 3, 10, M.LAMP);
+      break;
+    }
+    case 'bar': {
+      const U = (u) => (p.fx ? x1 - u : x0 + u), V = (v) => (p.fz ? z1 - v : z0 + v);
+      const T = (u, y, v, id) => put(U(u), YB + y, V(v), id);
+      const W2 = x1 - x0 + 1, D2 = z1 - z0 + 1, F = BAR_FRONT, H = BAR_WALL_H;
+      // Board walls on a dark skirting, on log corner posts. Now and then a board of a slightly different wood, nothing louder.
+      const wall = (u, y, v) => (y < 2 ? M.WOOD_D : (((u + v) * 2654435761 >>> 0) % 9 === 0 ? M.WOOD : M.PLANK));
+      // Boards underfoot, inside and on the porch.
+      for (let v = 1; v < F; v++) for (let u = 1; u < W2 - 1; u++) T(u, -1, v, M.WOOD_FLOOR);
+      for (let u = BAR_DOOR[0]; u <= BAR_DOOR[1]; u++) T(u, -1, F, M.WOOD_FLOOR);
+      for (let v = F + 1; v <= F + 2; v++) for (let u = 0; u < W2; u++) T(u, -1, v, M.PLANK);
+      for (let y = 0; y < H; y++) {
+        for (let v = 0; v <= F; v++) { T(0, y, v, wall(0, y, v)); T(W2 - 1, y, v, wall(W2 - 1, y, v)); }
+        for (let u = 0; u < W2; u++) {
+          T(u, y, 0, wall(u, y, 0));
+          if (y < BAR_DOOR_H && u >= BAR_DOOR[0] && u <= BAR_DOOR[1]) continue;
+          T(u, y, F, wall(u, y, F));
+        }
+      }
+      for (const [u, v] of [[0, 0], [W2 - 1, 0], [0, F], [W2 - 1, F]]) for (let y = 0; y < H; y++) T(u, y, v, M.LOG);
+      // Lit windows either side of the door and down each side (the right-hand side has the fireplace).
+      for (const [a, b] of BAR_WINDOWS) for (let u = a; u <= b; u++) for (let y = 2; y <= 3; y++) T(u, y, F, M.GLASS_C);
+      for (const v of [4, 5, 8, 9]) for (let y = 2; y <= 3; y++) T(0, y, v, M.GLASS_C);
+      for (const v of [3, 4]) for (let y = 2; y <= 3; y++) T(W2 - 1, y, v, M.GLASS_C);
+      // A low-pitched roof of rusted sheet: a step in every few rows up to a dark ridge, gable ends boarded in.
+      for (let k = 0; ; k++) {
+        const va = k * BAR_ROOF_STEP, vb = F - k * BAR_ROOF_STEP;
+        if (va > vb) break;
+        const top = vb - va < BAR_ROOF_STEP * 2;
+        for (let v = va; v <= vb; v++) for (let u = 0; u < W2; u++) {
+          const edge = v - va < BAR_ROOF_STEP || vb - v < BAR_ROOF_STEP;
+          T(u, H + k, v, top ? M.WOOD_D : edge ? M.RUST : (u === 0 || u === W2 - 1 ? M.PLANK : M.RUST));
+        }
+        if (top) break;
+      }
+      // The fireplace, set into the right-hand wall: a brick surround and mantel, the fire in the hearth, and its chimney up the outside.
+      const hv = BAR_HEARTH_V;
+      // Grey stone, the mantel a shade darker than the rest.
+      for (let y = 0; y < H; y++) for (let v = hv - 1; v <= hv + 1; v++) T(W2 - 1, y, v, M.STONE);
+      // Logs on the hearth; the flames over them are the real thing, drawn like any camp fire's.
+      for (let v = hv - 1; v <= hv + 1; v++) { T(W2 - 2, 0, v, v === hv ? M.LOG : M.STONE); T(W2 - 2, 1, v, v === hv ? 0 : M.STONE); T(W2 - 2, 2, v, M.GRANITE); }
+      for (let y = H; y <= H + 4; y++) T(W2 - 1, y, hv, M.STONE);
+      // The porch: its own roof just under the eaves, on log posts, two lamps under its edge and the sign hung over the door.
+      for (let v = F + 1; v <= F + 2; v++) for (let u = 0; u < W2; u++) T(u, H - 1, v, M.RUST);
+      for (const u of BAR_POSTS) for (let y = 0; y < H - 1; y++) T(u, y, F + 2, M.LOG);
+      for (const u of [3, W2 - 4]) T(u, H - 2, F + 2, M.LAMP);
+      const sx = BAR_DOOR[0] - 1;
+      [M.WOOD_D, M.AWN_R, M.PAINT_Y, M.PAINT_Y, M.AWN_R, M.WOOD_D].forEach((id, k) => T(sx + k, H - 2, F + 2, id));
+      // Benches along the porch, under the windows.
+      for (const [a, b] of BAR_BENCHES) for (let u = a; u <= b; u++) T(u, 0, F + 1, M.LOG);
+      // The counter, two high, a plank top on dark wood. Behind it, shelves set into the back wall, dark panelling between and above.
+      for (let u = BAR_COUNTER[0]; u <= BAR_COUNTER[1]; u++) {
+        T(u, 0, 3, M.WOOD_D); T(u, 1, 3, M.PLANK);
+        T(u, 1, 0, M.SHELF); T(u, 2, 0, M.WOOD_D); T(u, 3, 0, M.SHELF);
+        T(u, 4, 0, M.WOOD_D);
+      }
+      // A poster either end of the back wall.
+      T(1, 3, 0, M.AD_RED); T(W2 - 2, 3, 0, M.AD_CREAM);
+      for (const u of BAR_STOOLS) T(u, 0, 5, M.WOOD_D);
+      for (const u of BAR_TABLES) { T(u, 0, 6, M.WOOD_D); T(u, 1, 6, M.PLANK); }
+      // High tables in the middle of the room, on a rug.
+      for (let v = 6; v <= 9; v++) for (let u = 5; u <= W2 - 6; u++) T(u, -1, v, M.CARPET);
+      for (const [u, v] of BAR_HIGH_TABLES) { T(u, 0, v, M.WOOD_D); T(u, 1, v, M.PLANK); }
+      // Beams across under the roof, and the lamps hung from them.
+      for (const v of BAR_BEAMS) for (let u = 1; u < W2 - 1; u++) T(u, H - 1, v, M.WOOD_D);
+      for (const [u, v] of BAR_LAMPS) T(u, H - 2, v, M.LAMP);
+      // Tables in the yard: a plank top on legs.
+      for (const u of BAR_YARD_TABLES) { T(u, 0, BAR_YARD_V, M.WOOD_D); T(u + 1, 0, BAR_YARD_V, M.WOOD_D); T(u, 1, BAR_YARD_V, M.PLANK); T(u + 1, 1, BAR_YARD_V, M.PLANK); }
       break;
     }
     case 'clinic': {
@@ -1291,13 +1579,25 @@ function stampPart(p, c, box, put, car, letterAt) {
     }
     case 'shack':
     case 'hall': {
-      box(x0, YB, z0, x1, YB + h - 1, z1, p.mat);
+      // The town hall is plain timber: boards on a dark skirting, log posts at the corners. A shack is whatever it was put together from.
+      if (p.t === 'hall') {
+        box(x0, YB, z0, x1, YB + 1, z1, M.WOOD_D);
+        box(x0, YB + 2, z0, x1, YB + h - 1, z1, M.PLANK);
+        for (const [a, b] of [[x0, z0], [x1, z0], [x0, z1], [x1, z1]]) box(a, YB, b, a, YB + h - 1, b, M.LOG);
+      } else box(x0, YB, z0, x1, YB + h - 1, z1, p.mat);
       box(x0 + 1, YB, z0 + 1, x1 - 1, YB + h - 2, z1 - 1, 0);
       box(x0, YB + h, z0, x1, YB + h, z1, p.roof);
       const cx = (x0 + x1) >> 1;
       box(cx - 1, YB, z1, cx + 1, YB + 2, z1, 0);
-      for (let a = x0 + 2; a < x1 - 1; a += 4) if (Math.abs(a - cx) > 2) { put(a, YB + 2, z1, p.lit ? M.WIN_LIT : M.GLASS_K); if (h > 6) put(a, YB + 6, z1, p.lit ? M.WIN_LIT : M.GLASS_K); }
+      if (p.t !== 'hall') for (let a = x0 + 2; a < x1 - 1; a += 4) if (Math.abs(a - cx) > 2) { put(a, YB + 2, z1, p.lit ? M.WIN_LIT : M.GLASS_K); if (h > 6) put(a, YB + 6, z1, p.lit ? M.WIN_LIT : M.GLASS_K); }
       if (p.t === 'hall') {
+        // Proper windows, two across and two high, in tinted glass: along the front either side of the door, down both sides, and along the
+        // back clear of the clerk's board.
+        for (let a = x0 + 3; a + 1 < x1 - 1; a += 6) {
+          if (a + 1 < cx - 3 || a > cx + 3) box(a, YB + 2, z1, a + 1, YB + 3, z1, M.GLASS_T);
+          if (a + 1 < cx - 6 || a > cx + 6) box(a, YB + 2, z0, a + 1, YB + 3, z0, M.GLASS_T);
+        }
+        for (let b = z0 + 3; b + 1 < z1 - 1; b += 5) { box(x0, YB + 2, b, x0, YB + 3, b + 1, M.GLASS_T); box(x1, YB + 2, b, x1, YB + 3, b + 1, M.GLASS_T); }
         const lo = Math.max(x0 + 1, cx - 3), hi = Math.min(x1 - 1, cx + 3);
         box(lo, YB + 3, z1 + 1, hi, YB + 3, z1 + 3, M.CANVAS);
         box(lo, YB, z1 + 3, lo, YB + 2, z1 + 3, M.WOOD_D); box(hi, YB, z1 + 3, hi, YB + 2, z1 + 3, M.WOOD_D);
@@ -1580,29 +1880,36 @@ function stampPart(p, c, box, put, car, letterAt) {
       break;
     }
     case 'hallchurch': {
-      // A brick neighbourhood church that has had a hard few months. Its windows went early and it has been a town office ever since. It faces east, onto the square.
+      // A timber neighbourhood church that has had a hard few months. It has been a town office ever since. It faces east, onto the square.
       const D = x1 - x0 + 1, Wd = z1 - z0 + 1, mid = Wd >> 1, C = (v, y, u, id) => put(x1 - v, y, z0 + u, id);
-      const brick = (u, y, v) => {
-        const k = h2(((u + v) >> 2) + 17, (y >> 2) * 3) % 31;
-        return k === 0 ? M.PLANK : k === 1 ? M.BURNT : M.BRICK_R;
-      };
+      // Plain boards on a dark skirting, all the way up, tower and all.
+      const brick = (u, y, v) => (y < YB + 2 ? M.WOOD_D : M.PLANK);
       for (let v = 3; v < D; v++) for (let u = 0; u < Wd; u++) C(v, G0, u, Math.abs(u - mid) <= 2 ? M.WOOD_D : M.WOOD_FLOOR);
       // The walls, with what is left of the windows, and a low tar roof that has been patched more than once.
       for (let v = 3; v < D; v++) {
         const bay = (v - 6 + 500) % 5;
         for (const u of [0, Wd - 1]) for (let y = YB; y <= YB + 9; y++) {
           const win = v > 9 && v < D - 2 && (bay === 1 || bay === 2) && y >= YB + 3 && y <= YB + 7;
-          C(v, y, u, win ? (h2(v, y) % 4 === 0 ? M.STAINED : h2(v + u, y) % 3 ? M.BARRICADE : M.BARRICADE2) : brick(u, y, v));
+          C(v, y, u, win ? M.GLASS_T : brick(u, y, v));
         }
+        // Timber shingles up to a dark ridge, out a block past the walls at the eaves with a board along the edge.
         for (let k = 0; k <= mid; k++) {
-          const tile = () => M.ROOF_TAR;
-          C(v, YB + 10 + k, k, tile(k));
-          C(v, YB + 10 + k, Wd - 1 - k, tile(Wd - 1 - k));
+          const tile = k === mid ? M.WOOD_D : M.SHINGLE_R;
+          C(v, YB + 10 + k, k, tile);
+          C(v, YB + 10 + k, Wd - 1 - k, tile);
         }
+        C(v, YB + 9, -1, M.WOOD_D); C(v, YB + 9, Wd, M.WOOD_D);
+      }
+      // The roof runs a block out past both gables as well, except where the tower stands in front of it.
+      for (let k = 0; k <= mid; k++) for (const u of [k, Wd - 1 - k]) {
+        const id = k === mid ? M.WOOD_D : M.SHINGLE_R;
+        C(D, YB + 10 + k, u, id);
+        if (Math.abs(u - mid) > 3) C(2, YB + 10 + k, u, id);
       }
       // The two gable ends.
       for (let u = 0; u < Wd; u++) {
-        const peak = YB + 10 + Math.min(u, Wd - 1 - u);
+        // Up to just under the roof, so the shingles run right out to the edge over each end.
+        const peak = YB + 9 + Math.min(u, Wd - 1 - u);
         for (let y = YB; y <= peak; y++) {
           C(D - 1, y, u, brick(u, y, D - 1));
           const d = Math.abs(u - mid), door = d <= 2 && y <= YB + 5;
@@ -1610,18 +1917,28 @@ function stampPart(p, c, box, put, car, letterAt) {
         }
       }
       // One square tower over the door, nothing grand, and a welded cross.
+      // One square timber tower over the door: log corners, a dark band under and over the open belfry, and a shingled spire.
       for (let v = 3; v <= 8; v++) for (let u = mid - 3; u <= mid + 3; u++) {
-        if (!(v === 3 || v === 8 || Math.abs(u - mid) === 3)) continue;
-        for (let y = YB + 6; y <= YB + 22; y++) {
-          const open = (u === mid || v === 5 || v === 6) && y >= YB + 18 && y <= YB + 20;
-          if (!open) C(v, y, u, brick(u, y, v));
+        const edgeV = v === 3 || v === 8, edgeU = Math.abs(u - mid) === 3;
+        if (!edgeV && !edgeU) continue;
+        const corner = edgeV && edgeU;
+        // All the way down to the ground: the way in is through its foot, a doorway front and back.
+        for (let y = YB; y <= YB + 22; y++) {
+          const open = !corner && y >= YB + 17 && y <= YB + 20 && (edgeV ? Math.abs(u - mid) <= 2 : v >= 4 && v <= 7);
+          const door = edgeV && Math.abs(u - mid) <= 2 && y <= YB + 5;
+          if (open || door) continue;
+          C(v, y, u, corner ? M.LOG : y === YB + 16 || y === YB + 21 ? M.WOOD_D : M.PLANK);
         }
       }
-      // Its two inside corners stand on timber posts down to the floor.
-      for (const u of [mid - 3, mid + 3]) for (let y = YB; y < YB + 6; y++) C(8, y, u, M.LOG);
-      for (let v = 3; v <= 8; v++) for (let u = mid - 3; u <= mid + 3; u++) if (h2(u, v) % 5) C(v, YB + 23, u, M.ROOF_TAR);
-      for (let y = YB + 24; y <= YB + 28; y++) C(5, y, mid, M.IRON);
-      for (const k of [-1, 1]) C(5, YB + 26, mid + k, M.IRON);
+      // Boarded over above the doorway and under the bells, so it is a tower all the way up and not a shell.
+      for (let v = 4; v <= 7; v++) for (let u = mid - 2; u <= mid + 2; u++) { C(v, YB + 6, u, M.PLANK); C(v, YB + 16, u, M.PLANK); }
+      // The spire: a step in at every course, out a block past the tower at its foot, dark at the very top.
+      for (let k = 0; k <= 3; k++) {
+        const y = YB + 23 + k, a = k - 1;
+        for (let v = 3 + a; v <= 8 - a; v++) for (let u = mid - 3 + a; u <= mid + 3 - a; u++) C(v, y, u, k === 3 ? M.WOOD_D : M.SHINGLE_R);
+      }
+      for (let y = YB + 27; y <= YB + 31; y++) C(5, y, mid, M.IRON);
+      for (const k of [-1, 1]) C(5, YB + 29, mid + k, M.IRON);
       // The yard's colours off the corner, and sandbags either side of the door from the last time.
       for (const a of [mid - 8, mid + 8]) for (let y = YB + 6; y <= YB + 13; y++) C(2, y, a, y > YB + 11 ? p.flag2 : p.flag1);
       for (let u = 0; u < Wd; u++) if (Math.abs(u - mid) > 3) for (let v = 0; v <= 1; v++) { C(v, YB, u, M.SANDBAG); if (h2(u, v) % 2) C(v, YB + 1, u, M.SANDBAG); }

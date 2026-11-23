@@ -200,7 +200,7 @@ export class FarCity {
     // Camps read from afar as a wall ring with their tallest buildings poking over it.
     const WALL_COL = { cabs: M.TAXI, containers: M.CONT_R, palisade: M.LOG, hesco: M.SANDBAG, sheet: M.STEEL, scrap: M.RUST, white: M.CAR_W, brick: M.BRICK_R, stone: M.GRANITE };
     for (const c of L.camps) {
-      const col = srgb(WALL_COL[c.wall] || M.CONCRETE, 1);
+      const col = srgb(c.wall === 'stone' ? M.GRANITE : M.WOOD, 1);
       const top = STREET_Y + c.H;
       const edges = [[c.x0, c.z0, c.x1, c.z0 + 2], [c.x0, c.z1 - 2, c.x1, c.z1], [c.x0, c.z0, c.x0 + 2, c.z1], [c.x1 - 2, c.z0, c.x1, c.z1]];
       for (const [a, b, e, f] of edges) {

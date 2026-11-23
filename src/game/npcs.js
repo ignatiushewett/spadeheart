@@ -2,14 +2,37 @@
 // homes, routines and work, guards on the walls, gates that open for you, patrols on the streets outside.
 import { WX, WZ, STREET_Y, WATER_Y, G } from '../shared/constants.js';
 import { xU, zV, ROLES } from '../shared/layout.js';
-import { ITEMS, RUMORS, randomName, buildStock, pickFocus, CITIZENSHIP, papersFor } from './items.js';
+import { ITEMS, RUMORS, randomName, buildStock, pickFocus, CITIZENSHIP, papersFor, SURVIVOR_SURNAMES } from './items.js';
 import { NPC_WEAPON, WARDROBE } from '../engine/actors.js';
 import { isGlass as isGlassId } from '../shared/materials.js';
 import { LORE, COMMON_BARKS, ACTIVITY_BARKS, CONVERSATIONS, CAMP_TALK } from './camplore.js';
-import { MORE_TALK, MORE_BARKS } from './chatter.js';
+import { MORE_TALK, MORE_BARKS, COMPANION_TALK, COMPANION_BARKS } from './chatter.js';
 for (const k in MORE_TALK) if (CONVERSATIONS[k]) CONVERSATIONS[k].push(...MORE_TALK[k]);
 for (const k in MORE_BARKS) if (COMMON_BARKS[k]) COMMON_BARKS[k].push(...MORE_BARKS[k]);
 // Lines that belong to one camp or one person: heard twice, they give the game away, so they come round rarely.
+const BAR_HIRES = 3;           // guns for hire waiting at each bar
+const BAR_REGULARS = 1;        // regulars per seat or spot at the bar
+const BAR_DROP_IN = .08;       // the chance anyone else, choosing what to do next, thinks of the bar
+const HIRE_RESTOCK_DAYS = 4;   // days before someone else turns up to take a hired gun's place
+// A hired gun's price: the worth of what they carry, and their time on top.
+const hireFee = (weapon) => Math.round((150 + ((ITEMS[weapon] && ITEMS[weapon].value) || 300) * .6) / 10) * 10;
+const CREW_TALK_GAP = [18, 48];   // seconds between chances for your companions to talk
+const CREW_SILENCE = .25;          // of those chances, the share that pass in silence
+const CREW_SOLO = .45;             // with only one companion, the chance of a remark when the moment comes
+const TRAIL_STEP = .6, TRAIL_KEEP = 80;   // blocks between points on your track, and how many are kept
+const COMPANION_GAP = [1.2, 2.6];  // blocks back along your track: the first pair, then each pair after
+const COMPANION_SIDE = [2.6, 1.6]; // blocks out to the side: the first pair, then each pair after
+const COMPANION_APART = 2.6;       // closest two companions stand to each other
+const COMPANION_IDLE = [4, 9];
+const COMPANION_GIVE_UP = 8;      // seconds stuck before a companion catches up even in sight of you    // seconds between a waiting companion changing spot
+const HARD_CREW = [.65, .9];   // how hard a commission is (0 to 1) before it needs one companion, then two
+const COMPANION_CUT = .3;     // of a job's pay, the share your companions take if every kill on it was theirs
+const COMPANION_ROAM = 70;     // blocks from you a companion may wander inside a camp
+const COMPANION_BAR = .35;     // the chance, choosing what to do in a camp with a bar, that a companion goes there
+const COMPANION_DOES = new Set(['sit', 'talk', 'stand', 'browse']);
+const SENTRY_BEAT = 9;       // blocks either side of the post the outer watch walk
+const SENTRY_PACE = 1.6;      // blocks a second: a slow, watchful walk
+const SENTRY_PAUSE = 6;       // seconds stood at each end of the beat, give or take
 const SPECIFIC = new Set([...Object.values(CAMP_TALK).flat(), ...Object.values(LORE).flatMap((l) => (l.barks ? Object.values(l.barks).flat() : []))]);
 import { makePersona } from './dialogue.js';
 
@@ -47,6 +70,26 @@ export const OP_PAY = {
 };
 // How far from a camp's wall a kill still counts toward a night shift: out past where the guards on the wall do most of their work.
 export const NIGHT_RADIUS = 150;
+// What a companion can be kitted out with in a settlement, and what it costs there. Armour is the look as much as the plates: each tier
+// is one of the watch's wardrobes, so a companion in a patrol vest looks like the outer watch, and one in plates like the gate watch.
+export const CREW_ARMOUR = [
+  { name: 'Street clothes', wear: null, cut: 0, cost: 0 },
+  { name: 'Padded jacket', wear: 'light', cut: .15, cost: 120 },
+  { name: 'Patrol vest', wear: 'medium', cut: .3, cost: 450 },
+  { name: 'Plate carrier', wear: 'heavy', cut: .45, cost: 1200 },
+];
+// The guns a settlement's armourer will fit a companion out with, and their price.
+export const CREW_GUNS = { pistol: 160, shotgun: 440, smg: 520, crossbow: 600, sniper: 760, rifle: 980, lmg: 2100 };
+export const CREW_GUN_NAMES = { pistol: '9mm Pistol', shotgun: 'Pump Shotgun', smg: 'MP5 SMG', crossbow: 'Crossbow', sniper: 'Deer Rifle', rifle: 'M4 Carbine', lmg: 'M249 LMG', bat: 'Baseball Bat', machete: 'Machete', katana: 'Sword', axe: 'Fire Axe', spear: 'Spear' };
+export const crewGunStats = (w) => NPC_GUNS[w] || null;
+// Which armour someone is wearing, read off their clothes: a fatigues-wearing soldier already counts as padded.
+export const crewArmourTier = (n) => {
+  const v = n.variant, inRow = (kind) => v >= WARDROBE[kind][0] && v < WARDROBE[kind][0] + WARDROBE[kind][1];
+  for (let t = CREW_ARMOUR.length - 1; t >= 1; t--) if (inRow(CREW_ARMOUR[t].wear)) return t;
+  return inRow('mil') ? 1 : 0;
+};
+const CREW_TIP = .03;          // of a job's pay, what the client gives each companion who was there with you, on top of your pay
+const CREW_HEAL = 1.5;         // health a second a companion gets back resting in a settlement
 // What each place does about a missed quota: how much of the contract's earnings it still pays, and how it puts that to you. Nobody here is a charity,
 // and the ones doing badly can afford it least: the lower a camp has sunk, the less of even this it pays.
 const DOCK = {
@@ -177,7 +220,8 @@ class NPC {
     this.kid = !!opts.kid;
     this.setWeapon(opts.weapon);
     this.personaId = `p${nextPersona++}`;
-    this.persona = makePersona(Math.floor(rand() * 1e6), this.kid);
+    this.personaSeed = opts.personaSeed ?? Math.floor(rand() * 1e6);
+    this.persona = makePersona(this.personaSeed, this.kid);
     this.task = null;
     this.state = 0;
     this.barkT = 4 + rand() * 18;
@@ -224,6 +268,7 @@ export class NPCs {
     this.shotsBark = 0;
     this.pathBudget = 0;
     this.followers = [];
+    this.trail = [];   // where you have walked lately, for your companions to follow
     this.raiders = [];
     this.raidT = 40;
     this.convos = [];
@@ -266,12 +311,14 @@ export class NPCs {
     const sim = this.g.campSim, S = sim.state[c.id];
     if (!c.poiBy) {
       c.poiBy = {};
-      for (const p of c.pois) (c.poiBy[p.kind] || (c.poiBy[p.kind] = [])).push(p);
+      // The bar's places are handed out by the bar (startTask), to adults only: never picked as just any seat or spot to stand.
+      for (const p of c.pois) if (!p.bar) (c.poiBy[p.kind] || (c.poiBy[p.kind] = [])).push(p);
     }
     for (const p of c.pois) p.by = null;
     for (const p of c.hallPois || []) p.by = null;
     for (const p of c.hallYard || []) p.by = null;
     for (const p of c.hallQueue || []) p.by = null;
+    for (const p of (c.bar && c.bar.pois) || []) p.by = null;
     const add = (n) => { n.camp = c.id; n.campKey = c.key; n.campName = c.name; st.npcs.push(n); this.list.push(n); return n; };
     const beds = (c.poiBy.sleep || []).slice().sort(() => rand() - .5);
     let bedI = 0;
@@ -332,7 +379,9 @@ export class NPCs {
     }
     // The gate watch. Every gate has someone on it, day and night.
     for (const s of c.sentries) {
-      add(new NPC('sentry', s.x, s.outer ? this.g.world.terrainTop(Math.floor(s.x), Math.floor(s.z)) : STREET_Y, s.z, { weapon: pickOf(c.guardWeapons), variant: row(s.outer ? ['medium'] : ['light']), hp: 400, yaw: s.yaw, title: s.outer ? 'Outer watch' : 'Gate watch' }));
+      const sentryN = add(new NPC('sentry', s.x, s.outer ? this.g.world.terrainTop(Math.floor(s.x), Math.floor(s.z)) : STREET_Y, s.z, { weapon: pickOf(c.guardWeapons), variant: row(s.outer ? ['medium'] : ['light']), hp: 400, yaw: s.yaw, title: s.outer ? 'Outer watch' : 'Gate watch' }));
+      // The outer watch walk a stretch of the wall's foot, out and back, rather than standing at one spot all day.
+      if (s.outer) sentryN.walk = { x: s.x, z: s.z, ax: Math.cos(s.yaw), az: -Math.sin(s.yaw), at: (rand() - .5) * 2 * SENTRY_BEAT, dir: rand() < .5 ? 1 : -1, wait: rand() * 4 };
     }
     // The wall. Only those still alive stand their posts.
     st.guards = [];
@@ -361,6 +410,17 @@ export class NPCs {
     for (let k = 0; k < stalls.length * 1.1; k++) {
       const passing = adults.pop();
       if (passing) { passing.browser = true; passing.home = stalls[k % stalls.length]; }
+    }
+    // The bar has its regulars, and the guns for hire who wait there to be paid. Those already hired are not replaced for a few days.
+    if (c.bar) {
+      for (let k = 0; k < c.bar.pois.length * BAR_REGULARS; k++) { const q = adults.pop(); if (q) q.barGoer = true; }
+      const taken = (S.hired || []).filter((d) => this.g.day - d < HIRE_RESTOCK_DAYS).length;
+      for (let k = 0; k < BAR_HIRES - taken; k++) {
+        const weapon = pickOf(c.guardWeapons);
+        const n = add(new NPC('resident', 0, STREET_Y, 0, { weapon, variant: row([rand() < .5 ? 'heavy' : 'medium']), hp: 420 }));
+        n.barGoer = true;
+        n.hire = { fee: hireFee(weapon) };
+      }
     }
     this.holdGround(c, st);
     // Laid up in the tent, and waiting on the bench to be seen.
@@ -617,12 +677,15 @@ export class NPCs {
     let best = null, bd = 1e12;
     for (let k = 0; k < 6; k++) {
       const p = c.pois[Math.floor(rand() * c.pois.length)];
-      if (p.kind === 'sleep') continue;
+      if (p.kind === 'sleep' || p.bar) continue;
       const d = (p.x - home.x) ** 2 + (p.z - home.z) ** 2;
       if (d < bd) { bd = d; best = p; }
     }
     best = best || c.spots.plaza;
-    return { x: best.x + (rand() - .5) * 6, z: best.z + (rand() - .5) * 6, kind: 'stand' };
+    const x = best.x + (rand() - .5) * 6, z = best.z + (rand() - .5) * 6, b = c.bar;
+    // Children are kept out of the bar, its porch and its yard.
+    if (n.kid && b && x > b.x0 - 1 && x < b.x1 + 2 && z > b.z0 - 1 && z < b.z1 + 2) return { x: c.spots.plaza.x, z: c.spots.plaza.z, kind: 'stand' };
+    return { x, z, kind: 'stand' };
   }
 
   // Anywhere in the camp at all: a corner of it nobody in particular is sitting in.
@@ -654,7 +717,7 @@ export class NPCs {
 
   // Standing round one of the camp's fires, just outside the ring of benches, facing in: hands out to it, talking over it.
   fireSpot(c) {
-    const fires = c.fires.filter((f) => !f.out && !f.small);
+    const fires = c.fires.filter((f) => !f.out && !f.small && !f.hearth);
     for (let t = 0; t < 8 && fires.length; t++) {
       const f = pickOf(fires), a = rand() * 6.283, r = 4.6 + rand() * .9;
       const x = f.x + .5 + Math.cos(a) * r, z = f.z + .5 + Math.sin(a) * r;
@@ -673,6 +736,7 @@ export class NPCs {
   }
 
   startTask(n, c, instant) {
+    if (n.kind === 'follower') { this.companionTask(n, c); return; }
     // Someone just milling about the market keeps milling: on to the next stretch of stalls, up or down, more often than not.
     const milling = n.task && n.task.kind === 'market' && n.task.loose && rand() < .7;
     if (n.task && n.task.poi) { if (n.task.poi.by === n) n.task.poi.by = null; }
@@ -707,6 +771,14 @@ export class NPCs {
     } else if (stroll) { poi = this.strollSpot(c); loose = true; }
     else if (kind === 'warm') { poi = this.fireSpot(c); if (!poi) kind = 'stand'; }
     else poi = this.freePoi(c, kind, n);
+    // Off to the bar: always, for a gun waiting to be hired; often of an evening for the regulars, and now and then for anyone else.
+    if (c.bar && kind !== 'sleep' && !n.kid && (n.hire || n.barGoer || n.kind === 'follower' || (kind !== 'work' && kind !== 'farm' && rand() < BAR_DROP_IN))) {
+      const evening = this.g.tod > .7 || this.g.tod < .05;
+      const go = n.hire ? 1 : n.barGoer ? (evening ? .9 : .6) : n.kind === 'follower' ? .3 : evening ? .6 : .35;
+      const free = rand() < go ? c.bar.pois.filter((q) => !q.by && q.kind !== 'browse') : [];
+      // A few places are always left for the guns waiting to be hired, who have nowhere else to be.
+      if (free.length > (n.hire ? 0 : BAR_HIRES)) { poi = pickOf(free); kind = poi.kind; loose = false; }
+    }
     if (n.hallGoer && kind !== 'sleep' && c.hallPois) {
       const free = c.hallPois.filter((q) => !q.by);
       if (free.length) { poi = pickOf(free); kind = poi.kind; loose = false; }
@@ -806,8 +878,9 @@ export class NPCs {
 
   updateResident(n, dt, dp) {
     const g = this.g, P = g.player;
-    const c = g.layout.camps[n.camp];
-    const S = g.campSim.state[n.camp];
+    const campId = n.kind === 'follower' ? n.visit : n.camp;
+    const c = g.layout.camps[campId];
+    const S = g.campSim.state[campId];
     if (n.flee) { this.updateFleeing(n, dt, dp, c); return; }
     // Everyone in a camp lives at street level, or on top of a bed. Nobody gets to stay anywhere else, however they got there.
     const rest = n.arrived && n.task && n.task.kind === 'sleep' ? STREET_Y + 1 : STREET_Y;
@@ -1014,45 +1087,243 @@ export class NPCs {
   }
 
   // Companions you have talked into coming along.
+  // Companions. On the road they keep with you the way people walk together, each at their own distance and on their own side, drifting
+  // about, stopping when you stop and wandering a little while you wait. Inside a camp that is not in trouble, with you inside it too,
+  // they go about the place like anyone who lives there, as long as you stay within shouting distance.
   updateFollower(n, dt, dp) {
+    const camp = this.companionCamp(n, dp);
+    if (camp) {
+      if (n.visit !== camp.id) { this.leaveVisit(n); n.visit = camp.id; }
+      // Behind a wall they get their breath back, and patched up.
+      if (n.hp < n.maxHp) n.hp = Math.min(n.maxHp, n.hp + CREW_HEAL * dt);
+      this.updateResident(n, dt, dp);
+      return;
+    }
+    if (n.visit !== undefined) this.leaveVisit(n);
+    this.travelWith(n, dt, dp);
+  }
+
+  // The camp a companion can be let loose in: you are well inside a holding camp that is calm, they are inside it too, and not far off.
+  companionCamp(n, dp) {
+    const P = this.g.player, sim = this.g.campSim;
+    if (dp > COMPANION_ROAM) return null;
+    for (const c of this.g.layout.camps) {
+      if (P.x < c.x0 + 3 || P.x > c.x1 - 3 || P.z < c.z0 + 3 || P.z > c.z1 - 3) continue;
+      const inside = n.x > c.x0 + 2 && n.x < c.x1 - 2 && n.z > c.z0 + 2 && n.z < c.z1 - 2;
+      if (!inside || sim.state[c.id].status !== 'holding' || this.campPanic(c) > .3 || !c.nav) return null;
+      return c;
+    }
+    return null;
+  }
+
+  // Done with the camp (you left, or wandered too far, or trouble started): whatever they were doing is dropped, and their spot is free.
+  leaveVisit(n) {
+    if (n.task && n.task.poi && n.task.poi.by === n) n.task.poi.by = null;
+    n.task = null; n.path = null; n.pathI = 0; n.arrived = false; n.visit = undefined; n.exit = null;
+    if (n.y > STREET_Y && n.y < STREET_Y + 1.5) n.y = STREET_Y;
+  }
+
+  // Something to do in the camp, near where you are: a seat, a stall, a spot to talk, the bar now and then, or just somewhere to stand.
+  companionTask(n, c) {
+    const P = this.g.player;
+    if (n.task && n.task.poi && n.task.poi.by === n) n.task.poi.by = null;
+    n.stuckT = 0; n.stuckN = 0; n.lastX = n.x; n.lastZ = n.z;
+    const near = (q) => !q.by && COMPANION_DOES.has(q.kind) && Math.hypot(q.x - P.x, q.z - P.z) < COMPANION_ROAM * .7;
+    let pool = c.bar && rand() < COMPANION_BAR ? c.bar.pois.filter((q) => near(q) && q.kind !== 'browse') : [];
+    if (!pool.length) pool = c.pois.filter(near);
+    let poi = pool.length && rand() < .85 ? pickOf(pool) : null;
+    const loose = !poi;
+    if (loose) { const a = rand() * 6.283, r = 3 + rand() * 9; poi = { x: P.x + Math.cos(a) * r, z: P.z + Math.sin(a) * r, kind: 'stand' }; }
+    else poi.by = n;
+    const kind = poi.kind;
+    n.task = { poi, kind, loose, t: kind === 'sit' ? 40 + rand() * 80 : kind === 'browse' ? 12 + rand() * 18 : 15 + rand() * 35 };
+    n.path = null; n.pathI = 0; n.arrived = false;
+  }
+
+  // Walking with you outside a camp, or making their way out of one to you.
+  travelWith(n, dt, dp) {
     const g = this.g, w = g.world, P = g.player;
     if (dp > 55) {
       // Lost contact: they catch up the way people do when nobody is looking.
       const a = rand() * 6.28;
-      n.x = P.x + Math.cos(a) * 6; n.z = P.z + Math.sin(a) * 6; n.y = P.y;
+      n.x = P.x + Math.cos(a) * 6; n.z = P.z + Math.sin(a) * 6; n.y = this.g.world.groundBelow(n.x, P.y + 1.2, n.z, 48); n.vy = 0;
+      n.exit = null;
       return;
     }
-    const want = n.slot;
-    const tx = P.x + Math.cos(want) * 3.5, tz = P.z + Math.sin(want) * 3.5;
-    const dx = tx - n.x, dz = tz - n.z, d = Math.hypot(dx, dz);
-    // Set off once they are properly behind, and keep going until they are properly there. One line for both had them stopping and
-    // starting every frame while you walked, legs flicking between a stride and standing still.
-    if (n.following ? d < .7 : d > 1.9) n.following = !n.following;
-    if (n.following) {
-      // Slowing into their place rather than arriving at a run.
-      const speed = Math.min(6.8, 2.4 + d, Math.max(1.4, d * 3));
-      const ux = dx / d, uz = dz / d;
-      const nx = n.x + ux * speed * dt, nz = n.z + uz * speed * dt;
-      // Only onto ground they could step up onto (a kerb, a stair) with room to stand there: never up the face of a wall or a cliff.
-      const gyN = w.groundBelow(nx, n.y + 1.2, nz, 8), sy = Math.floor(gyN + .05), cx = Math.floor(nx), cz = Math.floor(nz);
-      if (gyN - n.y <= 1.1 && !w.solid(cx, sy, cz) && !w.solid(cx, sy + 1, cz) && !w.solid(cx, sy + 2, cz)) { n.x = nx; n.z = nz; n.stuckT = 0; }
+    if (n.pace === undefined) { n.pace = .9 + rand() * .25; n.hesitate = 1.4 + rand() * 1.8; }
+    // Still inside a camp's wall: out the way people walk, by the paths and through a gate, not straight at the wall.
+    if (this.walkOutOfCamp(n, dt, dp)) return;
+    // On the move they walk where you walked: each a distance back along your track and a little to one side of it, so turning on the
+    // spot or sidestepping does not send them swinging round you. Stopped, they drift about near you on their own, and look around.
+    const idx = Math.max(0, this.followers.indexOf(n)), trail = this.trail;
+    const moving = g.time - (this.trailAt || -9) < 1.2;
+    // Out to your sides more than behind you: the first two either side of you and only a step back, anyone after them wider and
+    // further back on a side of their own. Each keeps a little of their own on top, so it never looks drilled.
+    const rank = Math.floor(idx / 2), side = idx % 2 ? 1 : -1;
+    if (n.lat === undefined || n.latIdx !== idx) { n.latIdx = idx; n.lat = side * (COMPANION_SIDE[0] + rank * COMPANION_SIDE[1] + rand() * .9); n.back = COMPANION_GAP[0] + rank * COMPANION_GAP[1] + rand() * .8; }
+    let tx, tz;
+    if (moving) {
+      // Back along the track to this companion's place in the line.
+      const want = n.back + (n.pace - 1) * 2;
+      let left = want, px2 = P.x, pz2 = P.z, dx2 = 0, dz2 = -1;
+      for (let k = trail.length - 1; k >= 0 && left > 0; k--) {
+        const q = trail[k], sx = px2 - q.x, sz = pz2 - q.z, l = Math.hypot(sx, sz);
+        if (l < .001) continue;
+        dx2 = sx / l; dz2 = sz / l;
+        const step = Math.min(l, left);
+        px2 -= dx2 * step; pz2 -= dz2 * step; left -= step;
+      }
+      if (left > 0) { px2 -= dx2 * left; pz2 -= dz2 * left; }
+      tx = px2 - dz2 * n.lat; tz = pz2 + dx2 * n.lat;
+      n.idleT = 0;
+    } else {
+      // Waiting about: a new spot now and then, never far, and a look round once there.
+      if ((n.idleT = (n.idleT || 0) - dt) <= 0 || n.idleX === undefined) {
+        n.idleT = COMPANION_IDLE[0] + rand() * (COMPANION_IDLE[1] - COMPANION_IDLE[0]);
+        if (n.idleX === undefined || rand() < .7) {
+          // Somewhere off to their own side of you, not crowding in behind.
+          const a = Math.atan2(n.x - P.x, n.z - P.z) + (rand() - .5) * 1.6, r = 3.2 + rand() * (3 + this.followers.length);
+          n.idleX = P.x + Math.sin(a) * r; n.idleZ = P.z + Math.cos(a) * r;
+        }
+      }
+      // If you drift off while they wait, their spot comes with you.
+      if (Math.hypot(n.idleX - P.x, n.idleZ - P.z) > 9 + this.followers.length) { n.idleX = P.x + (n.x - P.x) * .4; n.idleZ = P.z + (n.z - P.z) * .4; }
+      tx = n.idleX; tz = n.idleZ;
+    }
+    // Nobody stands in anybody else's way, or in yours.
+    for (const m of this.followers) {
+      if (m === n) continue;
+      const ax = tx - m.x, az = tz - m.z, d0 = Math.hypot(ax, az);
+      if (d0 < COMPANION_APART && d0 > .01) { tx += ax / d0 * (COMPANION_APART - d0); tz += az / d0 * (COMPANION_APART - d0); }
+    }
+    { const ax = tx - P.x, az = tz - P.z, d0 = Math.hypot(ax, az); if (d0 < 2.2 && d0 > .01) { tx = P.x + ax / d0 * 2.2; tz = P.z + az / d0 * 2.2; } }
+    // You have gone down into a hole or up onto something: a spot that is not on your level is no place to be. They head in to you, and
+    // down off the edge if that is the way.
+    if (Math.abs(n.y - P.y) > 2.5 && !P.fly) {
+      const ax = tx - P.x, az = tz - P.z, d0 = Math.hypot(ax, az) || 1;
+      tx = P.x + ax / d0 * 1.6; tz = P.z + az / d0 * 1.6;
+    }
+    // The target itself eases from place to place, so a change of mind is a change of direction, not a jerk.
+    if (n.tx === undefined) { n.tx = tx; n.tz = tz; }
+    const ease = Math.min(1, dt * (moving ? 9 : 2.5));
+    n.tx += (tx - n.tx) * ease; n.tz += (tz - n.tz) * ease;
+    const dx = n.tx - n.x, dz = n.tz - n.z, d = Math.hypot(dx, dz);
+    // Set off once properly out of place, and keep going until properly there.
+    if (n.following ? d < .5 : d > (moving ? 1 : n.hesitate)) n.following = !n.following;
+    // On the move: your pace, plus a little to close the gap to their place, never a sprint past you to get there. Far behind they
+    // hurry more, up to a run.
+    const ps = this.pSpeed || 0;
+    const want = n.following ? Math.min(7, moving ? ps + Math.min(d > 8 ? 3 : 1.4, d * .4) : Math.max(1.1, Math.min(2.2, d * .9)) * n.pace) : 0;
+    n.v = (n.v || 0) + Math.sign(want - (n.v || 0)) * Math.min(Math.abs(want - (n.v || 0)), dt * 5);
+    const head = Math.atan2(Math.sin(P.yaw), -Math.cos(P.yaw));
+    // Two that have ended up shoulder to shoulder ease apart.
+    for (const m of this.followers) {
+      if (m === n) continue;
+      const ax = n.x - m.x, az = n.z - m.z, d0 = Math.hypot(ax, az);
+      if (d0 < 1.4 && d0 > .01) { const nx = n.x + ax / d0 * dt * 1.5, nz = n.z + az / d0 * dt * 1.5; if (this.canStepTo(n, nx, nz)) { n.x = nx; n.z = nz; } }
+    }
+    if (n.v > .05 && d > .01) {
+      const ux = dx / d, uz = dz / d, step = Math.min(d, n.v * dt);
+      // Straight there if they can; if not, along the obstacle one way or the other, the way you slide along a wall.
+      let moved = false;
+      const side = n.slide || (n.slide = rand() < .5 ? 1 : -1);
+      for (const [mx, mz] of [[ux, uz], [ux, 0], [0, uz], [ux * .3 - uz * .9 * side, uz * .3 + ux * .9 * side], [ux * .3 + uz * .9 * side, uz * .3 - ux * .9 * side]]) {
+        const l = Math.hypot(mx, mz);
+        if (l < .05) continue;
+        const nx = n.x + mx / l * step, nz = n.z + mz / l * step;
+        if (this.canStepTo(n, nx, nz)) { n.x = nx; n.z = nz; moved = true; break; }
+      }
+      if (moved) n.stuckT = Math.max(0, (n.stuckT || 0) - dt * 2);
       else n.stuckT = (n.stuckT || 0) + dt;
       if (n.aim <= 0) n.yaw = Math.atan2(ux, uz);
-      n.phase += speed * dt * 2.1;
-      n.state = n.aim > 0 ? 3 : .7;
-    } else { n.state = n.aim > 0 ? 3 : 0; n.stuckT = 0; }
+      n.phase += step * 2.1;
+      // On the move they keep walking, shooting or not: the legs go, and the gun stays up and pointed while they aim.
+      n.state = .7;
+      if (n.aim > 0) n.readyT = Math.max(n.readyT || 0, this.g.time + .8);
+    } else {
+      n.state = n.aim > 0 ? 3 : 0;
+      n.stuckT = 0;
+      // Stood about: they look at you, or the way you are looking, or off at something of their own, and change their mind now and then.
+      if (n.aim <= 0 && (n.lookT = (n.lookT || 0) - dt) <= 0) {
+        n.lookT = 2 + rand() * 4;
+        const r = rand();
+        n.yaw = r < .35 ? Math.atan2(P.x - n.x, P.z - n.z) : r < .6 ? head + (rand() - .5) * .8 : rand() * 6.283;
+      }
+    }
     // Stuck behind something and falling behind (you went up where they cannot follow): they catch up the way people do when nobody is
     // looking, a few steps behind you, never while you can see them do it.
     if ((n.stuckT || 0) > 2.5 && d > 6) {
       const fx = Math.sin(P.yaw), fz = -Math.cos(P.yaw), ahead = (n.x - P.x) * fx + (n.z - P.z) * fz;
-      if (ahead < 0 || !w.los(P.x, P.y + 2.4, P.z, n.x, n.y + 2, n.z)) {
+      // Properly stuck for a while, they catch up anyway: better a step you might glimpse than someone left stood against a wall.
+      if (ahead < 0 || n.stuckT > COMPANION_GIVE_UP || !w.los(P.x, P.y + 2.4, P.z, n.x, n.y + 2, n.z)) {
         const bx = P.x - fx * 3, bz = P.z - fz * 3;
-        if (!w.solid(Math.floor(bx), Math.floor(P.y + .05) + 1, Math.floor(bz))) { n.x = bx; n.z = bz; n.y = P.y; n.stuckT = 0; }
+        if (!w.solid(Math.floor(bx), Math.floor(P.y + .05) + 1, Math.floor(bz))) { n.x = bx; n.z = bz; n.y = w.groundBelow(bx, P.y + 1.2, bz, 48); n.vy = 0; n.stuckT = 0; }
       }
     }
-    const gy = w.groundBelow(n.x, n.y + 1.2, n.z, 8);
-    // Down any distance; up only by a step at a time.
-    if (gy > n.y) { if (gy - n.y <= 1.1) n.y += Math.min(gy - n.y, dt * 14); } else n.y -= Math.min(n.y - gy, dt * 14);
+    this.settleY(n, dt);
+  }
+
+  // Their feet on the ground: up a step at a time, down a step the same way, and off anything higher than a step they fall, faster and
+  // faster, and land hard if it was a long way.
+  settleY(n, dt) {
+    const gy = this.g.world.groundBelow(n.x, n.y + 1.2, n.z, 48);
+    if (gy > n.y) { if (gy - n.y <= 1.1) n.y += Math.min(gy - n.y, dt * 14); n.vy = 0; return; }
+    if (!(n.vy < 0) && n.y - gy <= 1.1) { n.y -= Math.min(n.y - gy, dt * 14); n.vy = 0; return; }
+    n.vy = Math.max(-40, (n.vy || 0) - 28 * dt);
+    n.y += n.vy * dt;
+    if (n.y <= gy) {
+      const hit = -n.vy;
+      n.y = gy; n.vy = 0;
+      // A long drop hurts, but it never finishes anyone off: they get up, winded, with at least a quarter of their health.
+      if (hit > 16) n.hp = Math.max(Math.min(n.hp, n.maxHp * .25), n.hp - (hit - 16) * 3 * (1 - CREW_ARMOUR[crewArmourTier(n)].cut));
+    }
+  }
+
+  // Only onto ground they could step up onto (a kerb, a stair) with room to stand there: never up the face of a wall or a cliff.
+  canStepTo(n, nx, nz) {
+    const w = this.g.world;
+    const gyN = w.groundBelow(nx, n.y + 1.2, nz, 8), sy = Math.floor(gyN + .05), cx = Math.floor(nx), cz = Math.floor(nz);
+    return gyN - n.y <= 1.1 && !w.solid(cx, sy, cz) && !w.solid(cx, sy + 1, cz) && !w.solid(cx, sy + 2, cz);
+  }
+
+  // A companion inside a camp's wall while you are elsewhere: along the camp's paths to the gate nearest you (or to you, if you are in
+  // the same camp), then on from there as usual. Returns true while still on the way.
+  walkOutOfCamp(n, dt, dp) {
+    const P = this.g.player;
+    const c = this.g.layout.camps.find((k) => n.x > k.x0 + 1 && n.x < k.x1 - 1 && n.z > k.z0 + 1 && n.z < k.z1 - 1);
+    if (!c || !c.nav || dp < 8) { n.exit = null; return false; }
+    const same = P.x > c.x0 && P.x < c.x1 && P.z > c.z0 && P.z < c.z1;
+    if (!n.exit || n.exit.camp !== c.id || n.exit.at + 6 < this.g.time) {
+      if (this.pathBudget <= 0) return false;
+      this.pathBudget--;
+      let gx = P.x, gz = P.z;
+      if (!same) {
+        const g = (c.gates || []).slice().sort((a, b) => Math.hypot(a.cx - P.x, a.cz - P.z) + Math.hypot(a.cx - n.x, a.cz - n.z) - Math.hypot(b.cx - P.x, b.cz - P.z) - Math.hypot(b.cx - n.x, b.cz - n.z))[0];
+        if (!g) return false;
+        const inX = g.horiz ? 0 : (g.side === 'W' ? 1 : -1), inZ = g.horiz ? (g.side === 'N' ? 1 : -1) : 0;
+        gx = g.cx + inX * 9; gz = g.cz + inZ * 9;
+        n.exitOut = { x: g.cx - inX * 6, z: g.cz - inZ * 6 };
+      } else n.exitOut = null;
+      const path = this.findPath(c, n.x, n.z, gx, gz);
+      n.exit = path ? { camp: c.id, path, i: path.length > 2 ? 2 : 0, at: this.g.time } : null;
+      if (!n.exit) return false;
+    }
+    const e = n.exit;
+    let tx, tz;
+    if (e.i < e.path.length) { tx = e.path[e.i]; tz = e.path[e.i + 1]; }
+    else if (n.exitOut) { tx = n.exitOut.x; tz = n.exitOut.z; }
+    else { n.exit = null; return false; }
+    const dx = tx - n.x, dz = tz - n.z, d = Math.hypot(dx, dz), speed = (dp > 20 ? 5.2 : 3.2) * (n.pace || 1), step = speed * dt;
+    if (d <= step) {
+      n.x = tx; n.z = tz;
+      if (e.i < e.path.length) e.i += 2; else n.exitOut = null;
+    } else { n.x += dx / d * step; n.z += dz / d * step; }
+    if (d > .01 && n.aim <= 0) n.yaw = Math.atan2(dx, dz);
+    n.phase += step * 2.1;
+    n.state = .7;
+    if (n.aim > 0) n.readyT = Math.max(n.readyT || 0, this.g.time + .8);
+    this.settleY(n, dt);
+    return true;
   }
 
   recruit(n) {
@@ -1062,7 +1333,14 @@ export class NPCs {
     if (n.task && n.task.poi && n.task.poi.by === n) n.task.poi.by = null;
     n.task = null;
     n.slot = this.followers.length * 2.1 + 1;
+    // Someone you travel with tells you their surname.
+    if (n.name && !n.name.includes(' ')) n.name = `${n.name} ${SURVIVOR_SURNAMES[(n.personaSeed >>> 3) % SURVIVOR_SURNAMES.length]}`;
     n.hp = Math.max(n.hp, 400);
+    n.maxHp = Math.max(n.maxHp, n.hp); n.bodyHp = n.maxHp;
+    // Whatever they had in their pockets: not much. It grows with their share of the work.
+    n.purse = n.purse ?? 5 + Math.floor(rand() * 30);
+    n.joined = this.g.day;
+    n.kills = n.kills || 0;
     if (n.camp >= 0) {
       const st = this.camps[n.camp];
       st.npcs = st.npcs.filter((m) => m !== n);
@@ -1072,9 +1350,72 @@ export class NPCs {
     return true;
   }
 
+  // Your companions, for the save: who they are, what they carry, how hurt they are, and where they stand.
+  followersToSave() {
+    return this.followers.filter((n) => !n.dead).map((n) => ({
+      name: n.name, weapon: n.weaponName || null, variant: n.variant, hp: n.hp, maxHp: n.maxHp, title: n.title || null,
+      camp: n.camp, home: n.home ?? n.camp, campKey: n.campKey, campName: n.campName, personaSeed: n.personaSeed, hired: !!n.hired,
+      purse: n.purse || 0, joined: n.joined ?? null, kills: n.kills || 0, gunFrom: n.gunFrom || null,
+      x: n.x, y: n.y, z: n.z,
+    }));
+  }
+
+  followersFromSave(list) {
+    this.followers.length = 0;
+    for (const d of list || []) {
+      const n = new NPC('follower', d.x, d.y, d.z, { name: d.name, weapon: d.weapon, variant: d.variant, hp: d.maxHp || d.hp, title: d.title || undefined, campKey: d.campKey, campName: d.campName, personaSeed: d.personaSeed });
+      n.hp = d.hp; n.camp = d.camp ?? -1; n.home = d.home ?? n.camp; n.hired = !!d.hired;
+      n.purse = d.purse || 0; n.joined = d.joined ?? this.g.day; n.kills = d.kills || 0; n.gunFrom = d.gunFrom || null;
+      if (n.name && !n.name.includes(' ')) n.name = `${n.name} ${SURVIVOR_SURNAMES[(n.personaSeed >>> 3) % SURVIVOR_SURNAMES.length]}`;
+      this.list.push(n);
+      this.followers.push(n);
+    }
+  }
+
+  // Where a companion can be kitted out: inside a settlement that is still standing, with them there beside you.
+  crewShop(n) {
+    const g = this.g, P = g.player, c = g.horde.inCamp(P.x, P.z, 0);
+    if (!c || g.campSim.state[c.id].status !== 'holding') return { camp: null, why: 'Kit can only be bought inside a settlement.' };
+    if (n && Math.hypot(n.x - P.x, n.z - P.z) > 60) return { camp: c, why: `${n.name.split(' ')[0]} has to be here with you.` };
+    return { camp: c, why: null };
+  }
+
+  // Who pays for it: they put in what they have, and you make up the rest.
+  crewSplit(n, cost) {
+    const theirs = Math.min(n.purse || 0, cost);
+    return { theirs, yours: cost - theirs };
+  }
+
+  crewBuy(n, what, id) {
+    const g = this.g, P = g.player;
+    if (this.crewShop(n).why) return false;
+    const cost = what === 'armour' ? CREW_ARMOUR[id].cost : CREW_GUNS[id];
+    if (!cost) return false;
+    const { theirs, yours } = this.crewSplit(n, cost);
+    if (P.scrip < yours) return false;
+    n.purse -= theirs;
+    P.scrip -= yours;
+    if (what === 'armour') n.variant = wardrobeRow([CREW_ARMOUR[id].wear]);
+    else { n.setWeapon(id); n.gunFrom = this.crewShop(n).camp.name; }
+    return true;
+  }
+
+  // Paid for: they come with you, and the bar is one short until someone else turns up looking for work.
+  hire(n) {
+    const camp = n.camp, fee = n.hire ? n.hire.fee : 0;
+    if (!this.recruit(n)) return false;
+    n.hired = true;
+    // Most of the fee is gone the same day. A little of it they keep by.
+    n.purse = Math.round(fee * .15);
+    delete n.hire;
+    if (camp >= 0) (this.g.campSim.state[camp].hired || (this.g.campSim.state[camp].hired = [])).push(this.g.day);
+    return true;
+  }
+
   dismiss(n) {
     const i = this.followers.indexOf(n);
     if (i >= 0) this.followers.splice(i, 1);
+    this.leaveVisit(n);
     n.kind = 'wanderer';
     n.dx = 0; n.dz = 0;
     n.squad = null;
@@ -2358,6 +2699,18 @@ export class NPCs {
       if (inId >= 0 && angry[inId] && this.hostileCamp(inId)) g.ui.banner('You are not welcome here', `They will shoot. Bail is ${this.bailFor(inId)} spades, at their Town Hall or to a patrol outside.`);
     }
     // Who is standing where, near you: people walking through a camp have to get round each other.
+    // How fast you are actually going, from where you were last frame: what your companions match their pace to.
+    {
+      const lx = this.lastPX ?? P.x, lz = this.lastPZ ?? P.z, moved = Math.hypot(P.x - lx, P.z - lz);
+      this.lastPX = P.x; this.lastPZ = P.z;
+      if (moved < 20 && dt > 0) this.pSpeed = (this.pSpeed || 0) + (moved / dt - (this.pSpeed || 0)) * Math.min(1, dt * 4);
+    }
+    // Your track: a point every so often as you walk, the last stretch of it kept. A jump (a teleport, a load) starts it again.
+    {
+      const tr = this.trail, last = tr[tr.length - 1], d = last ? Math.hypot(P.x - last.x, P.z - last.z) : 1e9;
+      if (d > 30) { tr.length = 0; tr.push({ x: P.x, z: P.z }); }
+      else if (d > TRAIL_STEP) { tr.push({ x: P.x, z: P.z }); if (tr.length > TRAIL_KEEP) tr.shift(); this.trailAt = g.time; }
+    }
     const crowd = this.crowd || (this.crowd = new Map());
     crowd.clear();
     for (const m of this.list) {
@@ -2471,6 +2824,7 @@ export class NPCs {
       }
       c.t = 1.5 + line.length * .042 + rand() * .5;
     }
+    this.crewTalk(dt);
     // Start another whenever there is room, with whoever happens to be standing together.
     this.chatT -= dt;
     if (this.chatT > 0 || this.convos.length >= 6 || g.ui.modal) return;
@@ -2512,14 +2866,38 @@ export class NPCs {
   }
 
   // Something nobody in earshot has just said.
+  // Your companions talk among themselves on a clock of their own (picked at random from everyone, they would hardly ever get a word in):
+  // often, about the road and each other, sometimes about anything, and now and then not at all. A lone companion makes the odd remark.
+  // Nothing is said that was said too recently; if everything was, they keep quiet.
+  crewTalk(dt) {
+    const g = this.g, P = g.player;
+    if (g.ui.modal || (this.crewT = (this.crewT ?? 10) - dt) > 0) return;
+    this.crewT = CREW_TALK_GAP[0] + rand() * (CREW_TALK_GAP[1] - CREW_TALK_GAP[0]);
+    if (rand() < CREW_SILENCE) return;
+    const crew = this.followers.filter((n) => !n.dead && !n.inConvo && n.state !== 7 && Math.hypot(n.x - P.x, n.z - P.z) < 26);
+    if (!crew.length) return;
+    const a = pickOf(crew), group = [a, ...crew.filter((m) => m !== a && Math.hypot(m.x - a.x, m.z - a.z) < 12)].slice(0, 3);
+    if (group.length >= 2) {
+      const late = g.tod > .8 || g.tod < .22;
+      const pool = g.weather.rain > .25 && rand() < .2 ? CONVERSATIONS.rain : late && rand() < .2 ? CONVERSATIONS.night : rand() < .7 ? COMPANION_TALK : CONVERSATIONS.general;
+      const lines = this.freshLine(pool, true);
+      if (!lines) return;
+      for (const m of group) m.inConvo = true;
+      this.convos.push({ people: group.slice(0, Math.max(2, Math.min(group.length, lines.length))), lines, i: 0, t: rand() * .4, urgent: false });
+      return;
+    }
+    if (rand() < CREW_SOLO) { const line = this.freshLine(COMPANION_BARKS, true); if (line) this.bark(a, line, 24); }
+  }
+
   // Each line rests a while once said: an ordinary one for six minutes, one that belongs to a particular camp or person for twenty-five.
   // Picked from whatever is rested; if nothing is, the one said longest ago.
-  freshLine(pool) {
+  freshLine(pool, quiet = false) {
     const said = this.said instanceof Map ? this.said : (this.said = new Map()), now = performance.now() / 1000;
     const rest = (l) => (SPECIFIC.has(l) ? 1500 : 360);
     const ok = pool.filter((l) => !said.has(l) || now - said.get(l) > rest(l));
     let line;
     if (ok.length) line = pickOf(ok);
+    else if (quiet) return null;
     else { let best = Infinity; for (const l of pool) { const t = said.get(l) ?? -Infinity; if (t < best) { best = t; line = l; } } }
     said.set(line, now);
     if (said.size > 600) for (const [k, t] of said) if (now - t > 1500) said.delete(k);
@@ -3406,7 +3784,9 @@ export class NPCs {
         if (n.swung) return;
         n.swung = true;
         swung = true;
+        H.hitBy = n;
         H.damage(i, n.evacuee ? 100 : 70, false, H.px[i], H.py[i] + 1.5, H.pz[i], false);
+        H.hitBy = null;
         g.particles.blood(H.px[i], H.py[i] + 1.5, H.pz[i], 0, .4, 0, 5, 3);
         n.yaw = Math.atan2(H.px[i] - n.x, H.pz[i] - n.z);
         n.aim = .4;
@@ -3431,7 +3811,9 @@ export class NPCs {
     // Cooks and carpenters with rifles: enough to slow a breach, not to stop one on their own.
     // Anyone running for their life is past saving anything but themselves, and every one of those shots is meant.
     if (rand() < (n.evacuee ? .6 : n.camp >= 0 && n.kind !== 'follower' ? .45 * (1 - g.campSim.desperation(g.campSim.state[n.camp]) * .5) : .85)) {
+      H.hitBy = n;
       H.damage(best, n.evacuee ? n.gun.dmg * 1.5 : n.gun.dmg, false, hx, hy, hz, false);
+      H.hitBy = null;
       g.particles.blood(hx, hy, hz, 0, .4, 0, 3, 3);
     }
     return true;
@@ -3516,7 +3898,8 @@ export class NPCs {
         }
       }
     }
-    if (n.evacuee || n.kind === 'roamer' || n.kind === 'follower' || n.kind === 'wanderer' || (hostile && n.armed) || (n.threat && n.kind !== 'guard')) {
+    // The watch posted at the gates and outside the wall shoot whatever comes at them, whether or not the camp is under attack.
+    if (n.evacuee || n.kind === 'roamer' || n.kind === 'follower' || n.kind === 'wanderer' || n.kind === 'sentry' || (hostile && n.armed) || (n.threat && n.kind !== 'guard')) {
       n.cd -= dt;
       if (n.cd <= 0) {
         n.cd = n.gun && n.gun.rate ? n.gun.rate * (1 + rand() * .5) * (n.evacuee ? 1.6 : campS && n.kind !== 'follower' ? 2 : 1) : .9;
@@ -3541,6 +3924,7 @@ export class NPCs {
       n.state = q.lie ? 7 : 5;
       return;
     }
+    if (n.walk && !(n.busyT > 0) && !n.threat && !(n.aim > 0)) { this.walkSentryBeat(n, dt, dp); return; }
     if (n.kind === 'vendor' || n.kind === 'boss' || n.kind === 'clerk' || n.kind === 'named' || n.kind === 'sentry') {
       if (n.busyT > 0 || n.threat) {
         // There is a fight on. They keep their eyes on it, and only look elsewhere once it has moved on.
@@ -3553,6 +3937,39 @@ export class NPCs {
     if (n.kind === 'follower') { this.updateFollower(n, dt, dp); return; }
     if (n.kind === 'wanderer') { this.updateWanderer(n, dt, dp); return; }
     if (n.squad) this.updatePatrol(n, dt, dp);
+  }
+
+  // Out and back along the foot of the wall: a stop at each end to look out over the ground, then the walk back. Only onto ground a
+  // person could step up onto, and never into water; where the way is blocked they turn round there.
+  walkSentryBeat(n, dt, dp) {
+    const w = this.g.world, P = this.g.player, b = n.walk;
+    if (b.wait > 0) {
+      b.wait -= dt;
+      // Stood at the end of the beat, looking out the way the post faces, with the odd glance along the wall.
+      if (dp < 8 && !n.inConvo) n.yaw = Math.atan2(P.x - n.x, P.z - n.z);
+      else n.yaw = n.baseYaw + Math.sin(this.g.time * .4 + n.tick) * .5;
+      n.state = 0;
+      return;
+    }
+    const step = SENTRY_PACE * dt;
+    let next = b.at + b.dir * step;
+    const end = Math.abs(next) >= SENTRY_BEAT;
+    if (end) next = Math.sign(next) * SENTRY_BEAT;
+    const nx = b.x + b.ax * next, nz = b.z + b.az * next;
+    const gy = w.groundBelow(nx, n.y + 1.2, nz, 6), cx = Math.floor(nx), cz = Math.floor(nz), sy = Math.floor(gy + .05);
+    const ok = gy > WATER_Y && Math.abs(gy - n.y) <= 1.1 && !w.solid(cx, sy, cz) && !w.solid(cx, sy + 1, cz) && !w.solid(cx, sy + 2, cz);
+    if (!ok || end) {
+      if (ok) { b.at = next; n.x = nx; n.z = nz; n.y = gy; }
+      b.dir = -b.dir;
+      b.wait = SENTRY_PAUSE * (.6 + rand() * .8);
+      n.state = 0;
+      return;
+    }
+    b.at = next; n.x = nx; n.z = nz;
+    n.y += Math.sign(gy - n.y) * Math.min(Math.abs(gy - n.y), dt * 10);
+    n.yaw = Math.atan2(b.ax * b.dir, b.az * b.dir);
+    n.phase += step * 2.1;
+    n.state = .7;
   }
 
   // The doctor goes round the tent: the foot of one cot, then another, the bench, back to the table, a while at each. Turns to you when
@@ -3932,6 +4349,7 @@ export class NPCs {
 
   hurt(n, amount) {
     if (n.dead) return;
+    if (n.kind === 'follower') amount *= 1 - CREW_ARMOUR[crewArmourTier(n)].cut;
     n.hp -= amount;
     if (n.hp <= 0) this.kill(n);
   }
@@ -3955,7 +4373,7 @@ export class NPCs {
     g.horde.addBody(n.x, n.y, n.z, n.yaw, n.variant, !!n.headless, 0, n.kid);
     if (n.task && n.task.poi && n.task.poi.by === n) n.task.poi.by = null;
     const fi = this.followers.indexOf(n);
-    if (fi >= 0) { this.followers.splice(fi, 1); g.ui.toast(`Your companion ${n.name} is dead.`, 'bad', 7); }
+    if (fi >= 0) { this.followers.splice(fi, 1); this.leaveVisit(n); g.ui.toast(`Your companion ${n.name} is dead.`, 'bad', 7); }
     // The bitten get back up. In a camp under attack, this is how it comes apart.
     if (n.kind !== 'vendor' && !byPlayer && !n.kid && rand() < .65) {
       const i = g.horde.spawnOne(n.x, Math.max(n.y, STREET_Y), n.z, 1);
@@ -4537,6 +4955,9 @@ export class Jobs {
     } else {
       job = { type, title, time: 40, held: 0, reward: Math.round(base * 1.35 + 20), desc: `Run a relay at ${where} and keep within range for 40 seconds. The transmitter is loud, so expect company.`, where };
     }
+    // The far end of the board (its harder run of offers) is not one-person work: the camp will not send you out there alone.
+    job.crewNeed = !harder ? 0 : p >= HARD_CREW[1] ? 2 : p >= HARD_CREW[0] ? 1 : 0;
+    if (job.crewNeed) job.desc += ` Not alone: take ${job.crewNeed === 1 ? 'someone' : `at least ${job.crewNeed} people`} with you.`;
     job.id = this.nextId++;
     job.x = x; job.z = z;
     job.y = STREET_Y;
@@ -4765,6 +5186,7 @@ export class Jobs {
     const g = this.g, e = this.earlyPayout(campId), j = this.opJob(campId);
     if (!e || e.locked || !j) return 0;
     this.active.splice(this.active.indexOf(j), 1);
+    e.pay = this.crewCut(j, e.pay);
     g.player.scrip += e.pay;
     g.stats.ops = (g.stats.ops || 0) + 1;
     g.audio.simple('coin');
@@ -4824,7 +5246,35 @@ export class Jobs {
     return Math.max(.05, rule.keep * (.55 + .45 * Math.min(1, this.g.director.strength(c))));
   }
 
-  defendKill(c, op) {
+  // A kill counted towards a job, and whether one of your companions made it: they take a cut of the pay for their share.
+  credit(j, crew) {
+    j.credit = (j.credit || 0) + 1;
+    if (crew) j.crew = (j.crew || 0) + 1;
+  }
+
+  // What is left of a payment once your companions have had their cut: a fraction of it, in proportion to how many of the kills were
+  // theirs. Only while someone is still with you to take it.
+  crewCut(j, amount) {
+    const g = this.g, P = g.player, crew = g.npcs.followers.filter((f) => !f.dead);
+    if (!j || !crew.length || amount <= 0) return amount;
+    const near = crew.filter((f) => Math.hypot(f.x - P.x, f.z - P.z) < 90);
+    const cut = j.crew && j.credit ? Math.max(1, Math.round(amount * COMPANION_CUT * Math.min(1, j.crew / j.credit))) : 0;
+    // Whoever came along gets a little something from the client as well, on top of what you are paid: it is how they afford their kit.
+    const tip = near.length ? Math.max(2, Math.round(amount * CREW_TIP)) : 0;
+    if (!cut && !tip) return amount;
+    crew.forEach((f, k) => { f.purse = (f.purse || 0) + Math.floor(cut / crew.length) + (k < cut % crew.length ? 1 : 0); });
+    for (const f of near) f.purse = (f.purse || 0) + tip;
+    const list = (fs) => {
+      const names = fs.map((f) => (f.name ? f.name.split(' ')[0] : 'Your companion'));
+      return names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+    };
+    const tipText = tip ? `${near.length === 1 ? '' : ' each'} for coming along` : '';
+    if (cut) g.ui.toast(`${list(crew)} took ${SPADE} ${cut.toLocaleString('en-US')} as ${crew.length === 1 ? 'their' : 'the crew\'s'} cut${tip ? `, and the client gave them ${SPADE} ${tip}${tipText}` : ''}.`);
+    else g.ui.toast(`The client gave ${list(near)} ${SPADE} ${tip}${tipText}.`);
+    return amount - cut;
+  }
+
+  defendKill(c, op, crew = false) {
     const g = this.g;
     if (!g.player.discovered[c.id] || g.npcs.hostileCamp(c.id)) return;
     // On patrol you are paid to walk, not to shoot.
@@ -4835,6 +5285,7 @@ export class Jobs {
     if (!j) j = this.commission(c, op);
     if (j.plan === 'vanguard') {
       j.vKills++; j.dayKills++;
+      this.credit(j, crew);
       if (!j.pending && !j.dayMet) {
         const due = this.quotaDue(j, op, op.start + j.day + 1);
         if (due > 0 && j.dayKills >= due) {
@@ -4842,7 +5293,7 @@ export class Jobs {
           this.contractNote(c, `Quota met for day ${j.day + 1} of Operation ${op.name}.`, 'good', '', ['Quota met', `Day ${j.day + 1} of Operation ${op.name}`]);
         }
       }
-    } else j.kills++;
+    } else { j.kills++; this.credit(j, crew); }
   }
 
   // An operation contract: on the board ahead of time, and open to anyone who walks in partway through. It takes over from the commission;
@@ -4907,10 +5358,11 @@ export class Jobs {
     return j;
   }
 
-  nightKill(c) {
+  nightKill(c, crew = false) {
     const j = this.nightOf(c.id);
     if (!j || j.status !== 'active' || j.shiftDone || !this.onShift(j)) return;
     j.shiftKills++;
+    this.credit(j, crew);
     if (j.shiftKills >= j.quota) this.completeNight(j, c);
   }
 
@@ -5065,6 +5517,8 @@ export class Jobs {
       this.active.push(owed);
     }
     owed.kills += kills;
+    owed.credit = (owed.credit || 0) + (j.credit || 0);
+    owed.crew = (owed.crew || 0) + (j.crew || 0);
     owed.fullPay = (owed.fullPay ?? owed.reward) + full;
     owed.reward += pay;
     owed.desc = `Operation ${op.name} succeeded. The Town Hall at ${c.name} has your pay, for as long as there is a ${c.name}.${owed.reward < owed.fullPay ? ` Missed quotas docked it from ${SPADE} ${owed.fullPay.toLocaleString('en-US')} to ${SPADE} ${owed.reward.toLocaleString('en-US')}.` : ''}`;
@@ -5124,9 +5578,10 @@ export class Jobs {
     P.dlg.flags[`${key}_paid`] = 1;
     if (!j) return null;
     this.active.splice(this.active.indexOf(j), 1);
-    P.scrip += j.reward;
+    const paid = this.crewCut(j, j.reward);
+    P.scrip += paid;
     P.rep = Math.min(100, P.rep + 3);
-    const out = [`${j.reward} spades`];
+    const out = [`${paid} spades`];
     if (j.bonus) { const n = ITEMS[j.bonus].bundle || 1; P.gain(j.bonus, n); out.push(`${n} ${ITEMS[j.bonus].name}`); }
     g.stats.jobs++;
     g.audio.simple('coin');
@@ -5136,6 +5591,7 @@ export class Jobs {
   turnIn(job) {
     const g = this.g, P = g.player, stood = job.type === 'defended';
     if (job.intro) P.dlg.flags.introDone = true;
+    job.reward = this.crewCut(job, job.reward);
     P.scrip += job.reward;
     // People remember how much you did.
     P.rep = Math.min(100, P.rep + (stood ? (job.kills >= 25 ? 3 : 1) : 2));
@@ -5154,11 +5610,12 @@ export class Jobs {
   }
 
   // Anyone's kill counts, the patrols' as much as yours. The block does not care who cleared it.
-  onKill(x, z) {
+  onKill(x, z, crew = false) {
     for (const j of this.active) {
       // The leader's first job is any of them, anywhere: the gate it points you at is only where they are easiest to find.
       if (j.type === 'kill' && j.status === 'active' && (j.intro || Math.hypot(x - j.x, z - j.z) < 70)) {
         j.got++;
+        this.credit(j, crew);
         if (j.got >= j.need) this.finish(j);
       }
     }

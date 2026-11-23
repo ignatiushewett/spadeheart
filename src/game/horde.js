@@ -2209,7 +2209,19 @@ export class Horde {
         if (!moved) c[o + 1] = fy + 1;
         continue;
       }
-      if (!w.solid(x, Math.floor(y - .05), z)) fall.set(k, 0);
+      if (!w.solid(x, Math.floor(y - .05), z)) { fall.set(k, 0); continue; }
+      // Lying along the edge of a drop with only the feet on it: a body goes over if its middle has nothing under it. It slides off
+      // the way it lies until it is clear of the edge, and falls from there.
+      const fs = ((c[o + 5] * .37) % 2) > 1 ? -1 : 1, dx = Math.sin(c[o + 3]) * fs, dz = Math.cos(c[o + 3]) * fs, uy = Math.floor(y - .05);
+      const under = (t) => w.solid(Math.floor(c[o] + dx * t), uy, Math.floor(c[o + 2] + dz * t));
+      if (!under(1) && !(under(.15) && under(1.85))) {
+        for (let s = 0; s < 5 && w.solid(Math.floor(c[o]), uy, Math.floor(c[o + 2])); s++) {
+          const nx = c[o] + dx * .3, nz = c[o + 2] + dz * .3;
+          if (w.solid(Math.floor(nx), fy, Math.floor(nz))) break;
+          c[o] = nx; c[o + 2] = nz;
+        }
+        if (!w.solid(Math.floor(c[o]), uy, Math.floor(c[o + 2]))) fall.set(k, 0);
+      }
     }
     for (const [k, v0] of fall) {
       const o = k * 8, x = Math.floor(c[o]), z = Math.floor(c[o + 2]), v = v0 + 22 * dt;

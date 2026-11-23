@@ -2,6 +2,7 @@
 // to somebody and go where that person goes, and the rest wander about, nap, go and get made a fuss of, and run about after the kids.
 // They are not in any fight: when the camp empties or falls, they are gone with it.
 
+import { STREET_Y } from '../shared/constants.js';
 const NAMES = ['Biscuit', 'Rex', 'Bella', 'Scout', 'Max', 'Daisy', 'Bones', 'Pepper', 'Rocky', 'Luna', 'Duke', 'Rosie', 'Tank', 'Bailey',
   'Shadow', 'Penny', 'Buster', 'Ginger', 'Ziggy', 'Molly', 'Chief', 'Hazel', 'Otis', 'Mabel', 'Bandit', 'Sergeant', 'Pickles', 'Dottie'];
 const PET_LINES = ['Hey, buddy.', 'Who is a good dog?', 'There you are.', 'Hello, trouble.', 'Go on, then. Just one scratch.', 'Look at you.'];
@@ -44,7 +45,7 @@ export class Dogs {
       const x = at.x + (rand() - .5) * 3, z = at.z + (rand() - .5) * 3;
       const name = names[i % names.length];
       this.list.push({
-        camp: c.id, owner, name, x, z, y: this.g.world.terrainTop(Math.floor(x), Math.floor(z)), yaw: rand() * 6.283, ys: 0, phase: rand() * 6,
+        camp: c.id, owner, name, x, z, y: this.g.world.groundBelow(x, STREET_Y + 8, z, 16), yaw: rand() * 6.283, ys: 0, phase: rand() * 6,
         v: 0, state: 0, variant: 192 + Math.floor(rand() * 64), side: rand() < .5 ? -1 : 1, t: rand() * 8, rest: 0, tx: x, tz: z, mode: 'idle',
       });
     }
@@ -121,7 +122,8 @@ export class Dogs {
     d.state = d.v > 3.2 ? 1 : d.v > .3 ? .7 : settle;
     d.ys = this.ease(d.ys, d.yaw, dt * 5);
     if (Math.hypot(d.x - P.x, d.z - P.z) < 90) {
-      const gy = w.groundBelow ? w.groundBelow(d.x, d.y + .6, d.z, 5) : w.terrainTop(Math.floor(d.x), Math.floor(d.z));
+      // From a little above its back, so one that has ended up inside the ground (or a step) climbs back out on top of it.
+      const gy = w.groundBelow(d.x, d.y + 1.6, d.z, 6);
       d.y += Math.sign(gy - d.y) * Math.min(Math.abs(gy - d.y), dt * 10);
     }
   }

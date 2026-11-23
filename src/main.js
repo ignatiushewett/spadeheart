@@ -35,7 +35,8 @@ const rand = Math.random;
 const nextFrame = () => new Promise((r) => { requestAnimationFrame(r); setTimeout(r, 120); });
 const DAY_SECONDS = 1500;
 const GARVEY_V = 5;        // which build of Carver Yard a save's edits belong to
-const WEST_V = 1;          // which lie of the land west of Weston a save's edits belong to (Mt Page and Fort Westpoint moved south)
+const WEST_V = 1;
+const CAMPS_V = 2;         // which plan of the camps' insides a save's edits belong to (2: the squares moved off-centre, the lanes bend)          // which lie of the land west of Weston a save's edits belong to (Mt Page and Fort Westpoint moved south)
 const WEST_AREA = { x0: 0, z0: 1350, x1: 2250, z1: 2850 };
 const INTRO_TIME = 7.5;    // seconds of words on black before the wake-up
 const INTRO_FADE = 1.3;    // the last of that is them fading out, and a beat of nothing
@@ -49,8 +50,11 @@ const OLD_SETTINGS_KEY = 'acez.settings.v1';
 const DB_NAME = 'acez';
 // Where the title flight ends: out over the bay to the east-south-east of her, looking back west-north-west past her and the Landing to
 // Weston, the plateau and Albion on the skyline, with the edge of the map only far off in the haze.
+// How far out the title screen builds the city in full. The view there holds still, so it can afford to see a long way.
+const MENU_VIEW = 704;
+const MENU_VEIL_MAX = 45;   // seconds the title screen waits on black for the view to build, at most
 const MENU_SHOT = { angle: -.18, dist: 185, height: 88, turn: -.32, pitch: -.14, fov: 1.05, flight: 125, startHeight: 30, startOff: 44, startPitch: -.1 };
-export const VERSION = 'v0.95';
+export const VERSION = 'v0.96';
 const SAVE_KEY = 'slot15';  // bumped whenever the map changes: old voxel edits no longer line up
 export const SLOTS = 3;
 // Slot 1 keeps the plain key, so a save from before there were slots simply becomes the first character.
@@ -146,7 +150,7 @@ class Game {
 
   defaultSettings() {
     return { ...LOOKS.cinematic, quality: 'ultra', view: 416, scale: 1, cap: 24000, sens: 1, volume: .8, motion: false, dof: true, fpsCap: 0, muteSiren: false, clock24: false, drips: true, grassWave: false, sway: 1, minimap: true, chatterNoHud: true, hitmarker: false, crosshair: false,
-      brightness: 1, bob: 1, music: 1, adsSens: 1, invertY: false, toggleAim: false, toggleCrouch: false, showFps: false, defaultsV: 7 };
+      bob: 1, music: 1, adsSens: 1, invertY: false, toggleAim: false, toggleCrouch: false, showFps: false, defaultsV: 8 };
   }
 
   loadSettings() {
@@ -174,6 +178,8 @@ class Game {
         if ((mine.defaultsV ?? 0) < 6) { Object.assign(s, LOOKS.cinematic); s.defaultsV = 6; }
         // Ultra is the default now: anyone still on the old default (High) moves up once; anyone who chose something else keeps it.
         if ((mine.defaultsV ?? 0) < 7) { if (s.quality === 'high' && s.view === 320) { s.quality = 'ultra'; s.view = 416; } s.defaultsV = 7; }
+        // Cinematic is a little darker now (85%): anyone on Cinematic who never touched the brightness moves with it, once.
+        if ((mine.defaultsV ?? 0) < 8) { if ((mine.brightness ?? 1) === 1 && s.fov === LOOKS.cinematic.fov && s.uiScale === LOOKS.cinematic.uiScale) s.brightness = .85; s.defaultsV = 8; }
         return s;
       }
       // Older settings carry over, except motion blur, which now starts off for everyone.
@@ -664,9 +670,12 @@ class Game {
     };
     H.onHitHuman = (h) => this.npcs.bitten(h);
     H.onKilled = (i, x, y, z, headshot, byPlayer) => {
-      if (byPlayer) this.jobs.onKill(x, z);
+      // Your companions' kills count for your jobs as yours do; they take a cut of the pay for them (jobs.crewCut).
+      const crew = !byPlayer && !!H.hitBy && H.hitBy.kind === 'follower';
+      if (byPlayer || crew) this.jobs.onKill(x, z, crew);
+      if (crew) H.hitBy.kills = (H.hitBy.kills || 0) + 1;
       this.addBlood(x, y, z, headshot ? .3 : .22, 3.4);
-      this.campSim.noteKill(x, z, byPlayer, H.siege[i]);
+      this.campSim.noteKill(x, z, byPlayer || crew, H.siege[i], crew);
       if (byPlayer) {
         const drop = rollZombieDrop(H.settings.loot);
         if (drop) this.addPickup(x, y + .4, z, drop);
@@ -852,6 +861,13 @@ class Game {
     if (e.code === 'Tab') {
       if (ui.modal === 'inventory') { this.resume(); return; }
       if (!ui.modal && P.alive) { this.openModal(() => ui.openInventory()); }
+      return;
+    }
+    // Caps Lock: your crew, who they are and what they carry.
+    if (e.code === 'CapsLock') {
+      if (e.repeat) return;
+      if (ui.modal === 'crewpanel') { this.resume(); return; }
+      if (!ui.modal && P.alive) { this.openModal(() => ui.openCrew()); }
       return;
     }
     if (ui.modal === 'map' && (e.code === 'KeyW' || e.code === 'ArrowUp')) { ui.panMap(-1); return; }
@@ -2005,6 +2021,10 @@ class Game {
     this.fadeK = 0;
     this.player.alive = true;
     this.menuFilled = false;
+    // Black until it is all there: nobody sees the city build itself.
+    const veil = document.getElementById('menu-veil');
+    veil.className = 'on';
+    this.menuVeilT = 0;
     this.npcs.list.length = 0;
     this.dogs.reset();
     this.npcs.followers.length = 0;
@@ -2073,7 +2093,7 @@ class Game {
       }
       this.jobs.startVisit(c);
       this.saveGame();
-      if (kit === 'survival') { this.wakeUp(c, bed, () => this.ui.banner(c.name, this.survivalBanner())); return; }
+      if (kit === 'survival') { this.wakeUp(c, bed, () => {}); return; }
       this.ui.banner(c.name, `You came in with nothing. Find ${leader.name}, who runs this place: they will get you set up.`);
     });
   }
@@ -2174,6 +2194,8 @@ class Game {
       if (!open.has('W')) edits = this.world.dropEditsIn(edits, c.x0 - M, c.z0, c.x0 - 1, c.z1);
       if (!open.has('E')) edits = this.world.dropEditsIn(edits, c.x1 + 1, c.z0, c.x1 + M, c.z1);
     }
+    // Every camp was replanned round its new bar, so damage inside an older save's walls belongs to buildings that have moved.
+    if ((s.campsV || 0) !== CAMPS_V) for (const c of this.layout.camps) edits = this.world.dropEditsIn(edits, c.x0 + 2, c.z0 + 2, c.x1 - 2, c.z1 - 2);
     this.world.importEdits(edits);
     this.lightsGone = new Set((s.lightsGone || []).filter((k) => {
       if (!rebuilt) return true;
@@ -2194,6 +2216,11 @@ class Game {
         const i = Math.floor(P.z) * WX + Math.floor(P.x);
         P.y = Math.max(P.y, (L.height[i] || (STREET_Y + L.terr[i])) + .05);
       }
+    }
+    // Saved inside a camp that has been laid out again since: out on its square, not inside whatever stands where you were.
+    if ((s.campsV || 0) !== CAMPS_V) {
+      const P = this.player, c = this.layout.camps.find((q) => P.x > q.x0 && P.x < q.x1 && P.z > q.z0 && P.z < q.z1);
+      if (c && c.spots.plaza) { P.x = c.spots.plaza.x; P.z = c.spots.plaza.z; P.y = STREET_Y; }
     }
     if (rebuilt) {
       const P = this.player;
@@ -2219,6 +2246,8 @@ class Game {
     this.dogs.reset();
     this.npcs.followers.length = 0;
     this.npcs.camps.forEach((c) => { c.active = false; c.npcs = []; c.guards = []; });
+    // Whoever was with you is with you again, where they were standing.
+    this.npcs.followersFromSave(s.followers);
     this.tod = s.tod;
     this.day = s.day;
     this.stats = s.stats || this.stats;
@@ -2231,7 +2260,7 @@ class Game {
   saveGame() {
     if (this.state !== 'play' && this.state !== 'loading') return;
     const data = {
-      version: 1, garvey: GARVEY_V, west: WEST_V, player: this.player.toSave(), jobs: this.jobs.toSave(), edits: this.world.exportEdits(), horde: this.horde.exportState(),
+      version: 1, garvey: GARVEY_V, west: WEST_V, campsV: CAMPS_V, player: this.player.toSave(), followers: this.npcs.followersToSave(), jobs: this.jobs.toSave(), edits: this.world.exportEdits(), horde: this.horde.exportState(),
       tod: this.tod, day: this.day, difficulty: this.difficulty, stats: this.stats, lightsGone: [...(this.lightsGone || [])], lotHurt: [...(this.lotHurt || new Map())].map(([k, e]) => [k, e.lost, e.base, e.down ? 1 : 0]), camps: this.campSim.toSave(), bikes: this.bikes.toSave(), director: this.director.toSave(), weather: this.weather.toSave(), savedAt: Date.now(),
       permaDead: this.player.loadout === 'survival' && !this.player.alive,
     };
@@ -2419,8 +2448,8 @@ class Game {
       }
     }
     P.y = Y;
-    this.wakeFx = { t: 0, c, bed, then, health: P.health, x: bed.x, y: Y, z: bed.z, intro: INTRO_TIME };
-    this.showIntro(true, c);
+    this.wakeFx = { t: 0, c, bed, then, health: P.health, x: bed.x, y: Y, z: bed.z, intro: 1.2 };   // a moment of dark, no words
+    // No words over the waking: the room and the window say it.
     document.body.classList.add('waking');
     document.getElementById('wake-lids').style.display = 'block';
     this.setLids(0);
@@ -2520,7 +2549,7 @@ class Game {
     this.beginLoad(`Elsewhere in the city`, () => {
       this.jobs.startVisit(c);
       this.saveGame();
-      this.wakeUp(c, bed, () => this.ui.banner(c.name, this.survivalBanner()));
+      this.wakeUp(c, bed, () => {});
     });
   }
 
@@ -2676,6 +2705,11 @@ class Game {
     this.audio.muffle(paused);
     if (!paused && this.state !== 'loading') this.updateWeather(dt);
     if (this.state === 'play' && !paused) this.updateFires(dt);
+    // The title screen sees further than the game does; back in the game it is whatever the settings say again.
+    const wantView = this.state === 'menu' ? Math.max(this.settings.view, MENU_VIEW) : this.settings.view;
+    if (this.world && this.state !== 'loading' && this.world.viewRadius !== wantView) { this.world.viewRadius = wantView; this.world.lastCX = -999; }
+    // Off the title screen before it had finished building: the black goes with it.
+    if (this.state !== 'menu' && this.menuVeilT !== -1e9 && this.menuVeilT !== undefined) { document.getElementById('menu-veil').className = ''; this.menuVeilT = -1e9; }
     if (this.state === 'menu') this.updateMenu(dt);
     else if (this.state === 'play' && !paused) this.updatePlay(dt);
     else if (this.state === 'play') this.world.update(this.player.x, this.player.z);
@@ -2707,8 +2741,10 @@ class Game {
     r.rainVis = 1;
     r.rainIndoor = play ? Math.min(1, Math.max(0, (1 - P.skyVis) / .92)) : 0;
     if (play) this.drips.update(dt, cam);
-    // Thin enough on the menu to see across the harbour.
-    r.fogK = play ? 1 : this.state === 'menu' ? .5 : 1.5;
+    // The title screen holds still, so it can afford to be drawn supersampled: sharper, and with clean edges.
+    r.superK = this.state === 'menu' ? 2 : 1;
+    // Thin enough on the menu to see across the harbour, the distance fading in over a long way rather than a short one.
+    r.fogK = play ? 1 : this.state === 'menu' ? .3 : 1.5;
     r.rainFloor = r.sky.night * (this.state === 'menu' ? .09 : .12);
     // In the game, at night, the streaks also get more body: out in the dark they are all you have to tell it is raining.
     r.rainNight = play ? r.sky.night * 1.1 : 0;
@@ -2774,10 +2810,18 @@ class Game {
     cam.roll = Math.sin(k * Math.PI) * .012;
     this.menuFocus = Math.hypot(C.bx - cam.x, C.bz - cam.z) * (1 - look) + MENU_SHOT.dist * look;
     cam.fov = MENU_SHOT.fov;
-    // What is loaded in full follows the flight: the camp while it is close, and her by the time it gets to her.
-    const share = .75 - .29 * k;
-    this.world.update(C.lx + C.ux * C.bd * share, C.lz + C.uz * C.bd * share);
-    if (!this.menuFilled && this.world.loadMask[(Math.floor(C.bx) >> 5) + (Math.floor(C.bz) >> 5) * CW]) {
+    // What is loaded in full sits out ahead of the camera, not round it: a little of what is at its feet, and as far up the bay as the
+    // distance allows, out towards the far end of Severn.
+    const ahead = Math.max(0, this.world.viewRadius - 230);
+    this.world.update(cam.x + Math.sin(cam.yaw) * ahead, cam.z - Math.cos(cam.yaw) * ahead);
+    const W = this.world, built = W.columns && W.columns.length ? (W.scan || 0) / W.columns.length : 0;
+    this.menuVeilT = (this.menuVeilT || 0) + dt;
+    if (this.menuVeilT >= 0 && (built > .985 || this.menuVeilT > MENU_VEIL_MAX)) {
+      this.menuVeilT = -1e9;
+      const veil = document.getElementById('menu-veil');
+      if (veil.classList.contains('on')) { veil.classList.add('out'); veil.classList.remove('on'); }
+    }
+    if (!this.menuFilled && (this.world.loadMask[(Math.floor(C.bx) >> 5) + (Math.floor(C.bz) >> 5) * CW] || built > .985)) {
       this.menuFilled = true;
       this.horde.fillAround(C.bx, C.bz);
     }
@@ -3207,10 +3251,13 @@ class Game {
         if (fxd * fxd + fzd * fzd > 110 * 110) continue;
         if (f.small || f.out) continue;
         const fy = STREET_Y + 1;
-        const size = f.big ? 2.3 : 1.3;
+        // A hearth's flames stay small, inside the opening; its smoke goes up the chimney.
+        const size = f.big ? 2.3 : f.hearth ? .7 : 1.3;
+        // A hearth fills its room with moving orange light, day or night.
+        if (f.hearth) { const fl = .82 + Math.sin(this.time * 11 + f.x) * .08 + rand() * .1; this.queueLight(f.x + .5, fy + .6, f.z + .5, 22, 7 * fl, 3 * fl, .6 * fl); }
         for (let k = this.emitN(f, 'fireAcc', f.big ? 28 : 12, dt); k > 0; k--) fx.fire(f.x + .5 + (rand() - .5) * (f.big ? 3 : 0), fy, f.z + .5 + (rand() - .5) * (f.big ? 3 : 0), size);
         // Wood smoke, a steady stream of it off the top of the flames.
-        for (let k = this.emitN(f, 'smokeAcc', f.big ? 8 : 3, dt); k > 0; k--) fx.smoke(f.x + .5 + (rand() - .5) * (f.big ? 1.4 : .3), fy + (f.big ? .7 : .35), f.z + .5 + (rand() - .5) * (f.big ? 1.4 : .3), f.big ? 1.25 : .7, .9, .16, f.big ? .27 : .2);
+        if (!f.hearth) for (let k = this.emitN(f, 'smokeAcc', f.big ? 8 : 3, dt); k > 0; k--) fx.smoke(f.x + .5 + (rand() - .5) * (f.big ? 1.4 : .3), fy + (f.big ? .7 : .35), f.z + .5 + (rand() - .5) * (f.big ? 1.4 : .3), f.big ? 1.25 : .7, .9, .16, f.big ? .27 : .2);
       }
     }
     for (let i = this.tempLights.length - 1; i >= 0; i--) {

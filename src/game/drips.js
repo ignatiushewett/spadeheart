@@ -1,4 +1,5 @@
 import { STREET_Y } from '../shared/constants.js';
+import { isGlass } from '../shared/materials.js';
 
 const rand = Math.random;
 const EDGES = [[1, 0], [-1, 0], [0, 1], [0, -1]];
@@ -135,6 +136,10 @@ export class Drips {
       if (y <= STREET_Y || y > cam.y + 26) continue;
       // Off the underside of the ledge, however thick it is, not out of the middle of its face.
       while (y > m.top[i] - 2 && g.world.get(x, y - 1, z)) y--;
+      // Glass is a window or a glass roof, not an eave: nothing runs off it to drip underneath.
+      let glass = false;
+      for (let k = y; k <= m.top[i]; k++) if (isGlass(g.world.get(x, k, z))) { glass = true; break; }
+      if (glass) continue;
       // Each open side is an edge of its own: the beside column is well below, so the water drops off this side and lands on whatever is down there.
       // A step down of one or two is just the roof going on; the water runs over it, not off it.
       for (const [dx, dz] of EDGES) {

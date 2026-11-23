@@ -99,3 +99,48 @@ export const MORE_BARKS = {
     "Getting cold up here.", "Another hour.", "Saw one by the road earlier.", "Don't lean on that, it moves.", "Quiet. Too quiet, probably.",
   ],
 };
+
+// Companions travelling together, out on the road or sat about a camp. What people say when they have walked a long way side by side:
+// the road, the dead, the places they have left, each other, and you, in passing. Used often, but every line rests once said, and
+// when nothing has rested long enough they say nothing.
+export const COMPANION_TALK = [
+  ["How far is it now?", "Same as the last time you asked.", "That's not an answer.", "It's the only one I've got."],
+  ["Look at the state of that place.", "Somebody tried to hold it.", "Didn't try hard enough.", "Don't. You don't know what they had."],
+  ["You still got water?", "Half a bottle.", "Ration it.", "I am rationing it. This is what rationing looks like."],
+  ["My feet are done.", "We'll stop soon.", "You said that an hour ago.", "And I'll keep saying it until it's true."],
+  ["Do you ever think about going back?", "To what?", "To where you lived.", "Every day. I don't think there's anything there."],
+  ["Did you see the way that one moved?", "Which one?", "By the cars. It was nearly running.", "They're all nearly something. Keep walking."],
+  ["You know where we're headed?", "Wherever they're going.", "That's not reassuring.", "It's kept us alive so far."],
+  ["I used to drive this road to work.", "Yeah?", "Forty minutes. I'd complain about the traffic.", "Wish we had some traffic now."],
+  ["Stop humming.", "I'm not humming.", "You've been humming for a mile.", "...Was it any good?", "No."],
+  ["You think they'll take us in, the next place?", "If we bring something with us.", "Like what?", "Guns. Hands. Not complaining."],
+  ["Hold up. Listen.", "I don't hear anything.", "That's what worries me.", "Let's just keep moving."],
+  ["{name}, cover the left.", "I've got the left.", "You've had the left for an hour.", "Then I'm good at it."],
+  ["What's the first thing you'd buy, if you had money that meant anything?", "A bath.", "You can't buy a bath.", "Watch me."],
+  ["I counted twelve back there.", "Twelve's nothing.", "Twelve's nothing when they're spread out.", "Fine. Twelve is something."],
+  ["Do you trust them?", "Who?", "You know who.", "They've kept us breathing. That's trust enough for today."],
+  ["I keep thinking I see people in the windows.", "Sometimes you do.", "Living ones?", "Sometimes."],
+  ["You're limping.", "I'm fine.", "You're limping and you're lying.", "I'm fine enough. Drop it."],
+  ["Remember that dog at the last place?", "The fat one?", "He was beautiful.", "He was fat. You can be both."],
+  ["Smell that? Smoke.", "Somebody's cooking.", "Or something's burning.", "Either way, somebody's alive out there."],
+  ["What did you do before?", "Plumber.", "Useful.", "Not anymore. Nothing runs."],
+  ["I don't like this stretch.", "Too open?", "Too quiet. Too open. Both.", "Eyes up, then."],
+  ["Hey. Thanks. Back there.", "For what?", "You know for what.", "...Yeah. Anytime."],
+  ["We should've stayed at the last camp.", "And done what?", "Slept. Eaten.", "And waited for them to come over the wall. No."],
+  ["You still have that picture?", "In my pocket.", "Who is it?", "My brother. I don't know where he is.", "We'll ask around."],
+  ["Is it me or is it getting dark early?", "It's you.", "It's definitely darker.", "It's always darker when you're tired."],
+  ["You ever been out this way before?", "Once. Fishing trip.", "Catch anything?", "A cold. Took a week to shake."],
+  ["If I go down, don't stop for me.", "Shut up.", "I mean it.", "So do I. Shut up."],
+  ["How many rounds have you got?", "Enough.", "That's not a number.", "It's enough of a number."],
+  ["I swear we passed that car already.", "Every car looks like that car.", "That one has a teddy bear on the dash.", "...Okay, that's a bit grim."],
+  ["Wind's picking up.", "Rain later.", "Good. Covers the smell.", "Covers the sound of them coming too."],
+];
+
+// One companion, walking with you: a remark now and then, said to you or to nobody.
+export const COMPANION_BARKS = [
+  "Long way to anywhere.", "I've got your back.", "Stay close.", "Looks clear. For now.", "Something moved over there.",
+  "We should find somewhere before dark.", "My boots are falling apart.", "Quiet out here.", "I don't like the look of that street.",
+  "Lead on.", "How are you holding up?", "That's a lot of them over there. Let's not.", "Keep moving, they'll smell us standing still.",
+  "I used to know someone who lived round here.", "Need a minute? Take it.", "Watch the corners.", "Right behind you.",
+  "Smells like rain.", "We're making good time.", "Remind me to never complain about walking again.",
+];

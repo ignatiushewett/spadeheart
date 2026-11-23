@@ -65,6 +65,7 @@ export const ROLES = {
   food: { title: 'Food Stall', sign: M.CONT_O },
   builder: { title: 'Lumber and Block', sign: M.PLANK },
   mechanic: { title: 'Mechanic', sign: M.PAINT_Y },
+  bar: { title: 'Barkeep', sign: M.AWN_R },
 };
 
 // What gets built where. f: floors, lot: plot size, house: the yard left round a detached house.
@@ -1011,18 +1012,31 @@ export function buildLayout(seed = 1609) {
       for (let k = end; k >= 0; k = prev[k]) { const cell = k >> 2; paint(c.x0 + (cell % NW) * 2, c.z0 + ((cell / NW) | 0) * 2); }
       return end >= 0;
     };
-    const { plaza, market, hq, field } = c.spots;
-    for (const g of c.gates) {
-      const inX = g.horiz ? 0 : g.side === 'W' ? 1 : -1, inZ = g.horiz ? (g.side === 'N' ? 1 : -1) : 0;
-      // From just inside the gate: nothing is trodden out past it.
-      for (let k = 2; k <= 6; k++) paintAt((g.horiz ? g.tc : g.cx) + inX * k, (g.horiz ? g.cz : g.tc) + inZ * k);
-      const sx = g.cx + inX * 6, sz = g.cz + inZ * 6;
-      if (market) route(sx, sz, market.x, market.z); else if (plaza) route(sx, sz, plaza.x, plaza.z);
+    const { hq, field } = c.spots;
+    // The square round the bonfire, trodden bare, its corners worn round: every lane comes out onto it.
+    const sq = c.square;
+    if (sq) for (let dz = -sq.d; dz <= sq.d; dz++) for (let dx = -sq.w; dx <= sq.w; dx++) {
+      if (Math.max(0, Math.abs(dx) - (sq.w - 10)) + Math.max(0, Math.abs(dz) - (sq.d - 10)) > 10) continue;
+      const i = (sq.z + dz) * WX + sq.x + dx;
+      if (ground[i] === G.CAMP || ground[i] === G.PARK) { ground[i] = G.DIRT; mark[i] = 0; }
     }
-    if (market && plaza) route(market.x, market.z, plaza.x, plaza.z);
-    if (plaza && hq) route(plaza.x, plaza.z, hq.x, hq.z);
-    if (plaza && c.clerk) route(plaza.x, plaza.z, c.clerk.doorX, c.clerk.doorZ);
-    if (plaza && field) route(plaza.x, plaza.z, field.x, field.z);
+    // Down the middle of every market lane, gate to square, round each bend: the main ways through the town.
+    for (const l of c.lanes || []) for (let z = l.z0; z <= l.z1; z++) for (let x = l.x0; x <= l.x1; x++) if (x > c.x0 + 1 && x < c.x1 - 1 && z > c.z0 + 1 && z < c.z1 - 1) paintAt(x, z);
+    // Off those, a way worn to each place people go: from the nearest point of a lane to its door.
+    const branch = (tx, tz) => {
+      let best = null, bd = 1e9;
+      for (const l of c.lanes || []) {
+        const lx = Math.max(l.x0, Math.min(l.x1, Math.floor(tx))), lz = Math.max(l.z0, Math.min(l.z1, Math.floor(tz))), d = Math.abs(lx - tx) + Math.abs(lz - tz);
+        if (d < bd) { bd = d; best = [lx, lz]; }
+      }
+      if (best && bd > 3) route(best[0], best[1], tx, tz);
+    };
+    for (const k of ['clinic', 'barYard', 'yard']) if (c.spots[k]) branch(c.spots[k].x, c.spots[k].z);
+    // On into the bar's yard and up to its porch steps.
+    if (c.spots.barYard && c.spots.bar) route(c.spots.barYard.x, c.spots.barYard.z, c.spots.bar.x, c.spots.bar.z);
+    if (c.clerk) branch(c.clerk.doorX, c.clerk.doorZ);
+    else if (hq) branch(hq.x, hq.z);
+    if (field) branch(field.x, field.z);
   }
 
   // --- Lots and buildings ----------------------------------------------------------------------------
@@ -1250,6 +1264,15 @@ export function buildLayout(seed = 1609) {
         for (let bz = b.z0; bz <= b.z1; bz++) for (let bx = b.x0, i = bz * WX + bx; bx <= b.x1; bx++, i++) if (lot[i] === id) { lot[i] = 0; ground[i] = G.CAMP; mark[i] = 0; }
       }
     }
+  }
+
+  // The two towers at the head of the Severn shore strip are gone: it starts as open ground along the water, the way it carries on.
+  for (const [x, z] of [[4698, 2798], [4665, 2847]]) {
+    const id = lot[z * WX + x];
+    if (!id) continue;
+    const b = buildings[id - 1];
+    b.gone = true;
+    for (let bz = b.z0; bz <= b.z1; bz++) for (let bx = b.x0, i = bz * WX + bx; bx <= b.x1; bx++, i++) if (lot[i] === id) { lot[i] = 0; ground[i] = G.PARK; mark[i] = 0; }
   }
 
   // Across the way from every gate the crews knocked down whatever stood there, and hauled off the wrecks: a clear field for the

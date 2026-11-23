@@ -5,7 +5,7 @@ import { STREET_Y, WX, WZ } from '../shared/constants.js';
 import { HP, M } from '../shared/materials.js';
 import { alarmPostCells, flagCells } from '../shared/camps.js';
 import { LORE } from './camplore.js';
-import { CAMP_START } from './items.js';
+import { CAMP_START, SURVIVOR_NAMES, SURVIVOR_SURNAMES } from './items.js';
 import { refugeCandidates, sideOf } from './director.js';
 import { NIGHT_RADIUS } from './npcs.js';
 
@@ -652,10 +652,27 @@ export class CampSim {
   // up, coming down, or gone is not sent at all: no magnitudes, no gate calls, no losses, no rockets from a wall nobody is on.
   radio(c, text, who = c && c.name, keep = true, always = false) {
     if (!c || !this.known(c)) return;
+    // Nobody speaks as "the station": each call comes from whoever's job it is, by name.
+    if (who === c.name) who = this.speaker(c, text);
     const st = this.state[c.id];
     if (!always && st && (st.evac || st.collapseT > 0 || st.status !== 'holding')) return;
     if (keep) this.logNews({ kind: 'radio', campId: c.id, who, text });
     if (!this.passing) this.g.ui.radio(who, text, c.name);
+  }
+
+  // Who is on the radio for a settlement: the operations desk for operations, contracts and the gates; the quartermaster for stores and
+  // stalls; the Town Hall for the people coming and going; the tower on that side for anything happening at one side of the wall; and the
+  // wall watch for the rest. Each is the same person every time, first name and surname, picked from the camp and the job.
+  speaker(c, text) {
+    const T = text.toLowerCase(), side = /\b(north|south|east|west)/.exec(T);
+    const role = /operation|contract|town hall|magnitude|gates?\b.*\b(lock|shut|open)|stood down|stand down/.test(T) ? 'Operations'
+      : /stall|counter|stores|supply|ammunition|crates|armoury|salvage|restock/.test(T) ? 'Quartermaster'
+        : /survivor|buried|search party|back on the air|welcome|came in/.test(T) ? 'Town Hall'
+          : side ? `${side[1][0].toUpperCase()}${side[1].slice(1)} Tower` : 'Wall Watch';
+    let h = 2166136261;
+    for (const ch of `${c.key}:${role}`) h = Math.imul(h ^ ch.charCodeAt(0), 16777619) >>> 0;
+    const first = SURVIVOR_NAMES[h % SURVIVOR_NAMES.length], last = SURVIVOR_SURNAMES[(h >>> 11) % SURVIVOR_SURNAMES.length];
+    return `${first} ${last}, ${role}`;
   }
 
   // An operation is bigger news than a radio call, and gets a bigger post.
@@ -714,10 +731,10 @@ export class CampSim {
 
   // One of the dead went down close to a wall. If an operation is on and it was you that put it down, that kill counts for you, whether the
   // crowd is at the wall right now or you went out looking for it. The camp pays for it if it holds.
-  noteKill(x, z, byPlayer) {
+  noteKill(x, z, byPlayer, siege, crew = false) {
     const H = this.g.horde;
     // A night shift counts further out than an operation does.
-    if (byPlayer) { const cn = H.inCamp(x, z, NIGHT_RADIUS); if (cn && this.state[cn.id].status === 'holding') this.g.jobs.nightKill(cn); }
+    if (byPlayer) { const cn = H.inCamp(x, z, NIGHT_RADIUS); if (cn && this.state[cn.id].status === 'holding') this.g.jobs.nightKill(cn, crew); }
     const c = H.inCamp(x, z, 100);
     if (!c) return;
     const s = this.state[c.id], r = s.rec, count = this.ledger(s);
@@ -729,7 +746,7 @@ export class CampSim {
     if (!byPlayer) return;
     if (r) r.yours = (r.yours || 0) + 1;
     s.op.yours++;
-    this.g.jobs.defendKill(c, s.op);
+    this.g.jobs.defendKill(c, s.op, crew);
   }
 
   // The count, once there is time to take it. A breach, a big assault or a raid gets written up. A few dozen at the wall does not.
