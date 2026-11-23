@@ -3,10 +3,14 @@
 Prototype built with Claude, playable in browser:
 https://ignatiushewett.github.io/spadeheart/
 
-Or play it in its own window, no browser: download the repository and double-click `Run Spadeheart.bat` (Windows, needs [Node.js](https://nodejs.org)). The first run sets it up once.
+Or download repository (Windows, needs [Node.js](https://nodejs.org)):
 
+`Run Spadeheart.bat` - Run in window
+
+`Run in Browser.bat` - Run in browser
+
+<img src="previews/shpreview8.png" alt="Preview">
 <img src="previews/shpreview.png" alt="Preview">
-<img src="previews/shpreview2.png" alt="Preview">
 <img src="previews/shpreview6.png" alt="Preview">
 <img src="previews/shpreview4.png" alt="Preview">
 <img src="previews/shpreview7.png" alt="Preview">
