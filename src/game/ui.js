@@ -124,6 +124,19 @@ const INV_SIZE = { pistol: [2, 1], revolver: [2, 1], smg: [3, 2], shotgun: [4, 2
   crowbar: [3, 1], axe: [3, 2], sledge: [4, 2], dynamite: [2, 1], medkit: [2, 2], antibiotic: [2, 1], stim: [2, 1], ammo_rocket: [2, 1], jacket: [2, 2], riot: [3, 3],
   tactical: [3, 3], backpack: [3, 3], flashlight: [2, 1], bike_keys: [2, 1], metrocard: [2, 1], cloth: [2, 1], scrap: [2, 1], whiskey: [1, 2], water: [1, 2] };
 const invSize = (id) => INV_SIZE[id] || [1, 1];
+// A voice's own colour on the radio: blues and greens and violets, one per name, the same every time.
+const voiceTint = (who) => {
+  let hh = 7;
+  for (const ch of String(who || '')) hh = (hh * 31 + ch.charCodeAt(0)) >>> 0;
+  return `hsl(${150 + (hh % 140)}, ${38 + (hh >> 7) % 22}%, ${64 + (hh >> 12) % 12}%)`;
+};
+// A person as a white figure, going red as they are hurt, with an amber outline for armour: the inventory's, and each crew card's.
+const figureSvg = (hp, armour) => {
+  const hurt = Math.pow(Math.min(1, Math.max(0, (.7 - hp) / .6)), 1.3), mix = (a, b, k) => a.map((v, i) => Math.round(v + (b[i] - v) * k));
+  const fill = `rgb(${mix([236, 232, 222], [214, 58, 46], hurt).join(',')})`;
+  const parts = [[14, 2, 12, 12], [11, 16, 18, 24], [3, 16, 6, 24], [31, 16, 6, 24], [11, 42, 8, 30], [21, 42, 8, 30]];
+  return `<svg viewBox="1 0 38 74" aria-hidden="true">${parts.map(([x, y, w, h]) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${fill}" stroke="${armour ? '#c8453a' : 'none'}" stroke-width="${armour ? 1.5 : 0}"/>`).join('')}</svg>`;
+};
 const iconFor = (id) => {
   const it = ITEMS[id] || {};
   const path = (rects) => rects.map(([x, y, w, h]) => `M${x} ${y}h${w}v${h}h${-w}z`).join('');
@@ -195,9 +208,10 @@ export class UI {
     // Every button in every menu, however it got there.
     const live = (e) => {
       const b = e.target && e.target.closest ? e.target.closest('button') : null;
-      return b && !b.disabled && !b.classList.contains('off') ? b : null;
+      return b && !b.disabled && !b.classList.contains('off') && !b.matches('.chan, [data-notify]') ? b : null;
     };
-    document.addEventListener('click', (e) => { if (live(e)) { g.audio.init(); g.audio.simple('ui'); } }, true);
+    // (The radio's dial, its notification switch, and anything sent over it make their own noise: static, not a click.)
+    document.addEventListener('click', (e) => { const b = live(e); if (b && !b.matches('[data-order], [data-checkin]')) { g.audio.init(); g.audio.simple('ui'); } }, true);
     document.addEventListener('pointerover', (e) => {
       const b = live(e);
       if (b !== this.overButton) { this.overButton = b; if (b) g.audio.simple('uiOver'); }
@@ -918,7 +932,7 @@ export class UI {
         const elsewhere = g.horde.inCamp(g.player.x, g.player.z, 0) !== camp && g.player.home !== camp.id;
         const lostNow = g.campSim.state[j.campId].evac || g.campSim.state[j.campId].collapseT > 0;
         const metNow = op && !j.pending && (j.dayMet || j.dayKills >= g.jobs.quotaDue(j, op, op.start + j.day + 1));
-        html += `<div class="trk op${lostNow ? ' lost' : ''}${metNow ? ' met' : ''}">${opBannerHtml(j.op || j.title.replace('Operation ', ''))}${elsewhere ? `<small>${camp.name}</small>` : ''}${grid(rows, 'main')}${grid(more, 'more')}${this.contractExtras(j.campId, j.plan === 'vanguard')}</div>`;
+        html += `<div class="trk op${lostNow ? ' lost' : ''}${metNow ? ' met' : ''}">${opBannerHtml(j.op || j.title.replace('Operation ', ''))}${elsewhere ? `<small>${camp.name}</small>` : ''}${grid(rows, 'main')}${grid(more, 'more')}${this.cutLine(j)}${this.contractExtras(j.campId, j.plan === 'vanguard')}</div>`;
       } else if ((j.type === 'patrol' || j.type === 'night') && j.status === 'active') {
         // A contract of either kind runs in shifts, so that is how it reads.
         const now = g.campSim.now();
@@ -945,8 +959,8 @@ export class UI {
         const met = j.type === 'patrol' ? j.walked : j.shiftDone;
         const shifts = j.type === 'patrol' ? OP_PAY.days : OP_PAY.nights, ticked = j.streak;
         const squares = Array.from({ length: shifts }, (_, k) => `<i${k < ticked ? ' class="on"' : ''}></i>`).join('');
-        html += `<div class="trk op contract${met ? ' met' : ''}"><div class="head"><b>${j.type === 'patrol' ? 'Patrol contract' : 'Night shift contract'}</b><span class="shifts">${squares}</span></div>${row(main, 'main')}${row(more, 'more')}${g.campSim.state[j.campId].op ? `<div class="bonus">Operation bonus added (+${SP} ${OP_PAY.shiftOp - OP_PAY.shift})</div>` : ''}${this.contractExtras(j.campId)}</div>`;
-      } else html += `<div class="trk${j.status === 'done' ? ' done' : ''}${j.fullPay > j.reward ? ' docked' : ''}"><b>${j.title}</b><span>${this.jobLine(j)}</span></div>`;
+        html += `<div class="trk op contract${met ? ' met' : ''}"><div class="head"><b>${j.type === 'patrol' ? 'Patrol contract' : 'Night shift contract'}</b><span class="shifts">${squares}</span></div>${row(main, 'main')}${row(more, 'more')}${this.cutLine(j)}${g.campSim.state[j.campId].op ? `<div class="bonus">Operation bonus added (+${SP} ${OP_PAY.shiftOp - OP_PAY.shift})</div>` : ''}${this.contractExtras(j.campId)}</div>`;
+      } else html += `<div class="trk${j.status === 'done' ? ' done' : ''}${j.fullPay > j.reward ? ' docked' : ''}"><b>${j.title}</b><span>${this.jobLine(j)}</span>${this.cutLine(j)}</div>`;
     }
     if (html !== this.trackerHtml) { this.trackerHtml = html; box.innerHTML = html; }
   }
@@ -1011,8 +1025,9 @@ export class UI {
 
   drawCompass() {
     const c = $('compass'), x = c.getContext('2d'), P = this.g.player;
-    // The strip itself is the top 52; how far things are is written underneath it, under each mark.
-    const W = c.width, H = 52, LY = 70;
+    // The strip itself is the top 52; how far things are is written underneath it, under each mark. Labels that would run into each
+    // other go on the next line down, and your companions' names always sit below the rest.
+    const W = c.width, H = 52, LY = 70, ROW = 25, tags = [];
     x.clearRect(0, 0, W, c.height);
     const yaw = P.yaw;
     x.textAlign = 'center';
@@ -1036,7 +1051,7 @@ export class UI {
       while (r < -Math.PI) r += Math.PI * 2;
       if (Math.abs(r) > fov * .95) continue;
       const px = W / 2 + r / fov * W / 2;
-      x.fillStyle = l === 'N' ? `rgba(232,176,74,${1 - Math.abs(r) / fov})` : `rgba(233,228,216,${1 - Math.abs(r) / fov})`;
+      x.fillStyle = l === 'N' ? `rgba(200,69,58,${1 - Math.abs(r) / fov})` : `rgba(233,228,216,${1 - Math.abs(r) / fov})`;
       x.fillText(l, px, 18);
     }
     // Where the work is: a blue square on the compass, and how far, the way a breach is shown. Nothing is drawn out in the world itself.
@@ -1052,11 +1067,7 @@ export class UI {
       x.fillRect(px - 6, 5, 12, 12);
       x.strokeStyle = 'rgba(8,14,20,.9)'; x.lineWidth = 2; x.strokeRect(px - 6, 5, 12, 12);
       const label = j.type === 'patrol' && j.posts ? `${j.posts[j.next].name}, ${dist}m` : `${dist}m`;
-      x.font = '600 21px Quantico, Bahnschrift, Segoe UI, sans-serif';
-      x.lineWidth = 4; x.strokeStyle = 'rgba(10,8,6,.8)';
-      x.strokeText(label, px, LY);
-      x.fillStyle = '#a8dcff';
-      x.fillText(label, px, LY);
+      tags.push({ px, text: label, fill: '#a8dcff', under: false });
     }
     // Holes in the wall of any camp you know of, nearby: a red diamond, and how far.
     const g = this.g;
@@ -1079,11 +1090,7 @@ export class UI {
         x.lineWidth = 2;
         x.strokeRect(-7, -7, 14, 14);
         x.restore();
-        x.font = '600 21px Quantico, Bahnschrift, Segoe UI, sans-serif';
-        x.lineWidth = 4; x.strokeStyle = 'rgba(10,8,6,.8)';
-        x.strokeText(`${dist}m`, px, LY);
-        x.fillStyle = `rgba(255,150,130,${a})`;
-        x.fillText(`${dist}m`, px, LY);
+        tags.push({ px, text: `${dist}m`, fill: `rgba(255,150,130,${a})`, under: false });
       }
     }
     // Your companions: a green circle each, always, with their name, and how far once they are more than a few steps off.
@@ -1099,13 +1106,40 @@ export class UI {
       x.fillStyle = '#8fd27a'; x.fill();
       x.strokeStyle = 'rgba(8,14,8,.9)'; x.lineWidth = 2; x.stroke();
       const who = f.name ? f.name.split(' ')[0] : 'Companion', label = dist < 6 ? who : `${who}, ${dist}m`;
-      x.font = '600 21px Quantico, Bahnschrift, Segoe UI, sans-serif';
-      x.lineWidth = 4; x.strokeStyle = 'rgba(10,8,6,.8)';
-      x.strokeText(label, px, LY);
-      x.fillStyle = '#b6e6a4';
-      x.fillText(label, px, LY);
+      tags.push({ px, text: label, fill: '#b6e6a4', under: true });
     }
-    x.fillStyle = '#e8b04a';
+    // Lay the labels out in lines: each on the first line where it has room, the companions starting below the last line the rest used.
+    x.font = '600 21px Quantico, Bahnschrift, Segoe UI, sans-serif';
+    const rows = [];
+    const place = (t, from) => {
+      const w = x.measureText(t.text).width + 14, a = t.px - w / 2, b = t.px + w / 2;
+      let k = from;
+      while (k < 5 && (rows[k] || []).some(([l, r]) => a < r && b > l)) k++;
+      if (k >= 5) return;
+      (rows[k] || (rows[k] = [])).push([a, b]);
+      t.row = k;
+    };
+    for (const t of tags) if (!t.under) place(t, 0);
+    const below = rows.length;
+    for (const t of tags) if (t.under) place(t, below);
+    // The canvas grows to fit the lines in use, and shrinks back a moment after they are gone, so what sits under it does not jump.
+    const need = LY + Math.max(0, rows.length - 1) * ROW + 16;
+    const keep = this.compassH && this.compassH > need && performance.now() - (this.compassAt || 0) < 1500;
+    const h = keep ? this.compassH : Math.max(86, need);
+    if (h !== this.compassH) { this.compassH = h; c.height = h; c.style.height = `${h / 2}px`; }
+    if (need >= h) this.compassAt = performance.now();
+    x.font = '600 21px Quantico, Bahnschrift, Segoe UI, sans-serif';
+    x.textAlign = 'center';
+    x.textBaseline = 'middle';
+    x.lineWidth = 4; x.strokeStyle = 'rgba(10,8,6,.8)';
+    for (const t of tags) {
+      if (t.row === undefined) continue;
+      const y = LY + t.row * ROW;
+      x.strokeText(t.text, t.px, y);
+      x.fillStyle = t.fill;
+      x.fillText(t.text, t.px, y);
+    }
+    x.fillStyle = '#c8453a';
     x.fillRect(W / 2 - 1, H - 20, 2, 18);
   }
 
@@ -1207,7 +1241,7 @@ export class UI {
     }
     for (const c2 of g.layout.camps) {
       const dx = c2.cx - P.x, dz = c2.cz - P.z;
-      if (Math.hypot(dx, dz) < range * 1.4 + Math.max(c2.x1 - c2.x0, c2.z1 - c2.z0)) { x.strokeStyle = '#e8b04a'; x.lineWidth = 1.5 * px; x.strokeRect(c2.x0 - P.x, c2.z0 - P.z, c2.x1 - c2.x0, c2.z1 - c2.z0); }
+      if (Math.hypot(dx, dz) < range * 1.4 + Math.max(c2.x1 - c2.x0, c2.z1 - c2.z0)) { x.strokeStyle = '#c8453a'; x.lineWidth = 1.5 * px; x.strokeRect(c2.x0 - P.x, c2.z0 - P.z, c2.x1 - c2.x0, c2.z1 - c2.z0); }
     }
     this.drawGates(x, (gx) => gx - P.x, (gz) => gz - P.z, px, range * 1.6, P);
     for (const j of g.jobs.active) {
@@ -1242,7 +1276,7 @@ export class UI {
         companionArrow(x, cx + dx * cY - dz * sY, cx + dx * sY + dz * cY, Math.atan2(fx * cY - fz * sY, -(fx * sY + fz * cY)), .8);
       }
     }
-    x.fillStyle = '#e8b04a';
+    x.fillStyle = '#c8453a';
     x.beginPath(); x.moveTo(cx, cx - 11); x.lineTo(cx + 7, cx + 8); x.lineTo(cx, cx + 4); x.lineTo(cx - 7, cx + 8); x.closePath(); x.fill();
     const na = -P.yaw;
     x.fillStyle = '#e9e4d8';
@@ -1345,66 +1379,174 @@ export class UI {
     return `Met out on the road, with nowhere in particular to be. With you since ${when}.`;
   }
 
+  // Your crew as cards, the one picked laid out under them: what they have, what they are doing, and what you can get them. The radio
+  // is alongside.
   renderCrew() {
     const g = this.g, P = g.player, N = g.npcs, crew = N.followers.filter((f) => !f.dead);
     if (!crew.includes(this.crewSel)) this.crewSel = crew[0] || null;
-    const n = this.crewSel;
-    const list = $('crew-list');
-    list.innerHTML = '';
-    if (!crew.length) list.innerHTML = '<div class="empty">Nobody is with you.<br><br>People in the settlements will come along once they know you well enough, people on the road more readily, and a settlement\'s bar always has someone who will come for a fee.</div>';
-    for (const f of crew) {
-      const hp = Math.max(0, Math.min(1, f.hp / f.maxHp)), d = Math.hypot(f.x - P.x, f.z - P.z);
-      const b = document.createElement('button');
-      b.className = `mate${f === n ? ' sel' : ''}`;
-      b.innerHTML = `<span class="nm">${f.name}</span><small>${f.hired ? 'Hired gun' : 'Companion'}, ${CREW_GUN_NAMES[f.weaponName] || 'unarmed'}${d > 40 ? `, ${fmt(d)} m away` : ''}</small><div class="hpbar${hp < .35 ? ' low' : ''}"><i style="width:${(hp * 100).toFixed(1)}%"></i></div>`;
-      b.addEventListener('click', () => { this.crewSel = f; g.audio.simple('ui'); this.renderCrew(); });
-      list.appendChild(b);
-    }
-    $('crew-sum').textContent = `${crew.length} of 3    ${SP} ${fmt(P.scrip)} yours`;
-    const shop = N.crewShop(null);
-    $('crew-where').textContent = shop.camp ? `Kit for sale in ${shop.camp.name}.` : 'Kit is sold only in settlements.';
-    const box = $('crew-detail');
-    if (!n) { box.innerHTML = ''; return; }
-    const first = n.name.split(' ')[0], fac = this.crewFaction(n), tier = crewArmourTier(n), A = CREW_ARMOUR[tier];
-    const days = g.day - (n.joined ?? g.day);
-    const gun = n.weaponName, gunNote = n.gunFrom ? `You kitted ${first} out with this in ${n.gunFrom}.` : WEAPON_TALK[gun] ? `"${WEAPON_TALK[gun]}"` : '';
-    const rows = [
-      ['With you', days < 1 ? 'Since today' : `${days} day${days === 1 ? '' : 's'}`],
-      ['Health', `${Math.ceil(Math.max(0, n.hp))} / ${Math.round(n.maxHp)}`],
-      ['Kills', fmt(n.kills || 0)],
-      ['Their spades', `${SP} ${fmt(n.purse || 0)}`],
-      ['Weapon', CREW_GUN_NAMES[gun] || 'Unarmed'],
-      ['Armour', `${A.name}${A.cut ? `, ${Math.round(A.cut * 100)}% less harm` : ''}`],
-    ];
-    let html = `<div class="dt">${n.name}</div><div class="fac">${fac.col ? `<i style="background:rgb(${fac.col.map((v) => Math.round(v * 255)).join(',')})"></i>` : ''}${fac.name}</div>`;
-    html += `<p class="story">${this.crewStory(n, fac)}${n.persona && n.persona.before ? `<br><br>"${n.persona.before}"` : ''}</p>`;
-    html += `<table>${rows.map(([a, b]) => `<tr><td>${a}</td><td>${b}</td></tr>`).join('')}</table>`;
-    if (gunNote) html += `<p class="gearnote">${gunNote}</p>`;
-    // Kit: what is better than what they have, and who pays what for it.
-    const why = N.crewShop(n).why;
-    const buy = (what, id, name, sub, cost) => {
-      const { yours } = N.crewSplit(n, cost);
-      return `<button class="buy" data-what="${what}" data-id="${id}"${why || P.scrip < yours ? ' disabled' : ''}><span>${name}</span><b>${SP} ${fmt(cost)}</b><small>${sub}</small></button>`;
+    const n = this.crewSel, rep = P.crewRep || 0;
+    const standing = rep < 0 ? 'Doubted' : rep < 20 ? 'Unproven' : rep < 40 ? 'Known' : rep < 60 ? 'Respected' : rep < 80 ? 'Trusted' : 'Legend';
+    $('crew-sum').textContent = `${crew.length} of ${N.crewRoom()}`;
+    // What people think of the group, and how far off the next place in it is.
+    const room = N.crewRoom(), next = room >= 8 ? 1 : Math.max(0, Math.min(1, (Math.max(0, rep) % 20) / 20));
+    $('crew-rep').innerHTML = `<span>Reputation</span><b>${standing}</b><div class="bar"><i style="width:${(next * 100).toFixed(0)}%"></i></div><small>${room >= 8 ? 'The group is as big as it gets' : `Room for ${room}, ${room + 1} when the group is better known`}</small>`;
+    const where = (f) => {
+      if (f.order === 'hold') return 'Off duty';
+      if (f.order === 'call') return 'On the way';
+      if (f.order === 'camp') { const c = g.layout.camps[f.orderCamp]; return c ? (f.atCamp ? `At ${c.name}` : `Going to ${c.name}`) : 'Away'; }
+      const d = Math.hypot(f.x - P.x, f.z - P.z);
+      return d > 60 ? `${fmt(d)} m away` : 'With you';
     };
-    // Said once, not on every row: what they put in, or why nothing can be bought here.
-    html += `<div class="shop-why">${why || (n.purse ? `${first} puts in ${SP} ${fmt(n.purse)}; you pay the rest.` : 'You pay for all of it.')}</div>`;
-    html += '<div class="list-title">Armour</div>';
-    const better = CREW_ARMOUR.map((a, t) => [a, t]).filter(([, t]) => t > tier);
-    html += better.length ? better.map(([a, t]) => buy('armour', t, a.name, `${Math.round(a.cut * 100)}% less harm`, a.cost)).join('') : '<div class="shop-why">Best there is.</div>';
-    html += '<div class="list-title">Weapons</div>';
-    html += Object.keys(CREW_GUNS).filter((w) => w !== gun).sort((a, b) => CREW_GUNS[a] - CREW_GUNS[b]).map((w) => {
-      const st = crewGunStats(w);
-      return buy('gun', w, CREW_GUN_NAMES[w], `${st.dmg} dmg, ${st.range} m`, CREW_GUNS[w]);
-    }).join('');
+    const cards = $('crew-cards');
+    cards.innerHTML = '';
+    for (const f of crew) {
+      const hp = Math.max(0, Math.min(1, f.hp / f.maxHp)), tier = crewArmourTier(f);
+      const b = document.createElement('button');
+      b.className = `crew-card${f === n ? ' sel' : ''}`;
+      b.innerHTML = `${figureSvg(hp, tier > 0)}<span class="nm">${f.name}</span><small>${CREW_GUN_NAMES[f.weaponName] || 'Unarmed'}</small><small>${where(f)}</small><div class="hpbar${hp < .35 ? ' low' : ''}"><i style="width:${(hp * 100).toFixed(1)}%"></i></div>`;
+      b.addEventListener('click', () => { this.crewSel = f; g.audio.simple('ui'); this.renderCrew(); });
+      cards.appendChild(b);
+    }
+    const shop = N.crewShop(null);
+    $('crew-where').textContent = crew.length && shop.camp ? `Kit for sale in ${shop.camp.name}.` : '';
+    const box = $('crew-detail');
+    if (!n) { box.innerHTML = ''; this.renderRadio(); return; }
+    const first = n.name.split(' ')[0], fac = this.crewFaction(n), tier = crewArmourTier(n), days = g.day - (n.joined ?? g.day);
+    let html = `<div class="dt">${n.name}</div><div class="fac">${fac.col ? `<i style="background:rgb(${fac.col.map((v) => Math.round(v * 255)).join(',')})"></i>` : ''}${fac.name}</div>`;
+    html += `<div class="cd-stats"><span><b>${Math.ceil(Math.max(0, n.hp))}</b>Health</span><span><b>${fmt(n.kills || 0)}</b>Kills</span><span><b>${SP} ${fmt(n.purse || 0)}</b>Their spades</span><span><b>${days < 1 ? 0 : days}</b>Days</span></div>`;
+    const order = n.order || 'follow';
+    html += `<div class="cd-orders">${[['follow', 'With me'], ['hold', 'Stand down'], ['camp', 'Back to camp'], ['call', 'Come to me']].map(([k, l]) => `<button data-order="${k}" class="${order === k ? 'on' : ''}">${l}</button>`).join('')}</div>`;
+    const why = N.crewShop(n).why;
+    const tile = (what, id, name, cost, owned) => {
+      const { yours } = N.crewSplit(n, cost);
+      return `<button class="kit-tile${owned ? ' owned' : ''}" data-what="${what}" data-id="${id}"${owned || why || P.scrip < yours ? ' disabled' : ''}><span>${name}</span><b>${owned ? 'Equipped' : `${SP} ${fmt(cost)}`}</b></button>`;
+    };
+    html += '<div class="list-title">Armour</div><div class="kit-grid">';
+    html += CREW_ARMOUR.map((a, t) => (t === 0 ? '' : tile('armour', t, a.name, a.cost, t <= tier))).join('');
+    html += '</div><div class="list-title">Weapon</div><div class="kit-grid">';
+    html += Object.keys(CREW_GUNS).sort((x, y) => CREW_GUNS[x] - CREW_GUNS[y]).map((w) => tile('gun', w, CREW_GUN_NAMES[w], CREW_GUNS[w], w === n.weaponName)).join('');
+    html += `</div><div class="shop-why">${why || (n.purse ? `${first} puts in ${SP} ${fmt(n.purse)}.` : '')}</div>`;
     box.innerHTML = html;
-    box.querySelectorAll('.buy').forEach((b) => b.addEventListener('click', () => {
+    box.querySelectorAll('[data-order]').forEach((b) => b.addEventListener('click', () => { this.radioChan = 'crew'; N.crewOrder(n, b.dataset.order); this.renderCrew(); this.renderRadio(); }));
+    box.querySelectorAll('.kit-tile').forEach((b) => b.addEventListener('click', () => {
       const what = b.dataset.what, id = what === 'armour' ? +b.dataset.id : b.dataset.id;
       if (!N.crewBuy(n, what, id)) return;
       g.audio.simple('coin');
-      this.toast(what === 'armour' ? `${first} is wearing a ${CREW_ARMOUR[id].name.toLowerCase()} now.` : `${first} has the ${CREW_GUN_NAMES[id]} now.`, 'good');
-      const top = box.scrollTop;
+      const top = $('crew-body').scrollTop;
       this.renderCrew();
-      box.scrollTop = top;
+      $('crew-body').scrollTop = top;
+    }));
+    this.renderRadio();
+  }
+
+  // A crew message: on the crew channel's log, and over the radio like any other call.
+  crewRadio(who, text) {
+    const g = this.g;
+    g.campSim.logNews({ kind: 'crew', who: who || 'You', mine: !who, text });
+    if (g.campSim.passing) return;
+    // What you send goes on the log; only what comes back is called out. A reply always sounds, even with the call-outs off, if you
+    // are reading the frequency when it comes in.
+    const reading = this.modal === 'crewpanel' && this.radioChan === 'crew';
+    if (who && this.notifies('crew')) this.radio(who, text, 'Private Frequency');
+    else if (who && reading) g.audio.simple('beep');
+    if (reading) this.renderRadio();
+  }
+
+  // Whether a channel's calls come up on screen as well as going on its log: yours and the operations channels do unless you turn them
+  // off, the civilian ones only if you turn them on.
+  notifies(key) {
+    const set = this.g.player.radioNotify || {};
+    return set[key] ?? !key.startsWith('civ:');
+  }
+
+  // The radio: every channel you can pick up, and the one you are on. Your crew; and each settlement you know of, twice: its
+  // operations channel, which you always hear, and its civilian channel, which you hear only if you listen in.
+  renderRadio() {
+    const g = this.g, P = g.player, sim = g.campSim, home = sim.lastCamp >= 0 ? sim.lastCamp : P.home;
+    const chans = [{ key: 'crew', name: 'Private Frequency' }];
+    for (const c of g.layout.camps) if (P.discovered[c.id]) chans.push({ key: `ops:${c.id}`, name: `${c.name} Operations`, id: c.id }, { key: `civ:${c.id}`, name: `${c.name} Civilian Radio`, id: c.id, civ: true });
+    if (!chans.some((q) => q.key === this.radioChan)) this.radioChan = 'crew';
+    const ch = chans.find((q) => q.key === this.radioChan);
+    $('radio-chans').innerHTML = chans.map((q) => `<button class="chan${q.key === ch.key ? ' on' : ''}" data-chan="${q.key}"><span>${q.name}</span></button>`).join('');
+    $('radio-chans').querySelectorAll('[data-chan]').forEach((b) => b.addEventListener('click', () => { if (this.radioChan !== b.dataset.chan) g.audio.simple('static'); this.radioChan = b.dataset.chan; this.renderRadio(); }));
+    const list = sim.news.filter((n) => (ch.key === 'crew' ? n.kind === 'crew'
+      : ch.civ ? n.kind === 'civ' && n.campId === ch.id
+        : n.kind !== 'crew' && n.kind !== 'civ' && (n.campId === undefined ? ch.id === home : n.campId === ch.id))).map((n, i) => [n, i]).sort((a, b) => (a[0].at - b[0].at) || (a[1] - b[1])).map((q) => q[0]);
+    const on = this.notifies(ch.key);
+    $('radio-head').innerHTML = `<span>${ch.name}</span><button class="${on ? 'on' : ''}" data-notify>Notifications ${on ? 'on' : 'off'}</button>`;
+    $('radio-head').querySelector('[data-notify]').addEventListener('click', () => {
+      (P.radioNotify || (P.radioNotify = {}))[ch.key] = !on;
+      g.audio.simple('static');
+      this.renderRadio();
+    });
+    let html = '', day = -1;
+    for (const n of list) {
+      const d = Math.floor(n.at), when = clockOf(n.at - d);
+      if (d !== day) { day = d; html += `<div class="list-title">Day ${OUTBREAK_DAYS + d}</div>`; }
+      if (n.kind === 'report') {
+        const rows = (n.rows || []).map(([k, v]) => `<span>${k}</span><span>${v}</span>`).join('');
+        html += `<div class="news-item report${n.fell ? ' fell' : ''}${n.win ? ' win' : ''}"><b>${n.title}</b><small>${[n.camp, n.sub, when].filter(Boolean).join(', ')}</small>${rows ? `<div class="rows">${rows}</div>` : ''}${n.note ? `<p>${n.note}</p>` : ''}</div>`;
+      } else if (n.kind === 'op') {
+        const rows = (n.rows || []).map(([k, v]) => `<span>${k}</span><span>${v}</span>`).join('');
+        html += `<div class="news-item op ${n.stage.toLowerCase().replace(/\s.*/, '')}">${opBannerHtml(n.name)}<b>${n.stage}</b><small>${g.layout.camps[n.campId].name}, ${when}</small><p>${n.text}</p>${rows ? `<div class="rows">${rows}</div>` : ''}</div>`;
+      } else if (n.kind === 'contract') {
+        html += `<div class="news-item contract${n.bad ? ' fell' : ''}">${n.title ? `<b>${n.title}</b>` : ''}<small>Contract, ${when}</small><p>${n.text}</p></div>`;
+      } else {
+        const by = n.kind === 'crew' || n.kind === 'civ' ? n.who : n.campId !== undefined && g.layout.camps[n.campId] ? (n.who && n.who !== g.layout.camps[n.campId].name ? n.who : 'Radio operator') : n.who;
+        // Each voice in its own shade, the same as when it comes over the air, so a conversation reads as one.
+        const tint = n.mine ? '' : ` style="border-color:${voiceTint(by)}"`, name = n.mine ? '' : ` style="color:${voiceTint(by)}"`;
+        html += `<div class="news-item ${n.kind === 'crew' ? 'crew' : n.kind === 'civ' ? 'civ' : 'radio'}${n.mine ? ' mine' : ''}"${tint}><small${name}>${by}, ${when}</small><p>${n.text}</p></div>`;
+      }
+    }
+    // On your own frequency, a call to the group to check in.
+    const foot = $('radio-foot'), crew = g.npcs.followers.filter((f) => !f.dead);
+    // And on a settlement's operations channel, a call for help.
+    const ops = ch.key.startsWith('ops:');
+    foot.style.display = ch.key === 'crew' || ops ? '' : 'none';
+    if (ch.key === 'crew') {
+      const busy = g.time < (g.npcs.checkInUntil || 0);
+      foot.innerHTML = `<button class="btn" data-checkin${!crew.length || busy ? ' disabled' : ''}>Check In</button>`;
+      foot.querySelector('[data-checkin]').addEventListener('click', () => { g.npcs.crewCheckIn(); this.renderRadio(); });
+    } else if (ops) {
+      const c = g.layout.camps[ch.id];
+      foot.innerHTML = `<button class="btn" data-checkin${g.npcs.helpReady(c) ? '' : ' disabled'}>Request Help</button>`;
+      foot.querySelector('[data-checkin]').addEventListener('click', () => { g.npcs.requestHelp(c); this.renderRadio(); });
+    }
+    // What you are in the middle of saying on this channel, still being typed.
+    const t = this.typing;
+    if (t && t.chan === ch.key) html += `<div class="news-item ${ch.key === 'crew' ? 'crew' : 'radio'} mine typing"><small>You</small><p><span>${t.text.slice(0, t.i)}</span><span style="visibility:hidden">${t.text.slice(t.i)}</span></p></div>`;
+    // Oldest at the top, the latest at the foot, and it opens on the latest.
+    $('radio-log').innerHTML = html;
+    $('radio-log').scrollTop = $('radio-log').scrollHeight;
+  }
+
+  // What the crew would take out of a job if it were paid now.
+  cutLine(j) {
+    const g = this.g;
+    if (!g.npcs.followers.some((f) => !f.dead)) return '';
+    const amount = j.type === 'defend' ? g.jobs.opPay(j) : j.type === 'night' || j.type === 'patrol' ? j.earned || 0 : j.reward || 0;
+    return `<span class="cut">Group's cut: ${fmt(g.jobs.cutPreview(j, amount))} spades</span>`;
+  }
+
+  // The jobs you have taken on, where the radio used to be.
+  renderQuests() {
+    const g = this.g, box = $('news-list');
+    let html = '';
+    for (const j of g.jobs.active) {
+      if (j.plan === 'commission') continue;
+      html += `<div class="job"><b>${j.title}</b><p>${j.desc}</p><span class="pay">${this.jobLine(j)}</span>${this.cutLine(j)}<button class="abandon" data-abandon="${j.id}">Abandon</button></div>`;
+    }
+    box.innerHTML = html;
+    // First click asks. Second click means it.
+    box.querySelectorAll('[data-abandon]').forEach((b) => b.addEventListener('click', () => {
+      if (b.dataset.sure) {
+        const j = g.jobs.active.find((a) => a.id === +b.dataset.abandon);
+        if (j) g.jobs.abandon(j);
+        this.renderQuests();
+        return;
+      }
+      b.dataset.sure = '1';
+      b.textContent = 'Really abandon?';
     }));
   }
 
@@ -1412,44 +1554,7 @@ export class UI {
   openInventory() {
     this.open('inventory', false);
     this.renderInventory();
-    const sim = this.g.campSim;
-    this.radioCamp = sim.lastCamp >= 0 ? sim.lastCamp : this.g.player.home;
-    this.renderNews();
-  }
-
-  // One camp's radio at a time: everything that has gone past while you were looking the other way, newest first, a day at a time.
-  renderNews() {
-    const g = this.g, sim = g.campSim, camps = g.layout.camps.filter((c) => g.player.discovered[c.id]);
-    if (!camps.some((c) => c.id === this.radioCamp)) this.radioCamp = camps.length ? camps[0].id : -1;
-    const at = camps.findIndex((c) => c.id === this.radioCamp), here = camps[at];
-    const bar = $('radio-camps');
-    bar.innerHTML = here ? `<button data-step="-1"${camps.length < 2 ? ' disabled' : ''}>&lsaquo;</button><span>${here.name} Radio${sim.state[here.id].status === 'overrun' ? ' (fallen)' : ''}</span><button data-step="1"${camps.length < 2 ? ' disabled' : ''}>&rsaquo;</button>` : '';
-    bar.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => {
-      this.radioCamp = camps[(at + Number(b.dataset.step) + camps.length) % camps.length].id;
-      this.renderNews();
-    }));
-    const list = sim.news.filter((n) => n.campId === undefined ? this.radioCamp === (sim.lastCamp >= 0 ? sim.lastCamp : g.player.home) : n.campId === this.radioCamp).map((n, i) => [n, i]).sort((a, b) => (b[0].at - a[0].at) || (b[1] - a[1])).map((q) => q[0]);
-    let html = '', day = -1;
-    for (const n of list) {
-      const d = Math.floor(n.at), when = clockOf(n.at - d);
-      if (d !== day) { day = d; html += `<div class="list-title">Day ${OUTBREAK_DAYS + d}</div>`; }
-      if (n.kind === 'report') {
-        const rows = (n.rows || []).map(([k, v]) => `<span>${k}</span><span>${v}</span>`).join('');
-        html += `<div class="news-item report${n.fell ? ' fell' : ''}${n.win ? ' win' : ''}"><b>${n.title}</b><small>${[when, n.camp, n.sub].filter(Boolean).join(', ')}</small>${rows ? `<div class="rows">${rows}</div>` : ''}${n.note ? `<p>${n.note}</p>` : ''}</div>`;
-      } else if (n.kind === 'op') {
-        const rows = (n.rows || []).map(([k, v]) => `<span>${k}</span><span>${v}</span>`).join('');
-        html += `<div class="news-item op ${n.stage.toLowerCase().replace(/\s.*/, '')}">${opBannerHtml(n.name)}<b>${n.stage}</b><small>${when}, ${g.layout.camps[n.campId].name}</small><p>${n.text}</p>${rows ? `<div class="rows">${rows}</div>` : ''}</div>`;
-      } else if (n.kind === 'contract') {
-        html += `<div class="news-item contract${n.bad ? ' fell' : ''}">${n.title ? `<b>${n.title}</b>` : ''}<small>${when}, Contract</small><p>${n.text}</p></div>`;
-      } else {
-        const station = n.campId !== undefined && g.layout.camps[n.campId] ? g.layout.camps[n.campId].name : null;
-        // The station's name is already over the list: just who is speaking, or the operator when it is the station itself.
-        const by = station ? (n.who && n.who !== station ? n.who : 'Radio operator') : n.who;
-        html += `<div class="news-item radio"><small>${when}, ${by}</small><p>${n.text}</p></div>`;
-      }
-    }
-    $('news-list').innerHTML = html || '<div style="color:var(--dim);font-size:13px">Nothing from this settlement yet. Radio calls, day reports and operations will collect here.</div>';
-    $('news-list').scrollTop = 0;
+    this.renderQuests();
   }
 
   // The inventory, Pip-Boy fashion: a tab for each kind of thing, its things listed big down the left, and whichever one is under the
@@ -1572,7 +1677,7 @@ export class UI {
     const hurt = Math.pow(Math.min(1, Math.max(0, (70 - P.health) / 60)), 1.3), sick = Math.min(1, Math.max(0, P.infection / 100));
     const mix = (a, b, k) => a.map((v, i) => Math.round(v + (b[i] - v) * k));
     const col = mix(mix([236, 232, 222], [128, 196, 92], sick), [214, 58, 46], hurt);
-    const fill = `rgb(${col.join(',')})`, edge = A ? '#e8b04a' : 'none';
+    const fill = `rgb(${col.join(',')})`, edge = A ? '#c8453a' : 'none';
     // Head, body, the arms the length of the body, and the legs: the same two-unit gap between every part of it.
     const parts = [[14, 2, 12, 12], [11, 16, 18, 24], [3, 16, 6, 24], [31, 16, 6, 24], [11, 42, 8, 30], [21, 42, 8, 30]];
     $('inv-stats').innerHTML = `<svg viewBox="1 0 38 74" class="figure" aria-hidden="true">${parts.map(([x, y, w, h]) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${fill}" stroke="${edge}" stroke-width="${A ? 1 : 0}"/>`).join('')}</svg>`;
@@ -1611,7 +1716,7 @@ export class UI {
   }
 
   priceBuy(id) {
-    const mod = 1.3 - Math.max(-30, Math.min(60, this.tradeStanding())) * .005;
+    const mod = (1.3 - Math.max(-30, Math.min(60, this.tradeStanding())) * .005);
     return Math.max(1, Math.ceil(ITEMS[id].value * mod));
   }
 
@@ -2196,6 +2301,65 @@ export class UI {
     return lines[Math.floor(Math.random() * lines.length)];
   }
 
+  // Anything you say over the radio is typed out first, a letter at a time, and only then goes out, with a burst of static. Said from
+  // a button in the radio menu, it is typed at the foot of that channel's log; said without pressing anything (a job paid, a
+  // commission taken), it is typed down with the radio calls. send() puts it on the log; then() runs once it has gone, so an answer
+  // comes after it and not before.
+  typeOut({ chan, text, menu, send, then }) {
+    const g = this.g, go = (noise) => { send(); if (noise) g.audio.simple('static'); if (then) then(); };
+    if (g.campSim.passing) { go(false); return; }
+    if (menu) {
+      // One at a time: a second order waits for the first to go out.
+      (this.typeQueue || (this.typeQueue = [])).push({ chan, text, go });
+      if (!this.typing) this.nextTyped();
+      return;
+    }
+    if (!this.notifies(chan)) { go(false); return; }
+    const box = $('toasts'), d = document.createElement('div');
+    d.className = 'radio mine';
+    const b = document.createElement('b'), shown = document.createElement('span'), rest = document.createElement('span');
+    b.textContent = 'You: ';
+    rest.style.visibility = 'hidden';
+    rest.textContent = text;
+    d.append(b, shown, rest);
+    const typing = text.length * .034 + 1.2;
+    d.style.animationDuration = `${typing + 6}s`;
+    box.appendChild(d);
+    while (box.children.length > 7) box.removeChild(box.firstChild);
+    setTimeout(() => d.remove(), (typing + 6) * 1000);
+    let i = 0;
+    const step = () => {
+      if (!d.isConnected) { go(true); return; }
+      const ch = text[i++];
+      shown.textContent = text.slice(0, i); rest.textContent = text.slice(i);
+      if (i % 2 === 0 && /[A-Za-z0-9]/.test(ch)) g.audio.voice(150);
+      if (i < text.length) setTimeout(step, ch === '.' || ch === ',' ? 160 : 34);
+      else setTimeout(() => go(true), 450);
+    };
+    setTimeout(step, 250);
+  }
+
+  // The next thing waiting to be typed in the radio menu, at the foot of its channel's log.
+  nextTyped() {
+    const g = this.g, t = this.typing = (this.typeQueue || []).shift() || null;
+    if (!t) return;
+    t.i = 0;
+    const reading = () => this.modal === 'crewpanel' && this.radioChan === t.chan;
+    if (reading()) this.renderRadio();
+    const step = () => {
+      const ch = t.text[t.i++];
+      const el = reading() && document.querySelector('#radio-log .typing p');
+      if (el) { el.firstChild.textContent = t.text.slice(0, t.i); el.lastChild.textContent = t.text.slice(t.i); }
+      if (reading() && t.i % 2 === 0 && /[A-Za-z0-9]/.test(ch)) g.audio.voice(150);
+      if (t.i < t.text.length) setTimeout(step, ch === '.' || ch === ',' ? 140 : 30);
+      else setTimeout(() => { this.typing = null; t.go(true); if (reading()) this.renderRadio(); this.nextTyped(); }, 400);
+    };
+    setTimeout(step, 150);
+  }
+
+  // Said to the group without pressing anything for it.
+  crewType(text, done) { this.typeOut({ chan: 'crew', text, menu: false, send: () => this.crewRadio(null, text), then: done }); }
+
   // Radio traffic between the camps, heard wherever you are.
   radio(who, text, station = null) {
     const box = $('toasts');
@@ -2205,10 +2369,8 @@ export class UI {
     const b = document.createElement('b');
     // Someone by name speaks for themself; the station's own calls come from its operator, with the place, so you know where.
     b.textContent = station ? (who && who !== station ? `${who}: ` : `${station} operator: `) : `${who}: `;
-    // Each voice in its own shade of the radio's blue, a little warmer or cooler, so you can tell who is talking at a glance.
-    let hh = 7;
-    for (const ch of String(who || station || '')) hh = (hh * 31 + ch.charCodeAt(0)) >>> 0;
-    const hue = 190 + (hh % 60) - 20, tint = `hsl(${hue}, ${42 + (hh >> 6) % 20}%, ${66 + (hh >> 11) % 10}%)`;
+    // Each voice in its own shade, so you can tell who is talking at a glance.
+    const tint = voiceTint(who || station);
     b.style.color = tint;
     d.style.borderLeftColor = tint;
     d.appendChild(b);
@@ -2699,7 +2861,7 @@ export class UI {
         const live = st && st.gates[i], broken = live && live.broken;
         // Locked down for the whole camp, shut on the dead coming through this gate, or shut to you over bail.
         const shut = S.locked || (live && live.shutT > 0) || g.npcs.owesBail(c.id);
-        const col = lost || broken ? 'rgba(232,176,74,.45)' : shut ? '#e0503f' : '#f4c35a';
+        const col = lost || broken ? 'rgba(200,69,58,.45)' : shut ? '#e0503f' : '#f4c35a';
         const ox = q.side === 'W' ? -1 : q.side === 'E' ? 1 : 0, oz = q.side === 'N' ? -1 : q.side === 'S' ? 1 : 0;
         // At least a few pixels thick, however far out the map is zoomed.
         const thick = Math.max(3, s * 2.2) / 2;
@@ -2732,7 +2894,7 @@ export class UI {
     for (const c2 of g.layout.camps) {
       const known = P.discovered[c2.id], line = g.campSim.statusLine(c2.id);
       const trouble = known && line !== 'Holding', shut = known && !trouble && !g.npcs.admitted(c2.id);
-      const color = line === 'Overrun' && known ? '#d8493b' : trouble && recovering(line) ? '#6aa6c8' : trouble ? '#f08a3c' : known ? '#e8b04a' : 'rgba(232,176,74,.7)';
+      const color = line === 'Overrun' && known ? '#d8493b' : trouble && recovering(line) ? '#6aa6c8' : trouble ? '#f08a3c' : known ? '#c8453a' : 'rgba(200,69,58,.7)';
       const lines = [{ text: c2.name, font: NAME, color: known ? '#f0dfb4' : 'rgba(240,223,180,.8)' }];
       if (!known) lines.push({ text: '(Unknown)', font: STATUS, color: 'rgba(233,228,216,.68)' });
       else if (trouble) lines.push({ text: `(${line})`, font: STATUS, color: line === 'Overrun' ? '#ff8a7a' : recovering(line) ? '#9cc8e0' : '#ffb26b' });
@@ -2823,12 +2985,6 @@ export class UI {
         const op = g.campSim.state[c.id].op;
         html += `<div style="font-size:13px;display:flex;justify-content:space-between;gap:8px"><span style="color:var(--ink)">Operation ${op.name}<br><span style="color:var(--dim)">${c.name}</span></span><span style="color:var(--amber);white-space:nowrap">${g.campSim.opDayHtml(op)}</span></div>`;
       }
-    }
-    html += '<div class="list-title">Commissions</div>';
-    const listed = g.jobs.active.filter((j) => j.plan !== 'commission');
-    if (!listed.length) html += '<div style="color:var(--dim);font-size:13px">None. Every Town Hall has a board.</div>';
-    for (const j of listed) {
-      html += `<div class="job"><b>${j.title}</b><p>${j.desc}</p><span class="pay">${this.jobLine(j)}</span><button class="abandon" data-abandon="${j.id}">Abandon</button></div>`;
     }
     const last = g.campSim.lastReport;
     if (last) {

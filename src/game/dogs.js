@@ -42,13 +42,24 @@ export class Dogs {
         if (owner) used.add(owner);
       }
       const at = owner || pick(c.pois.filter((p) => p.kind !== 'sleep')) || c.spots.plaza;
-      const x = at.x + (rand() - .5) * 3, z = at.z + (rand() - .5) * 3;
+      // On open ground, not inside a wreck or a stall's post.
+      const [x, z] = this.openNear(c, at.x + (rand() - .5) * 3, at.z + (rand() - .5) * 3) || [c.spots.plaza.x, c.spots.plaza.z];
       const name = names[i % names.length];
       this.list.push({
         camp: c.id, owner, name, x, z, y: STREET_Y, yaw: rand() * 6.283, ys: 0, phase: rand() * 6,
         v: 0, state: 0, variant: 192 + Math.floor(rand() * 64), side: rand() < .5 ? -1 : 1, t: rand() * 8, rest: 0, tx: x, tz: z, mode: 'idle',
       });
     }
+  }
+
+  // The nearest place a dog can stand, out to a few blocks.
+  openNear(c, x, z) {
+    if (this.open(c, x, z)) return [x, z];
+    for (let r = 1; r <= 6; r++) for (let a = 0; a < 12; a++) {
+      const px = x + Math.cos(a * .5236) * r, pz = z + Math.sin(a * .5236) * r;
+      if (this.open(c, px, pz)) return [px, pz];
+    }
+    return null;
   }
 
   // Can a dog stand here: walkable for people in that camp, the same test the residents use.
@@ -63,6 +74,8 @@ export class Dogs {
     const g = this.g, c = g.layout.camps[d.camp], P = g.player, w = g.world;
     const panic = g.npcs.campPanic(c);
     const o = d.owner && !d.owner.dead && d.owner.camp === d.camp && !d.owner.flee ? d.owner : null;
+    // Ended up somewhere it cannot stand (a crate put down on it, a wreck pushed over it): out onto the nearest open ground.
+    if (!this.open(c, d.x, d.z)) { const q = this.openNear(c, d.x, d.z); if (q) { d.x = q[0]; d.z = q[1]; d.y = STREET_Y; d.path = null; } }
     if (d.owner && !o) d.owner = null;
     let settle = 0;   // what to do when it gets there: 0 stand about, 5 sit, 7 lie down
     if (d.petT > 0) {
@@ -79,6 +92,19 @@ export class Dogs {
       const back = moving ? 1.6 : .9, side = moving ? 1.1 : 1.3;
       const sy = Math.sin(o.yaw || 0), cy = Math.cos(o.yaw || 0);
       d.tx = o.x - sy * back + cy * side * d.side; d.tz = o.z - cy * back - sy * side * d.side;
+      // Their person indoors, on a bench, somewhere a dog cannot stand: the nearest open ground beside them will do.
+      if (!this.open(c, d.tx, d.tz)) {
+        let best = null, bd = 1e9;
+        for (let r = 1; r <= 5 && !best; r++) for (let a = 0; a < 12; a++) {
+          const x = o.x + Math.cos(a * .5236) * r, z = o.z + Math.sin(a * .5236) * r;
+          if (!this.open(c, x, z)) continue;
+          const e = Math.hypot(x - d.x, z - d.z);
+          if (e < bd) { bd = e; best = [x, z]; }
+        }
+        if (best) { d.tx = best[0]; d.tz = best[1]; } else { d.tx = d.x; d.tz = d.z; }
+      }
+      // Stuck a moment ago: it sits where it is and waits, unless they have gone a good way off.
+      if (d.hold > 0) { d.hold -= dt; if (Math.hypot(o.x - d.x, o.z - d.z) < 9) { d.tx = d.x; d.tz = d.z; } else d.hold = 0; }
       settle = o.state === 5 || o.state === 7 ? 7 : (d.restPick ?? 5);
       if ((d.t -= dt) <= 0) { d.t = 8 + rand() * 14; d.restPick = rand() < .5 ? 5 : rand() < .5 ? 0 : 7; }
     } else {
@@ -110,14 +136,17 @@ export class Dogs {
       // clear again rather than nosing at the wall.
       const [ax, az] = this.steer(d, c, dt);
       const dx = ax - d.x, dz = az - d.z, dd = Math.hypot(dx, dz) || 1;
-      const sx = dx / dd * d.v * dt, sz = dz / dd * d.v * dt;
+      const sx = dx / dd * d.v * dt, sz = dz / dd * d.v * dt, bx = d.x, bz = d.z;
       if (this.open(c, d.x + sx, d.z + sz)) { d.x += sx; d.z += sz; }
       else if (this.open(c, d.x + sx, d.z)) d.x += sx;
       else if (this.open(c, d.x, d.z + sz)) d.z += sz;
-      else { d.path = null; d.repath = 0; d.stuck = (d.stuck || 0) + dt; }
-      if (d.stuck > 1.2) { d.stuck = 0; d.v = 0; if (!o && d.mode !== 'pet') this.wander(d, c); }
+      else { d.path = null; d.repath = 0; }
+      const moved = Math.hypot(d.x - bx, d.z - bz);
+      // Got nowhere: it does not stand there treading the air. It stops, and after a moment gives up on that and settles.
+      if (moved < 1e-4) { d.v = 0; d.stuck = (d.stuck || 0) + dt; }
+      else { d.stuck = 0; d.phase += moved * 2.8; }
+      if (d.stuck > 1.2) { d.stuck = 0; if (o) d.hold = 4 + rand() * 4; else if (d.mode !== 'pet') this.wander(d, c); else d.mode = 'idle'; }
       d.yaw = Math.atan2(dx, dz);
-      d.phase += d.v * dt * 2.8;
     }
     d.state = d.v > 3.2 ? 1 : d.v > .3 ? .7 : settle;
     d.ys = this.ease(d.ys, d.yaw, dt * 5);

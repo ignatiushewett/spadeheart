@@ -82,6 +82,8 @@ export class Player {
     this.placeColor = 0;
     this.discovered = {};
     this.invPos = {};
+    this.crewRep = 0;
+    this.radioNotify = {};
     this.campRep = {};
     this.grief = {};
     this.wanted = {};
@@ -1198,7 +1200,7 @@ export class Player {
     return {
       x: this.x, y: this.y, z: this.z, yaw: this.yaw, pitch: this.pitch, health: this.health, infection: this.infection, stamina: this.stamina, hunger: this.hunger, rest: this.rest, sedated: this.sedated, home: this.home, torchItem: true,
       scrip: this.scrip, inventory: this.inventory, mags: this.mags, weapon: this.weapon, armor: this.armor, rep: this.rep,
-      loadout: this.loadout, charName: this.charName, skin: this.skin, bornDay: this.bornDay, kills: this.kills, headshots: this.headshots, voxelsBroken: this.voxelsBroken, discovered: this.discovered, campRep: this.campRep, grief: this.grief, wanted: this.wanted, bail: this.bail || {}, bailExtra: this.bailExtra || {}, bailLock: this.bailLock || {}, campKills: this.campKills || {}, invPos: this.invPos || {}, dlg: this.dlg, perks: this.perks || {}, pendingKit: this.pendingKit || null,
+      loadout: this.loadout, charName: this.charName, skin: this.skin, bornDay: this.bornDay, kills: this.kills, headshots: this.headshots, voxelsBroken: this.voxelsBroken, discovered: this.discovered, campRep: this.campRep, grief: this.grief, wanted: this.wanted, bail: this.bail || {}, bailExtra: this.bailExtra || {}, bailLock: this.bailLock || {}, campKills: this.campKills || {}, crewRep: this.crewRep || 0, radioNotify: this.radioNotify || {}, invPos: this.invPos || {}, dlg: this.dlg, perks: this.perks || {}, pendingKit: this.pendingKit || null,
     };
   }
 

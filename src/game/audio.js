@@ -19,7 +19,7 @@ const GUNS = {
 };
 
 // Interface sounds: heard as they are whatever else is going on (see uiOut).
-const UI_SOUNDS = new Set(['ui', 'uiOver', 'coin', 'bonk', 'beep', 'pickup', 'crate']);
+const UI_SOUNDS = new Set(['ui', 'uiOver', 'coin', 'bonk', 'beep', 'pickup', 'crate', 'static']);
 
 export class Audio2 {
   constructor() {
@@ -565,6 +565,32 @@ export class Audio2 {
       case 'pump': { this.noiseBurst(d(.75, .03), .07, 'bandpass', 800, 450, 2, 1); later(150, () => this.noiseBurst(d(.8, .03), .07, 'bandpass', 1400, 800, 2, 1)); break; }
       case 'pickup': { const o = d(.18, .05); this.tone(o, .09, 'triangle', 620, 840, .5); later(60, () => this.tone(d(.18, .05), .1, 'triangle', 920, 1160, .4)); break; }
       case 'coin': { const o = d(1, .06); this.tone(o, .14, 'square', 1500, 1400, .3); later(70, () => this.tone(d(1, .06), .22, 'square', 2000, 1900, .3)); break; }
+      case 'static': {
+        // Old-television snow: a hard, bright wash of hiss that cuts in, judders a little slower than it did, crackles, and then trails
+        // off over most of a second rather than stopping dead.
+        const ctx = this.ctx, t = ctx.currentTime, body = .3 + rand() * .05, len = body + .45 + rand() * .08;
+        const src = ctx.createBufferSource();
+        src.buffer = this.noiseBuf; src.loop = true;
+        src.playbackRate.value = .85;
+        const hp = ctx.createBiquadFilter(), lp = ctx.createBiquadFilter(), g = ctx.createGain();
+        hp.type = 'highpass'; hp.frequency.value = 1100; hp.Q.value = .7;
+        lp.type = 'lowpass'; lp.frequency.value = 12500; lp.Q.value = .5;
+        // As it trails off it dulls, the way a set going quiet does.
+        lp.frequency.setValueAtTime(12500, t + body);
+        lp.frequency.exponentialRampToValueAtTime(5200, t + len);
+        g.gain.setValueAtTime(.0001, t);
+        g.gain.linearRampToValueAtTime(.5, t + .01);
+        for (let k = .03; k < body - .04; k += .03) g.gain.setValueAtTime(.3 + rand() * .3, t + k);
+        g.gain.setValueAtTime(.45, t + body);
+        g.gain.linearRampToValueAtTime(.16, t + body + (len - body) * .45);
+        g.gain.exponentialRampToValueAtTime(.0001, t + len);
+        for (let k = 0; k < 5; k++) later(rand() * body * 1000, () => this.noiseBurst(d(1.4, 0), .012 + rand() * .022, 'highpass', 2500 + rand() * 4000, 2000, 1, .8));
+        for (let k = 0; k < 2; k++) later((body + rand() * (len - body) * .6) * 1000, () => this.noiseBurst(d(.8, 0), .012 + rand() * .02, 'highpass', 2500 + rand() * 3000, 2000, 1, .5));
+        src.connect(hp); hp.connect(lp); lp.connect(g); g.connect(d(1.4, 0));
+        src.start(t, rand());
+        src.stop(t + len + .02);
+        break;
+      }
       case 'ui': { const o = d(1.2, 0); this.tone(o, .06, 'triangle', 640, 430, .7); this.noiseBurst(o, .022, 'bandpass', 2400, 1300, 1.4, .45); break; }
       case 'uiOver': this.tone(d(.45, 0), .026, 'triangle', 1180, 940, .5); break;
       // A blow landing on a body that stays up: a dull, heavy thud you feel more than hear.

@@ -156,7 +156,7 @@ export class Dialogue {
     const food = ['beans', 'water', 'whiskey'].find((id) => P.count(id));
     if (food && !npc.fed) list.push({ id: 'share', ask: `Here, take this. (${ITEMS[food].name})`, say: pick(['Oh. Thank you. You do not know what that means.', 'I will not forget that. People say that a lot. I mean it.', 'You are all right, you know that?']), food, standing: 1 });
     if (npc.kind === 'roamer' && npc.factionId && !g.npcs.admitted(npc.factionId - 1)) list.push({ id: 'papers', ask: `How does anyone get into ${npc.campName}?`, say: `They don't, not without papers. ${g.npcs.citizenFee(npc.factionId - 1).toLocaleString('en-US')} spades, one time, and any of us out here can sign you up. It's good until you die. Don't try the wall, either. They'll shoot you and they'll remember you.` });
-    const room = g.npcs.followers.length < 3;
+    const room = g.npcs.followers.length < g.npcs.crewRoom();
     if (npc.kind === 'follower') list.push({ id: 'dismiss', ask: 'Head on home. I will be all right from here.', say: 'If you are sure. Watch yourself out there.', dismiss: true });
     // A gun for hire, at the bar: they come for money, not for friendship, and anyone can pay.
     else if (npc.hire && room) list.push({ id: 'hire', ask: `[Hire] I need a gun out there. (${npc.hire.fee.toLocaleString('en-US')} spades)`, say: pick(['Money first. Then I go where you go.', 'Paid up front, and I do not do suicide runs. Deal.', 'You pay, I shoot. Lead the way.']), hire: true });

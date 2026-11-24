@@ -18,6 +18,19 @@ const OP_CALM = .55;
 export const GATE_LOCK_MAG = 6;
 export const GATE_LOCK_WARN = 20;
 const pickFrom = (a) => a[Math.floor(Math.random() * a.length)];
+// The little trades on a settlement's market, and what they come on the civilian radio to say.
+const CIV_TRADES = {
+  Tailor: ['Mending and patching at my stall. Bring the coat in before the winter does.', 'Buying old curtains and sheets. Anything with thread left in it.'],
+  Barber: ['Haircuts by the market for two cans or a good story. Lice checks are free.', 'The chair is free this afternoon. Come and look human again.'],
+  Bakery: ['Flatbread from the oven at noon. Bring your own flour and it is half price.', 'Out of yeast again. It is crackers until somebody finds some.'],
+  'Water Works': ['New filters on the {side} tank. The water is running clear again.', 'Do not drink from the roof barrels. Use the taps.'],
+  Cobbler: ['Boots resoled while you wait. It is tyre rubber, but it holds.', 'Got real laces in. Not string. Real ones.'],
+  'Tea Stall': ['The kettle is on at the stall. Nettle tea, and it is better than it sounds.', 'Hot water is free for anyone coming off the wall.'],
+  'Charging Rig': ['Charging batteries off the bike rig. Pedal for an hour and yours is free.', 'Torches and radios charged by morning. Drop them off tonight.'],
+  'Seed Swap': ['Seed swap at the planters this afternoon. Bring whatever you saved.', 'Spare tomato seedlings going. Take a pot home.'],
+  Smokehouse: ['Smoked fish in, while it lasts.', 'Bring me wood that is not painted and I will pay you in jerky.'],
+  Laundry: ['Washing done by the bucket by the {side} wall. Back dry by dark, rain allowing.', 'Whoever keeps taking the pegs, bring them back.'],
+};
 const cap = (w) => w.charAt(0).toUpperCase() + w.slice(1);
 // How long before a big attack, in days, the scouts have seen enough for the town hall to post it. The operation itself opens at the warning, a bit later.
 export const OUTBREAK_DAYS = 40;   // how long it had been going on the day you woke up
@@ -232,6 +245,7 @@ export class CampSim {
     // 0: the slow one, a long wail every so often. 1: the full siren, from three holes up or a real crowd inside. 2: everybody out.
     this.alarmLevel = alarm ? (this.state[alarm.id].evac ? 2 : this.state[alarm.id].fullT > 0 ? 1 : 0) : 0;
     this.updateCascades(dt);
+    this.civTick(dt);
     this.updateFlares(dt);
   }
 
@@ -659,7 +673,194 @@ export class CampSim {
     const st = this.state[c.id];
     if (!always && st && (st.evac || st.collapseT > 0 || st.status !== 'holding')) return;
     if (keep) this.logNews({ kind: 'radio', campId: c.id, who, text });
-    if (!this.passing) this.g.ui.radio(who, text, c.name);
+    if (!this.passing && this.g.ui.notifies(`ops:${c.id}`)) this.g.ui.radio(who, text, c.name);
+  }
+
+  // Each settlement's civilian radio: two hosts who keep it on the air, read the weather and pass on what people bring them, and talk
+  // between themselves when nothing else is happening; and the people who run things, the stalls, the clinic, the church, the kitchen,
+  // who come on with their own news. It goes on its log for anyone who wants to read it, and is called out over yours only if you ask.
+  civTick(dt) {
+    const g = this.g, live = g.layout.camps.filter((c) => this.known(c) && this.state[c.id].status === 'holding');
+    // A station you have just found has been on the air all along: the last few hours of it, back-filled.
+    const seeded = this.civSeeded || (this.civSeeded = new Set());
+    for (const c of live) {
+      if (seeded.has(c.id)) continue;
+      seeded.add(c.id);
+      if (this.news.some((n) => n.kind === 'civ' && n.campId === c.id)) continue;
+      const now = this.now();
+      for (let k = 6; k >= 1; k--) {
+        const at = now - k * (.012 + Math.random() * .01);
+        this.civPost(c).forEach((m, i) => this.logNews({ kind: 'civ', campId: c.id, who: m.who, text: m.text, topic: m.topic, at: at + i * .0015 }));
+      }
+    }
+    // The other host's answer, a few seconds after the first.
+    const q = this.civQueue || (this.civQueue = []);
+    for (let i = q.length - 1; i >= 0; i--) {
+      if ((q[i].t -= dt) > 0) continue;
+      const m = q.splice(i, 1)[0];
+      if (this.state[m.c.id].status === 'holding') this.civSend(m.c, m);
+    }
+    if ((this.civT = (this.civT ?? 12) - dt) > 0) return;
+    // Busiest from the morning to the evening; at night, now and then.
+    const t = g.tod, day = t > .22 && t < .92;
+    this.civT = day ? 14 + Math.random() * 22 : 60 + Math.random() * 70;
+    if (!live.length) return;
+    const c = pickFrom(live), [first, ...rest] = this.civPost(c);
+    this.civSend(c, first);
+    rest.forEach((m, i) => q.push({ ...m, c, t: 4 + i * 4 + Math.random() * 4 }));
+  }
+
+  // Big news on the civilian station, from one of the hosts, called out whether or not you listen in.
+  civAlert(c, text) {
+    if (!this.known(c)) return;
+    const [h] = this.civHosts(c), who = `${h[0]} ${h[1]}, Host`;
+    this.logNews({ kind: 'civ', campId: c.id, who, text });
+    if (!this.passing) this.g.ui.radio(who, text, `${c.name} Civilian Radio`);
+  }
+
+  civSend(c, m) {
+    this.logNews({ kind: 'civ', campId: c.id, who: m.who, text: m.text, topic: m.topic });
+    if (!this.passing && this.g.ui.notifies(`civ:${c.id}`)) this.g.ui.radio(m.who, m.text, `${c.name} Civilian Radio`);
+  }
+
+  // A name that belongs to this station and this job, the same one every time.
+  civName(c, job) {
+    let h = 2166136261;
+    for (const ch of `${c.key}:civ:${job}`) h = Math.imul(h ^ ch.charCodeAt(0), 16777619) >>> 0;
+    return [SURVIVOR_NAMES[h % SURVIVOR_NAMES.length], SURVIVOR_SURNAMES[(h >>> 11) % SURVIVOR_SURNAMES.length]];
+  }
+
+  // The two voices that run the station.
+  civHosts(c) {
+    const a = this.civName(c, 'host0');
+    let b = this.civName(c, 'host1');
+    for (let k = 2; b[0] === a[0] && k < 9; k++) b = this.civName(c, `host${k}`);
+    return [a, b];
+  }
+
+  // What the sky is doing, and what it is about to do.
+  civWeather() {
+    const g = this.g, w = g.weather, t = g.tod, night = t < .22 || t > .88;
+    const turning = w.timer < 140;
+    if (w.spell === 'pour' || w.rain > .6) {
+      return pickFrom([
+        'Weather: it is coming down hard. If you are not on the wall, get under a roof and stay there.',
+        'Weather: heavy rain for a good while yet. Keep your powder dry and your feet drier.',
+        'Weather: the rain is loud enough that the dead will not hear you. You will not hear them either. Eyes open.',
+        turning ? 'Weather: the worst of it should pass soon. Hang on a little longer.' : 'Weather: no sign of a break. The gutters on the market roof are overflowing, so mind the doorway.',
+      ]);
+    }
+    if (w.spell === 'light' || w.rain > .08) {
+      return pickFrom([
+        'Weather: light rain over the city. Put the collectors out if you have them.',
+        'Weather: drizzle, on and off. A good day for mending indoors.',
+        turning ? 'Weather: the drizzle is easing off. Should be dry before long.' : 'Weather: grey and wet for a while yet. Hang the washing inside.',
+      ]);
+    }
+    if (night) {
+      return pickFrom([
+        'Weather: clear and cold tonight. If you are on watch, take a blanket.',
+        turning ? 'Weather: cloud coming in over the ridge. Rain by morning, probably.' : 'Weather: still and dry tonight. Sound carries a long way, so keep it down out there.',
+      ]);
+    }
+    return pickFrom([
+      turning ? 'Weather: cloud building to the west. Expect rain before long.' : 'Weather: dry, and it should stay that way a good while.',
+      'Weather: clear skies. Fill the tanks while the sun is on them.',
+      w.wet > .2 ? 'Weather: dry for now, but the streets are still wet. Watch your footing on the stairs.' : 'Weather: dry and dusty. Cover the food at the stalls.',
+    ]);
+  }
+
+  // Everything that might come on next, by who would say it. Each comes back as one message, or two for the hosts talking to each other.
+  civPost(c) {
+    const g = this.g, s = this.state[c.id], t = g.tod, morning = t > .2 && t < .42, late = t > .7 || t < .05;
+    const name = () => pickFrom(SURVIVOR_NAMES), side = () => pickFrom(['north', 'south', 'east', 'west']);
+    const [ha, hb] = this.civHosts(c), A = `${ha[0]} ${ha[1]}, Host`, B = `${hb[0]} ${hb[1]}, Host`;
+    const [h1, h2, n1, n2] = Math.random() < .5 ? [A, B, ha[0], hb[0]] : [B, A, hb[0], ha[0]];
+    const recent = this.news.filter((n) => n.kind === 'civ' && n.campId === c.id).slice(-12);
+    const said = new Set(recent.map((n) => n.text.slice(0, 22)));
+    const fresh = (list) => { const f = list.filter((x) => !said.has((Array.isArray(x) ? x[0] : x).slice(0, 22))); return pickFrom(f.length ? f : list); };
+
+    // The hosts passing on what people have brought to the station.
+    const relayed = [
+      `Word from the ${side()} gate: ${name()}'s dog has gone missing. Brown, answers to ${pickFrom(['Biscuit', 'Scout', 'Moose', 'Pepper'])}. Bring him to the Town Hall if you find him.`,
+      `Someone has lost a wedding ring near the ${side()} gate. Hand it in at the Town Hall. There is a reward in it.`,
+      `${name()} on the ${side()} row needs a hand patching a roof before the next rain. They will feed you for it.`,
+      `A message for ${name()}: your brother made it in last night. He is waiting at the Town Hall.`,
+      `${name()} and ${name()} have had a baby girl. Mother and child are both doing fine. Congratulations from all of us.`,
+      `Two families on the ${side()} side want to swap a cot for a camp stove. Ask at the market if you can help.`,
+      'The generator goes off at midnight. Charge what you need before then.',
+      `We are told the water ration is ${pickFrom(['two', 'three'])} cans a head today. Bring your own bottle.`,
+      `${name()} wants everyone to know the stairwell on the ${side()} block is out. Use the other one.`,
+    ];
+    if (morning) relayed.push('School is in the yard in an hour. Send the little ones.', `The laundry lines by the ${side()} wall are free this morning, we are told.`);
+    if (s.drawing || s.breaches.length) relayed.push('Stay off the wall unless you are on the roster. Let the watch do their work.', 'If you can hear shooting, you are close enough. Stay inside until the watch says otherwise.');
+    if (s.op) relayed.push(`Operations is signing people up at the Town Hall for ${s.op.name}. Good money, we are told.`);
+
+    // The two of them, filling the air.
+    const banter = [
+      [`How is the coffee holding up, ${n2}?`, `It is brown and it is hot, ${n1}. Do not ask me anything more than that.`],
+      [`That is day ${g.day + 40} on the air, by my count.`, `${g.day + 41}. You slept through one.`],
+      ['We have had another request for music.', 'And we still do not have any. Hum along at home, everyone.'],
+      ['Somebody asked us if we are the last station left.', 'We are the last one that answers. Make of that what you like.'],
+      ['Do you remember traffic reports?', 'I remember hating them. I would give a lot to read one now.'],
+      [`${n2}, you have been in that chair since six.`, `The chair and I have an understanding, ${n1}.`],
+      ['If anyone out there has a record player that still works, we would like to talk to you.', 'We can pay in batteries. And gratitude. Mostly batteries.'],
+      ['Nice and quiet on the wall this hour.', `Do not say that out loud, ${n1}. You know what happens.`],
+      [`What did you eat today, ${n2}?`, 'Beans. And before you ask, yesterday too.'],
+      ['Someone left a cake at the door of the station this morning.', `There was a cake. ${n1} saw to that.`],
+    ];
+    if (late) banter.push(['Still with us at this hour?', 'Then you are on watch, or you cannot sleep. Either way, so are we.']);
+
+    // The people who run things, on with their own news.
+    const own = [];
+    const isPastor = (m) => /pastor|baptist|reverend|parish/i.test(m.title) || /^Rev\.|^Father /.test(m.name);
+    const cast = (LORE[c.key]?.cast || []).filter((m) => !this.dead[m.id]);
+    const by = (m) => `${m.name}, ${m.title}`;
+    for (const m of cast) {
+      if (isPastor(m)) {
+        own.push([by(m), 'Service in the church from nine. All are welcome, whatever you believe.'], [by(m), 'I am asking for volunteers to sit with the sick tonight. Nobody should be alone in there.'], [by(m), 'The church stays open all night for anyone who cannot sleep. Come in out of the dark.']);
+        if (s.buried > 0) own.push([by(m), 'We hold a memorial at sundown for the ones we lost. I will read the names.']);
+      } else if (m.role === 'general') {
+        own.push([by(m), `Fresh ${pickFrom(['beans', 'bandages', 'tinned peaches', 'batteries', 'rice', 'candles'])} in at the counter. First come, first served.`], [by(m), `I am short on ${pickFrom(['salt', 'soap', 'matches', 'thread'])}. Bring some in and I will pay over the odds.`], [by(m), 'Trading at the counter until dark. Fair weights and no credit.']);
+      } else if (m.role === 'arms') {
+        own.push([by(m), 'Rounds in for most calibres. Bring your own magazines, I am short.'], [by(m), 'Buying back spent brass by the jar.'], [by(m), 'Guns cleaned and checked at the counter while you wait.']);
+      } else if (m.role === 'junk') {
+        own.push([by(m), 'Buying scrap: pipe, wire, sheet metal, anything that rings when you drop it.'], [by(m), 'A pile of good doors and window bars just came in. Come and look.']);
+      } else if (m.role === 'medic') {
+        own.push([by(m), 'The clinic is open. Bring your cuts in before they turn, not after.'], [by(m), 'Boil your water. I am seeing too many bad stomachs this week.']);
+      } else if (m.role === 'mechanic') {
+        own.push([by(m), 'Fixing bikes, boots and radios by the market. Fair prices.'], [by(m), 'A chain and two tyres came in, if anyone has been waiting on them.']);
+      }
+    }
+    // The smaller trades: three of them on each station, the same three every time.
+    const trades = Object.keys(CIV_TRADES);
+    let th = 2166136261;
+    for (const ch of `${c.key}:trades`) th = Math.imul(th ^ ch.charCodeAt(0), 16777619) >>> 0;
+    for (let k = 0; k < 3; k++) {
+      const trade = trades.splice((th >>> (k * 5)) % trades.length, 1)[0], nm = this.civName(c, trade);
+      for (const line of CIV_TRADES[trade]) own.push([`${nm[0]} ${nm[1]}, ${trade}`, line.replace('{side}', side())]);
+    }
+    const clerk = this.civName(c, 'clerk'), cook = this.civName(c, 'cook'), bar = this.civName(c, 'bar');
+    own.push([`${clerk[0]} ${clerk[1]}, Town Hall`, 'Work posted on the board today. Come and see me.']);
+    if (s.op) own.push([`${clerk[0]} ${clerk[1]}, Town Hall`, 'Contracts going for patrols and night shifts. Ask at the desk.']);
+    if (morning) own.push([`${cook[0]} ${cook[1]}, Kitchen`, 'The breakfast line is open. One bowl each, and bring it back.']);
+    if (late) own.push([`${bar[0]} ${bar[1]}, Bar`, `Card game tonight. ${name()} is dealing.`], [`${bar[0]} ${bar[1]}, Bar`, 'Open late. The first round is on nobody.']);
+    if (!cast.some(isPastor) && c.spots.pulpit) {
+      const rev = this.civName(c, 'pastor');
+      own.push([`${rev[0]} ${rev[1]}, Pastor`, 'Service in the church from nine. All are welcome, whatever you believe.'], [`${rev[0]} ${rev[1]}, Pastor`, 'I am asking for volunteers to sit with the sick tonight. Nobody should be alone in there.']);
+    }
+    if (s.buried > 0 && !own.some((o) => /memorial/.test(o[1]))) relayed.push(`A memorial at sundown for the ones we lost. ${name()} is reading the names.`);
+
+    // Mostly the hosts. The weather is not read twice in a row.
+    const r = Math.random(), lastWeather = recent.slice(-4).some((n) => n.topic === 'weather');
+    if (r < .2 && !lastWeather) return [{ who: h1, text: this.civWeather(), topic: 'weather' }];
+    if (r < .45) return [{ who: h1, text: fresh(relayed) }];
+    if (r < .62) { const [x, y] = fresh(banter); return [{ who: h1, text: x }, { who: h2, text: y }]; }
+    // Whose turn: everyone gets an even chance, whoever has the most to say, and nobody who was just on.
+    const voices = [...new Set(own.map((o) => o[0]))], justOn = new Set(recent.slice(-4).map((n) => n.who));
+    const who = pickFrom(voices.filter((v) => !justOn.has(v)).length ? voices.filter((v) => !justOn.has(v)) : voices);
+    const theirs = own.filter((o) => o[0] === who), pick = theirs.filter((o) => !said.has(o[1].slice(0, 22)));
+    return [{ who, text: pickFrom(pick.length ? pick : theirs)[1] }];
   }
 
   // Who is on the radio for a settlement: the operations desk for operations, contracts and the gates; the quartermaster for stores and
@@ -686,7 +887,8 @@ export class CampSim {
   logNews(item) {
     if (item.at === undefined) item.at = this.now();
     this.news.push(item);
-    if (this.news.length > 400) this.news.shift();
+    // The civilian chatter goes first when the log is full: the operations and the reports are the ones worth keeping.
+    if (this.news.length > 700) { const i = this.news.findIndex((n) => n.kind === 'civ'); this.news.splice(i >= 0 && this.news.filter((n) => n.kind === 'civ').length > 150 ? i : 0, 1); }
   }
 
   // --- Waves --------------------------------------------------------------------------------------
@@ -719,6 +921,7 @@ export class CampSim {
     // The last one is announced like any other big one: nobody calls it the end before it is.
     const opener = major || s.fatal ? `A huge crowd is moving on ${c.name}` : `A crowd is moving on ${c.name}`;
     this.radio(c, `${opener} from the ${sideOf(s.dir)}. All guns to the wall.`, speaker);
+    if (major) this.civAlert(c, `The sirens are for real. A big crowd is coming in from the ${sideOf(s.dir)}. If you are not on the wall, get to the shelters.`);
     if (major) this.openOp(c, s);
     // Everything idle in earshot joins in.
     if (s.real) H.drawToCamp(c, 90, major ? .25 : .12);
@@ -966,6 +1169,7 @@ export class CampSim {
     const lore = LORE[c.key], who = lore.cast.find((m) => m.role === 'leader');
     const to = refuge ? ` Make for ${refuge.name}.` : '';
     this.radio(c, `It's over. Open the gates, everybody out.${to} Go now!`, this.dead[who.id] ? c.name : who.name, true, true);
+    this.civAlert(c, `This is the last call from this station. The settlement is being evacuated.${to} Take only what you can carry, and go now. Good luck, everyone.`);
     if (g.player.home === c.id) {
       g.jobs.startMigrate(c, refuge);
       if (!this.passing) g.ui.banner(`${c.name} is falling`, refuge ? `Survivors are running for ${refuge.name}. It is marked on your map.` : 'There is nowhere left to run to.');

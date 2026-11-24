@@ -127,6 +127,9 @@ function mapNoise(a, b) {
   return p + (q - p) * ua + (r - p) * ub + (p - q - r + t) * ua * ub;
 }
 
+// Menus that leave the game running behind them.
+const LIVE_MODALS = new Set(['dialog', 'map', 'inventory', 'crewpanel']);
+
 class Game {
   constructor() {
     this.state = 'boot';
@@ -928,7 +931,7 @@ class Game {
   // Right-click held with the building out: everything you can build, to pick from.
   openBuildMenu() { if (!this.ui.modal && this.player.alive && !(this.bikes && this.bikes.ride)) this.openModal(() => this.ui.openBuild()); }
 
-  // A modal opens over the game: the sim stops and the view racks out of focus.
+  // A modal opens over the game: the view racks out of focus, and unless it is one of LIVE_MODALS the sim stops.
   openModal(fn) {
     this.modalOpenWhilePlaying = true;
     document.exitPointerLock();
@@ -2770,13 +2773,15 @@ class Game {
     const r = this.renderer;
     this.time += dt;
     // Sirens belong to the game being played. Nothing else tells them to stop, so a menu, a pause or a loading screen has to.
-    if (this.state !== 'play' || (this.ui.modal && this.ui.modal !== 'dialog')) this.audio.setAlarm(null, 0, true);
+    // (The map, the inventory, the group and a conversation are looked at with the game still going on around you: those do not stop it.)
+    const live = !this.ui.modal || LIVE_MODALS.has(this.ui.modal);
+    if (this.state !== 'play' || !live) this.audio.setAlarm(null, 0, true);
     if (this.state === 'loading') {
       this.updateLoading();
       this.drawScene(dt, true);
       return;
     }
-    const paused = this.state === 'play' && !!this.ui.modal && this.ui.modal !== 'dialog';
+    const paused = this.state === 'play' && !live;
     this.audio.muffle(paused);
     if (!paused && this.state !== 'loading') this.updateWeather(dt);
     if (this.state === 'play' && !paused) this.updateFires(dt);
