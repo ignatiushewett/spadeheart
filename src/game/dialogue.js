@@ -26,11 +26,11 @@ export class Dialogue {
   // Someone with a post or a trade here does not walk off with you, however well you know them, and says why.
   dutyRefusal(npc) {
     const k = npc.kind, task = npc.task && npc.task.kind;
-    if (k === 'guard' || k === 'sentry') return pick(['I am on watch. Nobody walks off a post.', 'Not while I am holding this wall.', 'If I leave my post, somebody dies. No.']);
-    if (k === 'roamer') return pick(['I am on patrol. Talk to the camp if you want people.', 'We have our orders. No.']);
-    if (k === 'boss' || k === 'clerk' || k === 'named') return pick(['Somebody has to run this place. It is me.', 'I cannot leave. Not now, not with things the way they are.']);
-    if (k === 'vendor' || npc.mech || npc.doctor) return pick(['And who keeps this going while I am gone? No.', 'I have a trade here. People need it.']);
-    if (task === 'work' || task === 'farm' || task === 'teach') return pick(['I have work to do. This does not get done by itself.', 'Not today. This place does not run without us.', 'Ask someone who is not busy.']);
+    if (k === 'guard' || k === 'sentry') return pick(['I am on watch. Nobody walks off a post.', 'Not while I am holding this wall.', 'If I leave my post, somebody dies. No.', 'Ask me when I am off shift. Actually, do not ask me then either.', 'The wall does not watch itself.', 'Eyes out there, not on you. Move along.']);
+    if (k === 'roamer') return pick(['I am on patrol. Talk to the camp if you want people.', 'We have our orders. No.', 'My squad is right here. I am not leaving them for you.', 'We go back to the wall together or not at all.']);
+    if (k === 'boss' || k === 'clerk' || k === 'named') return pick(['Somebody has to run this place. It is me.', 'I cannot leave. Not now, not with things the way they are.', 'Everyone here counts on me being here in the morning. No.', 'You want me out there? Then who is in here?']);
+    if (k === 'vendor' || npc.mech || npc.doctor) return pick(['And who keeps this going while I am gone? No.', 'I have a trade here. People need it.', 'I close up, and somebody goes without. No.', 'My customers would never forgive me. Neither would I.']);
+    if (task === 'work' || task === 'farm' || task === 'teach') return pick(['I have work to do. This does not get done by itself.', 'Not today. This place does not run without us.', 'Ask someone who is not busy.', 'Do you see these hands? They are busy.', 'If I stop, nobody eats. No.', 'Come back when the work is done. It is never done.']);
     return null;
   }
 
@@ -201,12 +201,17 @@ export class Dialogue {
     if (t.recruit) {
       const duty = this.dutyRefusal(npc);
       if (duty) return { text: duty, then: null };
-      if (npc.refusedDay === g.day) return { text: pick(['I already told you. No.', 'Still no. Ask me another day.', 'Same answer as before.']), then: null };
+      if (npc.refusedDay === g.day) return { text: pick(['I already told you. No.', 'Still no. Ask me another day.', 'Same answer as before.', 'Asking twice does not change it.', 'No means no today. Try tomorrow.', 'You heard me the first time.']), then: null };
       if (Math.random() >= this.joinChance(npc)) {
         npc.refusedDay = g.day;
         const stranger = npc.kind !== 'wanderer' && this.standing(npc.camp) < JOIN_TRUSTED;
-        return { text: pick(stranger ? ['I do not know you well enough for that.', 'You want me to walk out of here with someone I barely know? No.', 'Ask me again when people here vouch for you.']
-          : ['No. I have got people here who need me.', 'Not a chance. I have seen what is out there.', 'Thanks, but no. I am staying put.', 'Maybe another time. Not today.']), then: null };
+        return { text: pick(stranger ? ['I do not know you well enough for that.', 'You want me to walk out of here with someone I barely know? No.', 'Ask me again when people here vouch for you.',
+          'I do not even know your name properly. No.', 'The last person who asked me that came back alone. I am not going anywhere with a stranger.', 'Nobody here knows you yet. Give it time.',
+          'You could be anybody. Out there, anybody is a bad thing to be.', 'Do some good round here first. Then ask me again.', 'I have seen you once. Once is not enough.']
+          : ['No. I have got people here who need me.', 'Not a chance. I have seen what is out there.', 'Thanks, but no. I am staying put.', 'Maybe another time. Not today.',
+            'I like you. I like the wall more.', 'My kid is in here. I am not leaving my kid.', 'I went out once. I am not going out again. Ask somebody braver.',
+            'Not today. Ask me when the weather turns.', 'I am flattered. I am also not stupid.', 'If I go, who does my shift? No.', 'You go on. I will hold the fort here.',
+            'Give me a reason that is not just you, and I will think about it.', 'I promised someone I would stay. I keep my promises.']), then: null };
       }
     }
     if (t.hire) {

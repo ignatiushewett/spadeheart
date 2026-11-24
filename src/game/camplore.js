@@ -11,7 +11,7 @@ export const LORE = {
     jobIntro: 'Odalys keeps the board. Pays on time, every time.',
     cast: [
       {
-        id: 'reyes', name: 'Odalys Reyes', role: 'leader', title: 'Mayor of the Market', weapon: 'pistol', wardrobe: 'civ',
+        id: 'reyes', name: 'Odalys Reyes', role: 'leader', title: 'Administrator of the Refuge', weapon: 'pistol', wardrobe: 'civ',
         greet: {
           first: 'New face. Good. New faces buy things. I am Odalys, and before you ask, nobody elected me. I ran dispatch for the MTA for nineteen years, and when the trains stopped I was the only person who still knew where everybody was.',
           again: ['Back again. Market is open, wall is up, and I have a list.', 'You still have all your fingers. That makes you an asset.', 'Talk fast. I have two caravans and a bad generator.'],
@@ -156,7 +156,7 @@ export const LORE = {
       {
         id: 'esi', name: 'Esi Mensah', role: 'captain', title: 'Wall Captain', weapon: 'crossbow', wardrobe: 'civ', spot: 'gate',
         greet: { first: 'I coached the Ballarat State archery team. Fourteen months ago that was the least useful job in Ballarat. Crossbows do not bring company. That is the entire doctrine.', again: ['Quiet shots today.', 'Bolts are reusable, bullets are not. Think about that.'] },
-        topics: [{ id: 'quiet', ask: 'Why not use rifles?', say: 'Every shot you fire is a dinner bell. We kept a rifle on each corner for emergencies, and the rest of us shoot quiet. Our wall has seen a quarter of what Fort Westpoint sees, and they have twice the guns.', standing: 1 }],
+        topics: [{ id: 'quiet', ask: 'Why not use rifles?', say: 'Every shot you fire is a dinner bell. We kept a rifle on each corner for emergencies, and the rest of us shoot quiet. Our wall has seen a quarter of what Fort Vigil sees, and they have twice the guns.', standing: 1 }],
       },
     ],
     barks: {
@@ -202,7 +202,7 @@ export const LORE = {
       {
         id: 'dwyer', name: 'Cpl. Dwyer', role: 'arms', title: 'Armorer', weapon: 'lmg', wardrobe: 'mil',
         greet: { first: 'Dwyer. I keep the guns running and the books honest, and the Sergeant keeps me from selling the guns. You have got spades? Then you are a coalition partner.', again: ['What can I do for our coalition partner?', 'Clean your weapon. I can smell it from here.'] },
-        topics: [{ id: 'sell', ask: 'Why does the Guard sell guns?', say: 'Because we need antibiotics and the Market wants hardware, and spades are the only thing both sides can stand to hold. Also I am saving up for something. I do not know what. It is just nice to save.' }],
+        topics: [{ id: 'sell', ask: 'Why does the Guard sell guns?', say: 'Because we need antibiotics and the Refuge wants hardware, and spades are the only thing both sides can stand to hold. Also I am saving up for something. I do not know what. It is just nice to save.' }],
       },
       {
         id: 'hobbs', name: 'Hobbs', role: 'junk', title: 'Motor Pool', weapon: 'smg', wardrobe: 'mil',
@@ -223,7 +223,7 @@ export const LORE = {
       {
         id: 'halloran', name: 'Judge Miriam Halloran', role: 'leader', title: 'The Judge', weapon: 'pistol', wardrobe: 'civ',
         greet: {
-          first: 'Miriam Halloran. Ballarat Superior Court, Albion County, retired against my will. You will find we have tomatoes and rules here, and you will find that the first depends on the second. Welcome to the Bastion. Do try not to be sentenced.',
+          first: 'Miriam Halloran. Ballarat Superior Court, Albion County, retired against my will. You will find we have tomatoes and rules here, and you will find that the first depends on the second. Welcome to Providence. Do try not to be sentenced.',
           again: ['Good to see you. Wipe your boots.', 'You are in my way, dear, but only slightly.'],
           hurt: 'Good heavens. Go to the clinic before you ruin the rug. We do have a rug.',
           night: 'Curfew is at nine. It does not apply to you, but it does apply to my disapproval.',
@@ -235,12 +235,12 @@ export const LORE = {
           { id: 'tried', sub: true, ask: 'Have you ever found anyone innocent?', say: 'Eleven of nineteen. People forget that part. The hearings are not a formality. If you ever need one, you shall have a very good defense.', standing: 1 },
           { id: 'food', ask: 'You really grow all this yourselves?', say: 'Eight hundred acres of it, once we are done. The Arnhem families spent a hundred and fifty years making the best soil in Ballarat, and the banks had most of it off them before any of this. There are six thousand mouths inside this wall and in the settlements that trade with us. In three months that is the only thing in the city that matters.', standing: 1 },
           { id: 'met', ask: 'What about the museums in Albion?', say: 'A Greek vase will not feed anyone. But I have sent two teams for the State House charter, because somebody must, and I will not explain myself further.' },
-          { id: 'seed', ask: 'Is there a way I could serve the Bastion?', req: { standing: 10 }, say: 'There is. The Conservatory Garden moved its heirloom seed bank down to the Shakespeare Garden shed, just north of us. We have four strains of everything and that is not enough. It is dangerous ground, and you would be doing it for strangers\' grandchildren.', then: ['seed_yes'], once: true },
+          { id: 'seed', ask: 'Is there a way I could serve Providence?', req: { standing: 10 }, say: 'There is. The Conservatory Garden moved its heirloom seed bank down to the Shakespeare Garden shed, just north of us. We have four strains of everything and that is not enough. It is dangerous ground, and you would be doing it for strangers\' grandchildren.', then: ['seed_yes'], once: true },
           { id: 'seed_yes', sub: true, ask: 'I will bring you the seeds.', say: 'I expected no less. Mind the Weston road.', job: 'sheep_seeds' },
-          { id: 'seed_done', pay: 'sheep_seeds', req: { flag: 'sheep_seeds_done', notFlag: 'sheep_seeds_paid' }, ask: 'Your seed bank, Judge.', say: 'Do you know, in forty-one years on the bench, no one has ever handed me anything that made me cry? Sit down. You are getting the tomatoes. They are not on the market, those tomatoes. You are an honored citizen of the Bastion, and that is a court order.', standing: 16, give: { medkit: 2, beans: 6, water: 6 } },
-          { id: 'trust', ask: 'Could the Bastion spare provisions?', req: { standing: 25 }, say: 'Citizens draw from the common stores. Here is your ration, and do not sell it, I would know.', give: { beans: 4, water: 4, medkit: 1 }, daily: true },
+          { id: 'seed_done', pay: 'sheep_seeds', req: { flag: 'sheep_seeds_done', notFlag: 'sheep_seeds_paid' }, ask: 'Your seed bank, Judge.', say: 'Do you know, in forty-one years on the bench, no one has ever handed me anything that made me cry? Sit down. You are getting the tomatoes. They are not on the market, those tomatoes. You are an honored citizen of Providence, and that is a court order.', standing: 16, give: { medkit: 2, beans: 6, water: 6 } },
+          { id: 'trust', ask: 'Could Providence spare provisions?', req: { standing: 25 }, say: 'Citizens draw from the common stores. Here is your ration, and do not sell it, I would know.', give: { beans: 4, water: 4, medkit: 1 }, daily: true },
         ],
-        favours: { sheep_seeds: { title: 'The heirloom seed bank', type: 'fetch', u: .5347, v: .603, reward: 360, bonus: 'stim', desc: 'Recover the heirloom seed bank from the co-op store under the Weston elevator, north of the Bastion.' } },
+        favours: { sheep_seeds: { title: 'The heirloom seed bank', type: 'fetch', u: .5347, v: .603, reward: 360, bonus: 'stim', desc: 'Recover the heirloom seed bank from the co-op store under the Weston elevator, north of Providence.' } },
       },
       {
         id: 'ellis', name: 'Ellis Boone', role: 'general', title: 'Farm Boss', weapon: 'shotgun', wardrobe: 'civ', spot: 'field',
@@ -282,9 +282,9 @@ export const LORE = {
         },
         topics: [
           { id: 'ready', ask: 'People say you were ready for this.', say: 'We were ready for it because we had already been thrown out of it. No power on this block since the eighties. We grow our own, we fix our own, and we have been fighting landlords, cops and Giuliani for forty years. A zombie is easy. A zombie does not have a lawyer.', then: ['others', 'ever'] },
-          { id: 'others', sub: true, ask: 'What do you make of the other settlements?', say: 'The Market is capitalism with better walls. The Judge is a nice old lady who murders people. Westpoint is a bunch of sweet boys saluting a dead government. They are all rebuilding the thing that was killing us already. And in six months they will all be trading with us anyway, because we are the only ones who know how to fix a bicycle.', standing: 1 },
+          { id: 'others', sub: true, ask: 'What do you make of the other settlements?', say: 'The Refuge is capitalism with better walls. The Judge is a nice old lady who murders people. the Fort is a bunch of sweet boys saluting a dead government. They are all rebuilding the thing that was killing us already. And in six months they will all be trading with us anyway, because we are the only ones who know how to fix a bicycle.', standing: 1 },
           { id: 'ever', sub: true, ask: 'Did you ever want it to end?', say: 'Honey, I used to stand on this dock and scream for it. I lost my whole building in the first week, thirty-five years of neighbors. Ask me again when I am drunk.', standing: 2, set: 'rat_truth' },
-          { id: 'paint', ask: 'Why paint the walls?', say: 'Because it is ours. Because Fort Westpoint is the color of a bureaucrat. And because when the dead come up to our wall, the last thing they see will be a twelve-foot pink rat with a middle finger. I am not saying they notice. I am saying I notice.' },
+          { id: 'paint', ask: 'Why paint the walls?', say: 'Because it is ours. Because Fort Vigil is the color of a bureaucrat. And because when the dead come up to our wall, the last thing they see will be a twelve-foot pink rat with a middle finger. I am not saying they notice. I am saying I notice.' },
           { id: 'squat', ask: 'What needs doing?', req: { standing: 10 }, say: 'I am not asking you to do anything, because I do not do that. But there is a building on Foundry Street, the Foundry squat, that held out longer than anybody, and the people in there have gone quiet, and somebody ought to go kill everything on that block and see. I just think that is an interesting thing that a person could do.', then: ['squat_yes'], once: true },
           { id: 'squat_yes', sub: true, ask: 'I am the person who could do it.', say: 'Well, I did not ask you. Remember that when you tell it later. Bring a shotgun.', job: 'tompkins_csquat' },
           { id: 'squat_done', pay: 'tompkins_csquat', req: { flag: 'tompkins_csquat_done', notFlag: 'tompkins_csquat_paid' }, ask: 'The block around C-Squat is clear.', say: 'And the people? No. No, I can see from your face. They went out swinging? Of course they did. I was at their wedding, those two, in 1994, it had a tuba. Take this. It is hers, and she would hate you, and she would want you to have it.', standing: 15, give: { sledge: 1, dynamite: 3 } },
@@ -321,7 +321,7 @@ export const LORE = {
       {
         id: 'brandt', name: 'Dr. Imani Brandt', role: 'leader', title: 'Chief of Medicine', weapon: 'pistol', wardrobe: 'med',
         greet: {
-          first: 'Dr. Brandt, Albion General, emergency medicine. Hold out both your arms. Thank you. Turn. Thank you. Welcome to the Redoubt. Sorry, I do that to everyone, and I will do it again next time.',
+          first: 'Dr. Brandt, Albion General, emergency medicine. Hold out both your arms. Thank you. Turn. Thank you. Welcome to Triage. Sorry, I do that to everyone, and I will do it again next time.',
           again: ['Arms, please. Good. What can I do for you?', 'I have twelve minutes, so choose carefully.'],
           hurt: 'Do not talk. Lie down. Who taught you to tie that? Do not tell me.',
           night: 'I have been up thirty hours. If I seem kind, it is a symptom.',
@@ -404,7 +404,7 @@ export const LORE = {
         topics: [{ id: 'shop', ask: 'A deacon with a chop shop?', say: 'Son, every car in this wall came through me. Half of them, I already knew. There is a Buick out on 124th I stole twice. I look at it and I say, well, look at you now, doing something useful. Same as me.', standing: 1 }],
       },
       {
-        id: 'reverend', name: 'Rev. Isaiah Cole', role: 'local', title: 'Abyssinian Baptist', weapon: 'pistol', wardrobe: 'civ', spot: 'hq',
+        id: 'reverend', name: 'Rev. Isaiah Cole', role: 'local', title: 'Abyssinian Baptist', weapon: 'pistol', wardrobe: 'clergy', spot: 'hq',
         greet: { first: 'Peace be with you. I am the Reverend Isaiah Cole. People ask me if this is the Rapture, and I tell them that the Lord does not usually do His work on the 2 train.', again: ['Peace.', 'Service at sundown, if you are in need. And even if you are not.'] },
         topics: [
           { id: 'faith', ask: 'Do you still believe, after all this?', say: 'I have buried two hundred people. I asked the Lord why at every one of them. He has not answered. I find I am not done asking, and I think that may be all that faith ever was. Are you carrying anything you would like to set down? I do not need to know what it is.', standing: 2 },
@@ -530,7 +530,7 @@ export const ACTIVITY_TALK = {
   sleep: ['Mmph.', 'Come back tomorrow.'],
   work: ['Same as yesterday: fix what broke. Something always broke.', 'If I keep my hands busy I do not have to think. It works about half the time.', 'We need this done before dark. Everything here needs doing before dark.'],
   farm: ['Blight on the south rows again. I am not a farmer. I sold insurance. But I am getting there.', 'People laugh until they get hungry.', 'A garden is the only thing here that gets better if you leave it alone for a day.'],
-  shop: ['Prices went up again. I blame the Market. Everyone blames the Market.', 'Trying to trade a car battery for a pair of boots that fit. Wish me luck.', 'Just looking. You look at things, you remember what it was like to want things.'],
+  shop: ['Prices went up again. I blame the Refuge. Everyone blames the Refuge.', 'Trying to trade a car battery for a pair of boots that fit. Wish me luck.', 'Just looking. You look at things, you remember what it was like to want things.'],
   talk: ['We were just saying. You ever think about how there used to be a whole department for parking?', 'Trading stories. It is that or trade complaints.', 'Oh, you know. Who is sleeping with who, who took whose blanket. Same as any town.'],
   class: ['Miss says I have to know my times tables in case there is a test. There is always a test.', 'Today we did Ballarat history. Nobody knows how it ends.'],
   teach: ['We do reading and sums, and which end of a rifle is which. In that order, I insist.', 'They are going to need to know what the world was, or they will not know what to build.'],
@@ -545,7 +545,7 @@ ACTIVITY_TALK.patrol = ['Walking the inside of the wall. If something is getting
 export const ACTIVITY_BARKS = {
   market: ["You looking for something?", "Not here. Round the back.", "Keep walking if you're not buying.", "Who sent you?", "I didn't see anything.", "Quiet tonight. Good.", "Got something you'd like, if you've got the spades."],
   patrol: ["All quiet this side.", "Coming through.", "You hear that? No? Okay.", "One more lap.", "Who left this here?"],
-  browse: ["How much? For that?", "I'll give you two cans.", "What else have you got?", "Is that real? Let me see it.", "My sister paid half that at the Market.", "I'm just looking.", "Hm. Maybe tomorrow."],
+  browse: ["How much? For that?", "I'll give you two cans.", "What else have you got?", "Is that real? Let me see it.", "My sister paid half that at the Refuge.", "I'm just looking.", "Hm. Maybe tomorrow."],
   sit: ["Anyway, that's when he told me it was his mother-in-law.", "Pass that over, would you?", "Remember brunch? Fourteen dollars for an egg.", "They sound louder tonight.", "I'd kill for a cold beer.", "Sing that one again.", "My feet are finished.", "So what happened after that?"],
   work: ["Hold this. No, the other end.", "Who keeps taking my hammer?", "That'll hold. For now.", "Almost got it.", "Hand me that, would you?", "This is on crooked.", "Ow. Damn it."],
   farm: ["Come on, you little beauties.", "Mind the rows.", "We could use some rain.", "These are coming in okay.", "Something's been at these."],
@@ -572,7 +572,7 @@ export const CONVERSATIONS = {
   nightmarket: [
     ["You got the thing?", "Keep your voice down.", "Do you have it or not?", "Behind the crates. Ten minutes."],
     ["Where'd you get this?", "You don't want to know.", "I kind of do.", "No. You don't."],
-    ["That's Fort Westpoint ammo.", "It's ammo.", "It's got their stamp on it.", "Then don't shoot it at them."],
+    ["That's Fort Vigil ammo.", "It's ammo.", "It's got their stamp on it.", "Then don't shoot it at them."],
     ["Antibiotics. Real ones.", "Sealed?", "Mostly.", "What's mostly?"],
     ["I never saw you, {name}.", "Saw who?", "Good."],
     ["Who's that guy watching us?", "Nobody. Keep walking.", "He's still looking.", "So look less."],
@@ -833,13 +833,13 @@ export const CAMP_TALK = {
 // Leaders keep it short. A first hello is who they are and what the place is; past that they talk about the place, what they need from
 // you, and whether they can spare you anything. The rest of what they used to say is cut.
 const SHORT_FIRST = {
-  bryant: 'So you made it in. This is Lakeshore Market, and I am Odalys Reyes: I keep it running. Trade fair and keep the peace.',
-  battery: 'Welcome aboard, such as it is. Captain Wen Liu. We hold the pier at Severn Landing and we watch the water.',
+  bryant: 'So you made it in. This is the Ballarat State Refuge Community. Everyone calls it the Refuge, and I am Odalys Reyes: I keep it running. Trade fair and keep the peace.',
+  battery: 'Welcome aboard, such as it is. Captain Wen Liu. We hold the pier at the Docks and we watch the water.',
   wash: 'A new arrival? Good. Adaeze Okafor. I chair the Commune, which mostly means I count the votes.',
-  union: 'Stop there. This is Fort Westpoint, and it runs like a post. I am Staff Sergeant Whitaker. Follow the rules and you can stay.',
+  union: 'Stop there. This is Fort Vigil, and it runs like a post. I am Staff Sergeant Whitaker. Follow the rules and you can stay.',
   sheep: 'Arnhem has laws, and I am the one who keeps them. Miriam Halloran. Keep to them and you will eat well.',
   tompkins: 'Nobody is in charge of the Collective. Which means you talk to me. They call me Mother Rat.',
-  morning: 'You are not hurt? Good, then you can wait. Imani Brandt. The Redoubt is a clinic first and a settlement second.',
+  morning: 'You are not hurt? Good, then you can wait. Imani Brandt. Triage is a clinic first and a settlement second.',
   garvey: 'Look who walked in. Everybody here pulls their weight, and so will you. I am Odessa Calloway; I run Carver Yard.',
   tryon: 'Welcome to St. Brigid\'s. This street has always come to the church in a bad winter, and so can you. Father Declan Rourke.',
 };

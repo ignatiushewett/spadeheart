@@ -31,7 +31,7 @@ export const MORE_TALK = {
     ["I found a map of the whole state in an old gas station.", "Anything useful on it?", "Picnic areas. All the picnic areas.", "Well. In case we want a picnic.", "I've marked the good ones."],
     ["You still writing in that notebook?", "Every night.", "What do you even write?", "Who came in. Who didn't come back.", "...That's a lot of pages.", "I'm on my third."],
     ["{name}, can you cut my hair?", "With what?", "Whatever you've got.", "I've got a knife and no idea.", "That's better than I've got."],
-    ["Heard they've got hot water up at Westpoint.", "Says who?", "Some trader.", "Traders say anything to sell a can.", "I'd walk there for a hot shower.", "You'd walk back smelling the same."],
+    ["Heard they've got hot water up at the Fort.", "Says who?", "Some trader.", "Traders say anything to sell a can.", "I'd walk there for a hot shower.", "You'd walk back smelling the same."],
     ["What's the first thing you'd do if it all stopped tomorrow?", "Sleep. A whole night.", "That's it?", "With the door unlocked."],
     ["Have you been sleeping okay?", "Not really. You?", "I keep hearing the scratching.", "There's nothing scratching.", "I know. That's what bothers me."],
     ["The new guy keeps saluting everyone.", "Was he army?", "He was a mall cop.", "Let him salute. Makes him feel better."],

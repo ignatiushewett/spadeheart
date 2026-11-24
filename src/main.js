@@ -35,8 +35,12 @@ const rand = Math.random;
 const nextFrame = () => new Promise((r) => { requestAnimationFrame(r); setTimeout(r, 120); });
 const DAY_SECONDS = 1500;
 const GARVEY_V = 5;        // which build of Carver Yard a save's edits belong to
-const WEST_V = 1;
-const CAMPS_V = 2;         // which plan of the camps' insides a save's edits belong to (2: the squares moved off-centre, the lanes bend)          // which lie of the land west of Weston a save's edits belong to (Mt Page and Fort Westpoint moved south)
+const WEST_V = 1;          // which lie of the land west of Weston a save's edits belong to (Mt Page and Fort Vigil moved south)
+const CAMPS_V = 3;         // which plan of the camps' insides a save's edits belong to (3: the bar and clinic face the lanes, St. Brigid's)
+const MAP_V = 2;           // where the settlements stand (2: B.S.R.C., St. Brigid's, Fort Vigil, Providence and the Docks moved)
+// The ground that changed when they moved: Albion and Severn Bay, whose streets go round the walls inside them, and the fields Providence
+// moved across. (Out west is WEST_AREA's.)
+const MAP_AREAS = [{ town: 'albion' }, { town: 'severn' }, { x0: 2380, z0: 3570, x1: 3020, z1: 3870 }];
 const WEST_AREA = { x0: 0, z0: 1350, x1: 2250, z1: 2850 };
 const INTRO_TIME = 7.5;    // seconds of words on black before the wake-up
 const INTRO_FADE = 1.3;    // the last of that is them fading out, and a beat of nothing
@@ -48,13 +52,13 @@ for (const id of [M.STEEL, M.STEEL_D, M.ALUM, M.IRON, M.BLOCK_STEEL, M.CONT_R, M
 const SETTINGS_KEY = 'acez.settings.v2';
 const OLD_SETTINGS_KEY = 'acez.settings.v1';
 const DB_NAME = 'acez';
-// Where the title flight ends: out over the bay to the east-south-east of her, looking back west-north-west past her and the Landing to
+// Where the title flight ends: out over the bay to the east-south-east of her, looking back west-north-west past her and The Docks to
 // Weston, the plateau and Albion on the skyline, with the edge of the map only far off in the haze.
 // How far out the title screen builds the city in full. The view there holds still, so it can afford to see a long way.
 const MENU_VIEW = 704;
 const MENU_VEIL_MAX = 45;   // seconds the title screen waits on black for the view to build, at most
 const MENU_SHOT = { angle: -.18, dist: 185, height: 88, turn: -.32, pitch: -.14, fov: 1.05, flight: 125, startHeight: 30, startOff: 44, startPitch: -.1 };
-export const VERSION = 'v0.98';
+export const VERSION = 'v0.99';
 const SAVE_KEY = 'slot15';  // bumped whenever the map changes: old voxel edits no longer line up
 export const SLOTS = 3;
 // Slot 1 keeps the plain key, so a save from before there were slots simply becomes the first character.
@@ -2015,9 +2019,10 @@ class Game {
     this.ui.open('menu', false);
     this.tod = rand();
     this.weather.randomise();
-    const lady = this.layout.structs.find((s) => s.type === 'statue'), bat = this.layout.camps.find((c) => c.key === 'battery');
+    // (The flight is framed on the old marina lots in the bay, where the Docks used to be.)
+    const lady = this.layout.structs.find((s) => s.type === 'statue'), bat = { cx: 4120, cz: 3400 };
     const bx = bat.cx - lady.x, bz = bat.cz - lady.z, bd = Math.hypot(bx, bz);
-    // What gets loaded in full is everything from the foot of the light to the far side of the Landing, whichever of them the camera is nearer to.
+    // What gets loaded in full is everything from the foot of the light to the far side of the Docks, whichever of them the camera is nearer to.
     this.menuCenter = { x: lady.x + bx * .63, z: lady.z + bz * .63, lx: lady.x, lz: lady.z, ux: bx / bd, uz: bz / bd, bd, bx: bat.cx, bz: bat.cz };
     this.menuT = rand() * 100;
     this.menuY = undefined;
@@ -2025,7 +2030,7 @@ class Game {
     {
       const ca = Math.cos(MENU_SHOT.angle), sa = Math.sin(MENU_SHOT.angle), M0 = this.menuCenter;
       const to = { x: M0.lx - (M0.ux * ca - M0.uz * sa) * MENU_SHOT.dist, z: M0.lz - (M0.ux * sa + M0.uz * ca) * MENU_SHOT.dist };
-      // Off the near wall of the Landing, out over the bay.
+      // Off the near wall of the Docks, out over the bay.
       const from = { x: bat.cx - M0.ux * (MENU_SHOT.startOff + 115) + M0.uz * 20, z: bat.cz - M0.uz * (MENU_SHOT.startOff + 115) - M0.ux * 20 };
       const mx = (from.x + to.x) / 2, mz = (from.z + to.z) / 2, nx = mx - M0.lx, nz = mz - M0.lz, nd = Math.hypot(nx, nz) || 1;
       // Facing the camp at the start and past her at the end, and always the long way round to the left.
@@ -2198,13 +2203,18 @@ class Game {
     // Garvey was rebuilt. Damage inside its wall belongs to buildings that are gone, and nobody should wake up inside a new one.
     const rebuilt = s.garvey !== GARVEY_V, yard = this.layout.camps.find((k) => k.key === 'garvey');
     let edits = rebuilt ? this.world.dropEditsIn(s.edits, yard.x0 + 2, yard.z0 + 2, yard.x1 - 2, yard.z1 - 2) : s.edits;
-    // The mountain and Fort Westpoint moved south. Anything dug or built out there in an older save was in ground that is not where it
+    // The mountain and Fort Vigil moved south. Anything dug or built out there in an older save was in ground that is not where it
     // was, so it goes, and so does any damage the fort had: it is a new wall.
-    const moved = (s.west || 0) !== WEST_V, A = WEST_AREA;
+    const moved = (s.west || 0) !== WEST_V || (s.mapV || 1) !== MAP_V, A = WEST_AREA;
+    const areas = [A, ...MAP_AREAS.map((r) => (r.town ? this.layout.towns.find((t) => t.key === r.town) : r)).filter(Boolean)];
     if (moved) {
-      edits = this.world.dropEditsIn(edits, A.x0, A.z0, A.x1, A.z1);
-      const fort = this.layout.camps.find((k) => k.key === 'union'), fs = fort && s.camps && s.camps.state && s.camps.state[fort.id];
-      if (fs) { fs.breaches = []; fs.broken = null; }
+      // Whatever was dug or built there was in ground that is not where it was, and every wall that moved is a new wall.
+      for (const r of areas) edits = this.world.dropEditsIn(edits, r.x0, r.z0, r.x1, r.z1);
+      for (const c of this.layout.camps) {
+        const cs = s.camps && s.camps.state && s.camps.state[c.id];
+        if (cs && c.key !== 'garvey' && c.key !== 'wash' && c.key !== 'morning' && c.key !== 'tompkins') { cs.breaches = []; cs.broken = null; }
+      }
+      s.lotHurt = []; s.lightsGone = [];
     }
     // The outside face of a standing camp's wall, and its gate towers, are as hard as the wall itself now. Damage to them in an older
     // save is put back, on every side that does not have an open breach the camp is still dealing with.
@@ -2235,7 +2245,7 @@ class Game {
     if (moved) {
       // Stood out there: on top of whatever the ground is now, not inside a hillside.
       const P = this.player, L = this.layout;
-      if (P.x > A.x0 && P.x < A.x1 && P.z > A.z0 && P.z < A.z1) {
+      if (areas.some((r) => P.x > r.x0 && P.x < r.x1 && P.z > r.z0 && P.z < r.z1)) {
         const i = Math.floor(P.z) * WX + Math.floor(P.x);
         P.y = Math.max(P.y, (L.height[i] || (STREET_Y + L.terr[i])) + .05);
       }
@@ -2283,7 +2293,7 @@ class Game {
   saveGame() {
     if (this.state !== 'play' && this.state !== 'loading') return;
     const data = {
-      version: 1, garvey: GARVEY_V, west: WEST_V, campsV: CAMPS_V, player: this.player.toSave(), followers: this.npcs.followersToSave(), jobs: this.jobs.toSave(), edits: this.world.exportEdits(), horde: this.horde.exportState(),
+      version: 1, garvey: GARVEY_V, west: WEST_V, mapV: MAP_V, campsV: CAMPS_V, player: this.player.toSave(), followers: this.npcs.followersToSave(), jobs: this.jobs.toSave(), edits: this.world.exportEdits(), horde: this.horde.exportState(),
       tod: this.tod, day: this.day, difficulty: this.difficulty, stats: this.stats, lightsGone: [...(this.lightsGone || [])], lotHurt: [...(this.lotHurt || new Map())].map(([k, e]) => [k, e.lost, e.base, e.down ? 1 : 0]), camps: this.campSim.toSave(), bikes: this.bikes.toSave(), director: this.director.toSave(), weather: this.weather.toSave(), savedAt: Date.now(),
       permaDead: this.player.loadout === 'survival' && !this.player.alive,
     };

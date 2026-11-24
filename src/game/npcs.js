@@ -97,7 +97,7 @@ const DOCK = {
   bryant: { keep: .2, why: 'There is a penalty clause. The market always reads the small print.' },
   battery: { keep: .25, why: 'The Harbormaster pays for cargo delivered, and you came up short.' },
   wash: { keep: .4, why: 'The Assembly voted on your case. It was close.' },
-  union: { keep: .15, why: 'Failure to meet a tasking. Nobody at Fort Westpoint gets partial credit.' },
+  union: { keep: .15, why: 'Failure to meet a tasking. Nobody at Fort Vigil gets partial credit.' },
   sheep: { keep: .2, why: 'The Judge has ruled on it, and she does not hear appeals.' },
   tompkins: { keep: .35, why: 'Nobody here wants to fine you. There just is not much left in the tin.' },
   morning: { keep: .3, why: 'Those spades were going to buy antibiotics.' },
@@ -161,6 +161,12 @@ const RAIDER_GUN = {
 };
 const RAIDER_NAMES = ['Crow', 'Dutch', 'Rat', 'Knuckles', 'Tiny', 'Spook', 'Mace', 'Lefty', 'Boots', 'Sully', 'Razor', 'Ghost', 'Pike', 'Wes', 'Hatch', 'Cricket', 'Nine', 'Dolly', 'Sparks', 'Mouse', 'Preacher', 'Vee', 'Bones', 'Junior', 'Ash', 'Bishop', 'Blue', 'Bricks', 'Buck', 'Chalk', 'Chicago', 'Cinder', 'Cutter', 'Deuce', 'Dice', 'Duke', 'Fang', 'Flint', 'Fox', 'Grease', 'Hollow', 'Jinx', 'Judge', 'Kid', 'Lark', 'Latch', 'Lucky', 'Magpie', 'Monk', 'Moth', 'Needles', 'Nickel', 'Patch', 'Pepper', 'Queens', 'Rabbit', 'Reno', 'Rook', 'Rust', 'Saint', 'Scratch', 'Shiv', 'Smoke', 'Snake', 'Socks', 'Stitch', 'Tack', 'Tallboy', 'Termite', 'Trey', 'Tuesday', 'Viper', 'Wire', 'Wolf', 'Yonkers', 'Zero'];
 const RAIDER_IDLE = ["This block's picked clean.", "Keep it down, they can hear you.", 'I told you, nothing on 9th.', "Where's the rest of the crew?", "I'm so sick of canned peaches.", "Somebody's been through here.", 'Watch the windows.', 'We should have gone north.'];
+// What the Reverend has to say from the front of the church, to the people on his side of it.
+const SERMON = ['The Lord did not promise us an easy road. He promised to walk it with us.', 'Look at the person next to you. They are still here. So are you. Say amen.',
+  'We are not the last of anything. We are the first of whatever comes next.', 'Somebody in this room carried a stranger to that gate. Somebody did. And the Lord saw it.',
+  'They took the city. They did not take the valley, and they did not take this house.', 'You are tired. I know you are tired. Rest here a while, and then we go back to the wall.',
+  'Weeping may endure for a night. I know, church. It has been a long night.', 'Say it with me now. We feed who comes. We bury who falls. We keep the light on.',
+  'Do not ask me why. I have asked Him. I am still waiting on the answer, same as you.', 'Leon Calloway sang in that choir for thirty years. Somebody sing for him tonight.'];
 const RAIDER_BREAK = ['Forget this!', "I'm out!", 'Not worth it!', 'Go, go, go!'];
 const RAID_CREW = ['gunman', 'shotgun', 'rusher', 'gunman', 'scav', 'gunner', 'gunman', 'bomber', 'rusher', 'marksman', 'scav', 'shotgun'];
 const RAID_BARKS = ['Stores first! Then we go!', 'Grab what you can carry!', 'Keep them off me!', "Don't stop, don't stop!", 'Who has eyes on the stores?', 'Two minutes, then we are gone!'];
@@ -405,7 +411,7 @@ export class NPCs {
     // There is always a line at the town hall.
     if (c.hallQueue) for (let k = 0; k < c.hallQueue.length + 3; k++) { const q = adults.pop(); if (q) q.hallQueue = true; }
     if (c.hallPois) for (let k = 0; k < c.hallPois.length * .3; k++) { const q = adults.pop(); if (q) q.hallGoer = true; }
-    if (c.hallYard) for (let k = 0; k < c.hallYard.length * .45; k++) { const q = adults.pop(); if (q) q.hallYard = true; }
+    if (c.hallYard) for (let k = 0; k < c.hallYard.length * .2; k++) { const q = adults.pop(); if (q) q.hallYard = true; }
     // The market has its idlers, working their way from stall to stall and wandering off again.
     const stalls = c.vendors.slice().sort(() => rand() - .5);
     for (let k = 0; k < stalls.length * 1.1; k++) {
@@ -786,7 +792,9 @@ export class NPCs {
       if (free.length > (barHire ? 0 : BAR_HIRES)) { poi = pickOf(free); kind = poi.kind; loose = false; }
     }
     if (n.hallGoer && kind !== 'sleep' && c.hallPois) {
-      const free = c.hallPois.filter((q) => !q.by);
+      let free = c.hallPois.filter((q) => !q.by);
+      // During the service the pews on the Reverend's side fill up first.
+      if (c.spots.pulpit && this.inService()) { const side = free.filter((q) => q.kind === 'sit' && Math.sign(q.z - c.clerk.z) === Math.sign(c.spots.pulpit.z - c.clerk.z)); if (side.length) free = side; }
       if (free.length) { poi = pickOf(free); kind = poi.kind; loose = false; }
     }
     if (n.hallYard && kind !== 'sleep' && c.hallYard) {
@@ -3998,6 +4006,7 @@ export class NPCs {
       return;
     }
     if (n.walk && !(n.busyT > 0) && !n.threat && !(n.aim > 0)) { this.walkSentryBeat(n, dt, dp); return; }
+    if (n.kind === 'named' && n.part && n.part.id === 'reverend' && n.camp >= 0 && this.g.layout.camps[n.camp].spots.pulpit) { this.reverendStep(n, dt, dp); return; }
     if (n.kind === 'vendor' || n.kind === 'boss' || n.kind === 'clerk' || n.kind === 'named' || n.kind === 'sentry') {
       if (n.busyT > 0 || n.threat) {
         // There is a fight on. They keep their eyes on it, and only look elsewhere once it has moved on.
@@ -4010,6 +4019,50 @@ export class NPCs {
     if (n.kind === 'follower') { this.updateFollower(n, dt, dp); return; }
     if (n.kind === 'wanderer') { this.updateWanderer(n, dt, dp); return; }
     if (n.squad) this.updatePatrol(n, dt, dp);
+  }
+
+  // Nine in the morning until five: the service.
+  inService() { const t = this.g.tod; return t >= .375 && t < .708; }
+
+  // The Reverend's day. Through the service he is up at the front on his side of the church, preaching to the pews there; the rest of
+  // the day he goes in and out of it, between the steps out front and the aisle, by the same ways everyone walks.
+  reverendStep(n, dt, dp) {
+    const g = this.g, P = g.player, c = g.layout.camps[n.camp];
+    const R = n.rev || (n.rev = { want: 'out', t: 20 + rand() * 30, say: 4 });
+    if (n.busyT > 0 || n.threat || n.aim > 0 || n.inConvo) {
+      if (n.inConvo || dp < 3) n.yaw = Math.atan2(P.x - n.x, P.z - n.z);
+      n.state = n.aim > 0 ? 3 : 0;
+      return;
+    }
+    if (this.inService()) R.want = 'pulpit';
+    else if (R.want === 'pulpit') { R.want = 'out'; R.t = 30 + rand() * 30; }
+    else if ((R.t -= dt) <= 0) { R.t = 45 + rand() * 50; R.want = R.want === 'out' ? 'aisle' : 'out'; }
+    const goal = c.spots[R.want === 'out' ? 'hq' : R.want];
+    if (R.goal !== goal) {
+      if (this.pathBudget <= 0) { n.state = 0; return; }
+      this.pathBudget--;
+      R.goal = goal;
+      R.path = this.findPath(c, n.x, n.z, goal.x, goal.z);
+      R.i = R.path && R.path.length > 2 ? 2 : 0;
+    }
+    if (R.path && R.i <= R.path.length) {
+      const tx = R.i < R.path.length ? R.path[R.i] : goal.x, tz = R.i < R.path.length ? R.path[R.i + 1] : goal.z;
+      const dx = tx - n.x, dz = tz - n.z, d = Math.hypot(dx, dz), step = 1.7 * dt;
+      if (d <= step) { n.x = tx; n.z = tz; R.i += 2; } else { n.x += dx / d * step; n.z += dz / d * step; }
+      if (d > .01) n.yaw = Math.atan2(dx, dz);
+      n.phase += step * 2.1;
+      n.state = .7;
+      n.y = STREET_Y;
+      return;
+    }
+    n.state = 0;
+    if (R.want === 'pulpit') {
+      // Preaching: facing his side of the church, arms going, a line every few seconds for whoever is in the pews.
+      n.yaw = goal.yaw;
+      if (Math.sin(g.time * 1.4 + n.tick) > -.2) n.state = 4;
+      if ((R.say -= dt) <= 0) { R.say = 6 + rand() * 5; if (dp < 45) g.ui.floatSay(n, pickOf(SERMON), 4.5); }
+    } else if (dp < 8) n.yaw = Math.atan2(P.x - n.x, P.z - n.z);
+    else if (goal.yaw !== undefined) n.yaw = goal.yaw;
   }
 
   // Out and back along the foot of the wall: a stop at each end to look out over the ground, then the walk back. Only onto ground a

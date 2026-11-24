@@ -378,15 +378,15 @@ export function buildLayout(seed = 1609) {
   const around = (x, z, hw, hd, extra = {}) => ({ x0: x - hw, x1: x + hw, z0: z - hd, z1: z + hd, ...extra });
   const P_LIBRARY = { x0: 2036, x1: 2070, z0: 1348, z1: 1412 };
   const campRects = {
-    bryant: { x0: 1824, x1: 2096, z0: 1240, z1: 1520, keep: [P_LIBRARY], plazaX: 1966, plazaZ: 1380 },   // Lakeshore Market: built into the south of Albion, above the lake
-    battery: around(4120, 3400, 135, 86),      // Severn Landing: built into the south side of Severn Bay, up from the marina
-    wash: around(2150, 2120, 122, 84),         // Weston Grange, under the ridge on the north side of Weston: the road from the valley runs through town to it
-    union: around(560, 2140, 94, 140),        // Fort Westpoint, off the west road just above the truck stop, well clear of Albion
-    sheep: around(2570, 3720, 150, 104),       // Arnhem Bastion, out among the fields
-    tompkins: around(4380, 1400, 86, 128),      // Cannery Collective: the old cannery lots in south Dayton, back from the shore
-    morning: around(2900, 560, 138, 92),      // Gibson Redoubt, on the north side at the head of the valley
+    bryant: around(1700, 450, 136, 140),       // B.S.R.C.: in Albion between the Old Quarter and the Millrace, west of the river
+    battery: around(4572, 2650, 105, 96),      // The Docks: at the top of the Strand, where it leaves the end of town above Lagoon Front
+    wash: around(2150, 2120, 122, 84),         // Concord, under the ridge on the north side of Weston: the road from the valley runs through town to it
+    union: around(108, 2140, 94, 140),        // Fort Vigil, off the west road just above the truck stop, well clear of Albion
+    sheep: around(2830, 3720, 150, 104),       // Providence, out among the fields
+    tompkins: around(4380, 1400, 86, 128),      // Dayton Exchange: the old cannery lots in south Dayton, back from the shore
+    morning: around(2900, 560, 138, 92),      // Mercy, on the north side at the head of the valley
     garvey: around(1740, 3350, 128, 96),      // Carver Yard: the old mill village in the valley below Esperance, where a new life starts
-    tryon: around(560, 900, 90, 124),         // St. Brigid's: the stone parish in the Westmoor tenements, on Albion's west side
+    tryon: around(560, 1150, 90, 124),         // St. Brigid's: the stone parish in the Westmoor tenements, on Albion's west side
   };
   // The walls stand a block further out than the plots above: the yard inside and the walkway get the room.
   for (const k in campRects) { const r = campRects[k]; r.x0--; r.z0--; r.x1++; r.z1++; }

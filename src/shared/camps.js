@@ -35,13 +35,13 @@ const E = {
 };
 
 export const CAMP_DEFS = [
-  { key: 'bryant', name: 'Lakeshore Market', blurb: 'A trade town behind a wall of stacked taxis, where the river runs into the lake. No shooting on the market floor.', wall: 'cabs', H: 7, door: M.TAXI, gates: 'NSEW', flag: [M.PAINT_Y, M.PAINT_K], emblem: 'dollar', faction: [.78, .62, .14], wardrobe: ['civ', 'scrap', 'civ'], stalls: ['general', 'arms', 'medic', 'junk', 'food', 'builder'], stallCount: 44, guardWeapons: ['rifle', 'shotgun', 'smg', 'rifle', 'sniper'], folkWeapons: ['pistol', 'shotgun', 'smg', 'bat', 'machete', 'pistol'], folk: 330, mix: { shack: 5, tent: 2, shelter: 3, fire: 2, table: 3, kitchen: 1, workshop: 2, garden: 0, laundry: 1, well: 1, school: .4 } },
-  { key: 'battery', name: 'Severn Landing', blurb: 'Containers, ferries and people still watching the bay for a ship.', wall: 'containers', H: 8, door: M.RUST, gates: 'NW', flag: [M.AWN_B, M.TENT_W], emblem: 'anchor', faction: [.2, .42, .72], wardrobe: ['scrap', 'civ'], stalls: ['general', 'junk', 'food', 'builder'], stallCount: 26, guardWeapons: ['rifle', 'shotgun', 'lmg', 'rifle'], folkWeapons: ['shotgun', 'pistol', 'axe', 'machete'], folk: 240, shackMats: [M.CONT_R, M.CONT_B, M.CONT_O, M.CONT_G], mix: { shack: 7, tent: 1, shelter: 3, fire: 2, table: 2, kitchen: 1, workshop: 2, garden: 0, laundry: 2, well: 1, school: .3 } },
-  { key: 'wash', name: 'Weston Grange', blurb: 'A log palisade around the old fairground and its arch. Everything here is decided by vote.', wall: 'palisade', H: 7, door: M.LOG, gates: 'NSE', flag: [M.BARN_R, M.TENT_W], emblem: 'arch', faction: [.52, .27, .2], wardrobe: ['civ', 'civ', 'med'], stalls: ['general', 'medic', 'food', 'builder'], stallCount: 24, guardWeapons: ['rifle', 'crossbow', 'shotgun', 'crossbow'], folkWeapons: ['crossbow', 'bat', 'machete', 'pistol', 'spear'], folk: 280, mix: { shack: 2, tent: 5, shelter: 3, fire: 3, table: 3, kitchen: 1, workshop: 1, garden: 3, laundry: 1, well: 1, school: 1 } },
-  { key: 'union', name: 'Fort Westpoint', blurb: 'National Guard who stopped taking orders. Sandbags, drills and a straight flagpole.', wall: 'hesco', H: 7, door: M.STEEL_D, gates: 'NSE', flag: [M.CONT_G, M.TENT_W], emblem: 'star', faction: [.82, .82, .78], wardrobe: ['mil', 'mil', 'mil', 'civ'], stalls: ['arms', 'junk', 'food', 'builder'], stallCount: 20, guardWeapons: ['rifle', 'rifle', 'lmg', 'sniper', 'rifle'], folkWeapons: ['rifle', 'rifle', 'smg', 'pistol'], folk: 300, tentCols: [M.TENT_G, M.TENT_G, M.CANVAS], shackMats: [M.CONT_G, M.CONCRETE_D], mix: { shack: 1, tent: 7, shelter: 1, fire: 1, table: 2, kitchen: 1, workshop: 2, garden: 0, laundry: .5, well: 1, school: .2 } },
-  { key: 'sheep', name: 'Arnhem Bastion', blurb: 'Sheet steel, crops and rules. The closest thing left to a town.', wall: 'sheet', H: 8, door: M.STEEL, gates: 'NSE', flag: [M.AWN_G, M.PAINT_Y], emblem: 'leaf', faction: [.26, .55, .24], wardrobe: ['civ', 'civ', 'mil'], stalls: ['general', 'arms', 'medic', 'food', 'builder'], stallCount: 28, guardWeapons: ['rifle', 'sniper', 'shotgun', 'rifle'], folkWeapons: ['shotgun', 'pistol', 'rifle', 'axe', 'bat'], folk: 380, shackMats: [M.PLANK, M.WOOD, M.TENT_W], mix: { shack: 7, tent: 1, shelter: 2, fire: 2, table: 3, kitchen: 1, workshop: 1, garden: 5, laundry: 2, well: 1, school: 1 } },
-  { key: 'tompkins', name: 'Cannery Collective', blurb: 'Punks, squatters and a wall they painted themselves, in the old cannery sheds back of Dayton. They were ready for this.', wall: 'scrap', H: 7, door: M.RUST, gates: 'SW', flag: [M.PAINT_K, M.RUST], emblem: 'anarchy', faction: [.27, .25, .25], wardrobe: ['scrap', 'scrap', 'civ'], stalls: ['junk', 'general', 'food', 'builder'], stallCount: 22, guardWeapons: ['shotgun', 'smg', 'crossbow', 'rifle'], folkWeapons: ['bat', 'machete', 'axe', 'crossbow', 'pistol', 'spear'], folk: 240, shackMats: [M.RUST, M.CONT_R, M.PLANK, M.RUST, M.PAINT_K, M.BRICK_B], mix: { shack: 6, tent: 2, shelter: 4, fire: 4, table: 2, kitchen: 1, workshop: 3, garden: 1, laundry: 1, well: 1, school: .2 } },
-  { key: 'morning', name: 'Gibson Redoubt', blurb: 'The last working clinic this side of the mountain, ringed by ambulances and white tents.', wall: 'white', H: 7, door: M.CAR_W, gates: 'NS', flag: [M.TENT_W, M.AWN_R], emblem: 'cross', faction: [.72, .14, .12], wardrobe: ['med', 'med', 'civ'], stalls: ['medic', 'general', 'food', 'builder'], stallCount: 24, guardWeapons: ['rifle', 'shotgun', 'smg', 'rifle'], folkWeapons: ['pistol', 'pistol', 'smg', 'bat'], folk: 280, tentCols: [M.TENT_W], shackMats: [M.TENT_W, M.CAR_W], mix: { shack: 2, tent: 7, shelter: 2, fire: 1, table: 2, kitchen: 1, workshop: 1, garden: 1, laundry: 3, well: 1, school: .4 } },
+  { key: 'bryant', name: 'B.S.R.C.', blurb: 'The Ballarat State Refuge Community: the state\'s last quarantine zone, between the Old Quarter and the mills. Concrete walls, curfew, ration lines, and a market floor where nobody shoots.', wall: 'qz', H: 10, door: M.STEEL_D, gates: 'NSEW', flag: [M.PAINT_Y, M.PAINT_K], emblem: 'dollar', faction: [.78, .62, .14], wardrobe: ['civ', 'scrap', 'civ'], stalls: ['general', 'arms', 'medic', 'junk', 'food', 'builder'], stallCount: 44, guardWeapons: ['rifle', 'shotgun', 'smg', 'rifle', 'sniper'], folkWeapons: ['pistol', 'shotgun', 'smg', 'bat', 'machete', 'pistol'], folk: 330, mix: { shack: 5, tent: 2, shelter: 3, fire: 2, table: 3, kitchen: 1, workshop: 2, garden: 0, laundry: 1, well: 1, school: .4 } },
+  { key: 'battery', name: 'The Docks', blurb: 'Containers, ferries and people still watching the bay for a ship.', wall: 'containers', H: 8, door: M.RUST, gates: 'NW', flag: [M.AWN_B, M.TENT_W], emblem: 'anchor', faction: [.2, .42, .72], wardrobe: ['scrap', 'civ'], stalls: ['general', 'junk', 'food', 'builder'], stallCount: 26, guardWeapons: ['rifle', 'shotgun', 'lmg', 'rifle'], folkWeapons: ['shotgun', 'pistol', 'axe', 'machete'], folk: 240, shackMats: [M.CONT_R, M.CONT_B, M.CONT_O, M.CONT_G], mix: { shack: 7, tent: 1, shelter: 3, fire: 2, table: 2, kitchen: 1, workshop: 2, garden: 0, laundry: 2, well: 1, school: .3 } },
+  { key: 'wash', name: 'Concord', blurb: 'A log palisade around the old fairground and its arch. Everything here is decided by vote.', wall: 'palisade', H: 7, door: M.LOG, gates: 'NSE', flag: [M.BARN_R, M.TENT_W], emblem: 'arch', faction: [.52, .27, .2], wardrobe: ['civ', 'civ', 'med'], stalls: ['general', 'medic', 'food', 'builder'], stallCount: 24, guardWeapons: ['rifle', 'crossbow', 'shotgun', 'crossbow'], folkWeapons: ['crossbow', 'bat', 'machete', 'pistol', 'spear'], folk: 280, mix: { shack: 2, tent: 5, shelter: 3, fire: 3, table: 3, kitchen: 1, workshop: 1, garden: 3, laundry: 1, well: 1, school: 1 } },
+  { key: 'union', name: 'Fort Vigil', blurb: 'National Guard who stopped taking orders. Sandbags, drills and a straight flagpole.', wall: 'hesco', H: 7, door: M.STEEL_D, gates: 'NSE', flag: [M.CONT_G, M.TENT_W], emblem: 'star', faction: [.82, .82, .78], wardrobe: ['mil', 'mil', 'mil', 'civ'], stalls: ['arms', 'junk', 'food', 'builder'], stallCount: 20, guardWeapons: ['rifle', 'rifle', 'lmg', 'sniper', 'rifle'], folkWeapons: ['rifle', 'rifle', 'smg', 'pistol'], folk: 300, tentCols: [M.TENT_G, M.TENT_G, M.CANVAS], shackMats: [M.CONT_G, M.CONCRETE_D], mix: { shack: 1, tent: 7, shelter: 1, fire: 1, table: 2, kitchen: 1, workshop: 2, garden: 0, laundry: .5, well: 1, school: .2 } },
+  { key: 'sheep', name: 'Providence', blurb: 'Sheet steel, crops and rules. The closest thing left to a town.', wall: 'sheet', H: 8, door: M.STEEL, gates: 'NSE', flag: [M.AWN_G, M.PAINT_Y], emblem: 'leaf', faction: [.26, .55, .24], wardrobe: ['civ', 'civ', 'mil'], stalls: ['general', 'arms', 'medic', 'food', 'builder'], stallCount: 28, guardWeapons: ['rifle', 'sniper', 'shotgun', 'rifle'], folkWeapons: ['shotgun', 'pistol', 'rifle', 'axe', 'bat'], folk: 380, shackMats: [M.PLANK, M.WOOD, M.TENT_W], mix: { shack: 7, tent: 1, shelter: 2, fire: 2, table: 3, kitchen: 1, workshop: 1, garden: 5, laundry: 2, well: 1, school: 1 } },
+  { key: 'tompkins', name: 'Dayton Exchange', blurb: 'Punks, squatters and a wall they painted themselves, in the old cannery sheds back of Dayton. They were ready for this.', wall: 'scrap', H: 7, door: M.RUST, gates: 'SW', flag: [M.PAINT_K, M.RUST], emblem: 'anarchy', faction: [.27, .25, .25], wardrobe: ['scrap', 'scrap', 'civ'], stalls: ['junk', 'general', 'food', 'builder'], stallCount: 22, guardWeapons: ['shotgun', 'smg', 'crossbow', 'rifle'], folkWeapons: ['bat', 'machete', 'axe', 'crossbow', 'pistol', 'spear'], folk: 240, shackMats: [M.RUST, M.CONT_R, M.PLANK, M.RUST, M.PAINT_K, M.BRICK_B], mix: { shack: 6, tent: 2, shelter: 4, fire: 4, table: 2, kitchen: 1, workshop: 3, garden: 1, laundry: 1, well: 1, school: .2 } },
+  { key: 'morning', name: 'Triage', blurb: 'The last working clinic this side of the mountain, ringed by ambulances and white tents.', wall: 'white', H: 7, door: M.CAR_W, gates: 'NS', flag: [M.TENT_W, M.AWN_R], emblem: 'cross', faction: [.72, .14, .12], wardrobe: ['med', 'med', 'civ'], stalls: ['medic', 'general', 'food', 'builder'], stallCount: 24, guardWeapons: ['rifle', 'shotgun', 'smg', 'rifle'], folkWeapons: ['pistol', 'pistol', 'smg', 'bat'], folk: 280, tentCols: [M.TENT_W], shackMats: [M.TENT_W, M.CAR_W], mix: { shack: 2, tent: 7, shelter: 2, fire: 1, table: 2, kitchen: 1, workshop: 1, garden: 1, laundry: 3, well: 1, school: .4 } },
   { key: 'garvey', lowCorners: true, clearCorners: 30, name: 'Carver Yard', blurb: 'Block captains, a church and a basketball court, in the old mill village down the valley from Esperance. The valley looks after its own.', wall: 'brick', H: 7, door: M.TAXI, gates: 'NSE', flag: [M.AWN_R, M.AWN_G], emblem: 'fist', faction: [.72, .42, .12], wardrobe: ['civ', 'civ', 'scrap'], stalls: ['arms', 'junk', 'general', 'food', 'builder'], stallCount: 28, guardWeapons: ['rifle', 'shotgun', 'sniper', 'lmg'], folkWeapons: ['shotgun', 'pistol', 'bat', 'rifle', 'smg'], folk: 430, shackMats: [M.BRICK_R, M.BRICK_B, M.PLANK, M.RUST], tentCols: [M.TENT_G, M.CANVAS, M.TENT_W, M.CANVAS], mix: { tenement: 5, wreck: .8, shack: 4, tent: 1, shelter: 2, fire: 4, table: 5, kitchen: 2, workshop: 1, garden: 1, laundry: 2, well: 1, school: 1 } },
   { key: 'tryon', name: 'St. Brigid\'s', blurb: 'The old stone parish in the Westmoor tenements: church, school and convent round their yards, walled in by the street that grew up in its pews. Crossbows, because gunfire carries.', wall: 'stone', H: 11, door: M.WOOD_D, gates: 'SW', flag: [M.STAINED, M.PAINT_Y], emblem: 'tower', faction: [.38, .33, .42], wardrobe: ['civ', 'mil', 'civ'], stalls: ['general', 'arms', 'food', 'builder'], stallCount: 22, guardWeapons: ['crossbow', 'rifle', 'sniper', 'rifle'], folkWeapons: ['crossbow', 'spear', 'crossbow', 'axe', 'machete'], folk: 270, shackMats: [M.GRANITE, M.WOOD_D, M.SCHIST], mix: { shack: 5, tent: 2, shelter: 2, fire: 3, table: 3, kitchen: 1, workshop: 2, garden: 2, laundry: 1, well: 1, school: .4 } },
 ];
@@ -159,7 +159,7 @@ export function planCamp(def, id, r, ground) {
     const g = horiz
       ? { side, x0: tc - gateHalf, x1: tc + gateHalf, z0: base, z1: base + 1 }
       : { side, x0: base, x1: base + 1, z0: tc - gateHalf, z1: tc + gateHalf };
-    g.y0 = YB; g.y1 = YB + hc - 2; g.mat = def.wall === 'stone' ? def.door : M.WOOD_D; g.horiz = horiz; g.tc = tc;
+    g.y0 = YB; g.y1 = YB + hc - 2; g.mat = def.wall === 'stone' || def.wall === 'qz' ? def.door : M.WOOD_D; g.horiz = horiz; g.tc = tc;
     g.cx = (g.x0 + g.x1) >> 1; g.cz = (g.z0 + g.z1) >> 1;
     c.gates.push(g);
     const inX = horiz ? 0 : (side === 'W' ? 1 : -1), inZ = horiz ? (side === 'N' ? 1 : -1) : 0;
@@ -322,27 +322,9 @@ export function planCamp(def, id, r, ground) {
   c.fires.push({ x: px, z: pz, big: true });
   light(px, pz, 30, FIRE);
   // Long benches around the bonfire: this is where a camp sits together at night.
-  // One of the benches north or south of it has given way to something else: a long table with a lamp on it, or a cook station where
-  // the square gets fed.
-  const swapZ = orng() < .5 ? -8 : 8, swapKind = orng() < .5 ? 'table' : 'kitchen';
+  orng(); orng();   // (two draws that once picked something to stand in for a bench: kept, so the lanes do not move)
   for (const [dx, dz, yaw] of [[-8, 0, Math.PI / 2], [8, 0, -Math.PI / 2], [0, -8, 0], [0, 8, Math.PI]]) {
     const hz = dx === 0;
-    if (dz === swapZ && swapKind === 'table') {
-      const z = pz + dz - 2;
-      add('table', px - 4, z, px + 4, z + 4, 4, { lamp: true });
-      light(px, z + 2, 9);
-      for (let k = 1; k < 8; k += 2) { c.pois.push({ x: px - 4 + k + .5, z: z + .5, kind: 'sit', yaw: 0, seat: true }, { x: px - 4 + k + .5, z: z + 4.5, kind: 'sit', yaw: Math.PI, seat: true }); }
-      continue;
-    }
-    if (dz === swapZ) {
-      const z = dz < 0 ? pz - 11 : pz + 6, z1 = z + 5;
-      add('kitchen', px - 4, z, px + 4, z1, 5);
-      light(px, z + 2, 13, FIRE);
-      c.fires.push({ x: px, z: z + 2, small: true });
-      c.pois.push({ x: px - 1.5, z: z + 4.5, kind: 'work', yaw: Math.PI }, { x: px + 2, z: z + 4.5, kind: 'work', yaw: Math.PI });
-      for (let k = 0; k < 4; k++) c.pois.push({ x: px - 2 + k * 2, z: z1 + 1.5, kind: 'shop', yaw: Math.PI });
-      continue;
-    }
     add('bench', px + dx - (hz ? 4 : 0), pz + dz - (hz ? 0 : 4), px + dx + (hz ? 4 : 0), pz + dz + (hz ? 0 : 4), 1);
     for (let k = -3; k <= 3; k += 1.5) c.pois.push({ x: px + dx + (hz ? k : 0) + .5, z: pz + dz + (hz ? 0 : k) + .5, kind: 'sit', yaw, seat: true });
   }
@@ -359,6 +341,8 @@ export function planCamp(def, id, r, ground) {
     }
   };
   talkCluster(px + 15, pz + 7); talkCluster(px - 15, pz - 7); talkCluster(px + 16, pz - 9);
+  // And more of them about the rest of the square, out past the benches: it is where people stop and talk.
+  for (const [dx, dz] of [[-18, 12], [5, 15], [-6, -15], [20, 2], [-20, -2], [12, -15], [-12, 16]]) talkCluster(px + dx, pz + dz);
   const first = c.gates[0];
   c.spots.gate = { x: first.cx + (first.horiz ? 12 : (first.side === 'W' ? 9 : -9)), z: first.cz + (first.horiz ? (first.side === 'N' ? 9 : -9) : 12) };
 
@@ -368,6 +352,10 @@ export function planCamp(def, id, r, ground) {
     c.maxY = Math.max(c.maxY, YB + 32);
     c.clerk = { x: x1 - (D - 5) + .5, z: pz + .5, yaw: Math.PI / 2, doorX: x1 - 1.5, doorZ: pz + .5 };
     c.spots.hq = { x: x1 + 2.5, z: pz - 7.5 };
+    // Where the Reverend preaches from: up at the altar end on the north side, facing down that side's pews to the door. And the aisle,
+    // halfway down, where he walks when there is no service.
+    c.spots.pulpit = { x: x1 - (D - 8) + .5, z: z0 + 6 + .5, yaw: Math.PI / 2 };
+    c.spots.aisle = { x: x1 - 14 + .5, z: pz + .5, yaw: Math.PI / 2 };
     light(x1 - 2, pz, 15); light(x1 - 13, pz, 13); light(x1 - 24, pz, 13);
     for (let k = 0; k < 4; k++) c.pois.push({ x: x1 + 2.5, z: pz - 4.5 + k * 3, kind: 'stand', yaw: -Math.PI / 2 });
     // Only the walls, the sandbags and the table stop anyone. Everything between them is floor.
@@ -511,8 +499,10 @@ export function planCamp(def, id, r, ground) {
   };
   switch (def.key) {
     case 'bryant':
-      sig('lions', 13, 6, -50, -14, 4);
-      hall(-40, -48, 36, 16, 8, M.CONT_O, M.TENT_B);
+      // The administration block, poured concrete under a gravel roof, with the state's trucks parked up in front of it.
+      sig('humvee', 5, 9, -56, -14, 5);
+      sig('humvee', 5, 9, -46, -14, 5);
+      hall(-40, -48, 36, 16, 8, M.CONCRETE_D, M.ROOF_GRAVEL);
       sig('mural', 22, 1, 40, -44, 12, { seed: 3 });
       break;
     case 'battery':
@@ -1054,6 +1044,14 @@ export function planCamp(def, id, r, ground) {
 // happened to be, under a band of grey concrete along the top. St. Brigid's alone still has its old stone.
 const WALL_WOOD = [M.PLANK, M.WOOD, M.WOOD_D, M.PLANK, M.WOOD, M.WOOD_D, M.WOOD];
 function wallVoxel(style, t, h, row, H) {
+  // The Refuge: the state built this one. Poured concrete panels on a footing of road barriers, a steel post at every joint, and a dark
+  // concrete cap. Nothing patched, nothing borrowed.
+  if (style === 'qz') {
+    if (h < 2) return M.JERSEY;
+    if (h >= H - 2) return M.CONCRETE_D;
+    if (t % 6 === 0) return M.STEEL_D;
+    return h % 4 === 3 ? M.CONCRETE_D : M.CONCRETE;
+  }
   if (style !== 'stone') {
     if (h >= H - 2) return ((t >> 2) + h) % 4 ? M.CONCRETE : M.CONCRETE_D;
     return WALL_WOOD[((Math.imul(t >> 1, 2654435761) >>> 0) >>> 7) % WALL_WOOD.length];
@@ -1155,7 +1153,7 @@ export function stampCamp(c, ctx) {
         for (let y = by; y < YB + H; y++) {
           if (y < oy || y >= oy + CS) continue;
           const h = y - YB;
-          if (gate && y >= YB && h <= hc - 2) { P(t, y, row, wall === 'stone' ? c.door : M.WOOD_D); continue; }
+          if (gate && y >= YB && h <= hc - 2) { P(t, y, row, wall === 'stone' || wall === 'qz' ? c.door : M.WOOD_D); continue; }
           // Over the door, its slot: open from the top of the doorway to the top of the wall, so the door goes up through it and
           // nothing else, between the steel guides either side.
           if (gate && wall !== 'stone' && h > hc - 2) continue;
@@ -1261,8 +1259,8 @@ function stampPart(p, c, box, put, car, letterAt) {
     }
     case 'tower': {
       // Timber towers on log legs, braced every few blocks, to go with the timber walls; St. Brigid's are stone.
-      const mat = p.mat === 'stone' ? M.GRANITE : M.WOOD_D;
-      if (p.mat === 'stone') {
+      const mat = p.mat === 'stone' ? M.GRANITE : p.mat === 'qz' ? M.CONCRETE_D : M.WOOD_D;
+      if (p.mat === 'stone' || p.mat === 'qz') {
         box(x0, YB, z0, x1, YB + h - 1, z1, mat);
       } else {
         for (const [a, b] of [[x0, z0], [x1, z0], [x0, z1], [x1, z1]]) box(a, YB, b, a, YB + h - 1, b, M.LOG);
@@ -1272,13 +1270,13 @@ function stampPart(p, c, box, put, car, letterAt) {
       for (let a = x0 - 1; a <= x1 + 1; a++) { put(a, YB + h + 1, z0 - 1, mat); put(a, YB + h + 1, z1 + 1, mat); }
       for (let b = z0 - 1; b <= z1 + 1; b++) { put(x0 - 1, YB + h + 1, b, mat); put(x1 + 1, YB + h + 1, b, mat); }
       for (const [a, b] of [[x0 - 1, z0 - 1], [x1 + 1, z0 - 1], [x0 - 1, z1 + 1], [x1 + 1, z1 + 1]]) box(a, YB + h + 1, b, a, YB + h + 4, b, M.WOOD_D);
-      box(x0 - 1, YB + h + 5, z0 - 1, x1 + 1, YB + h + 5, z1 + 1, p.big ? M.RUST : M.CANVAS);
+      box(x0 - 1, YB + h + 5, z0 - 1, x1 + 1, YB + h + 5, z1 + 1, p.big || p.mat === 'qz' ? M.RUST : M.CANVAS);
       // The lamp hangs up against the roof, well over anyone's head.
       put(cxm, YB + h + 4, czm, M.LAMP);
       if (p.climb) {
         // The stair inside: a step a block higher every cell round the shaft from the walk to the lookout floor, each one built solid
         // down to the walk so nobody goes under it, and the floor left open over the last few so you come up through it.
-        const fy = YB + c.hc - 1, top = YB + h, N = top - fy, frame = p.mat !== 'stone';
+        const fy = YB + c.hc - 1, top = YB + h, N = top - fy, frame = p.mat !== 'stone' && p.mat !== 'qz';
         const { ring, entry, inner } = p.climb;
         ring.forEach(([x, z], k) => {
           const col = k <= N ? k : 0;
