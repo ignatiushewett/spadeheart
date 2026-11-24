@@ -45,7 +45,7 @@ export class Dogs {
       const x = at.x + (rand() - .5) * 3, z = at.z + (rand() - .5) * 3;
       const name = names[i % names.length];
       this.list.push({
-        camp: c.id, owner, name, x, z, y: this.g.world.groundBelow(x, STREET_Y + 8, z, 16), yaw: rand() * 6.283, ys: 0, phase: rand() * 6,
+        camp: c.id, owner, name, x, z, y: STREET_Y, yaw: rand() * 6.283, ys: 0, phase: rand() * 6,
         v: 0, state: 0, variant: 192 + Math.floor(rand() * 64), side: rand() < .5 ? -1 : 1, t: rand() * 8, rest: 0, tx: x, tz: z, mode: 'idle',
       });
     }
@@ -122,10 +122,15 @@ export class Dogs {
     d.state = d.v > 3.2 ? 1 : d.v > .3 ? .7 : settle;
     d.ys = this.ease(d.ys, d.yaw, dt * 5);
     if (Math.hypot(d.x - P.x, d.z - P.z) < 90) {
-      // From a little above its back, so one that has ended up inside the ground (or a step) climbs back out on top of it.
-      const gy = w.groundBelow(d.x, d.y + 1.6, d.z, 6);
+      // Up onto a step or a bench only where there is room to stand on top of it; never up the face of a wall, however it ended up
+      // against one, and never more than a step off the ground of the camp.
+      const fx = Math.floor(d.x), fz = Math.floor(d.z);
+      let gy = w.groundBelow(d.x, d.y + 1.6, d.z, 6);
+      if (gy > d.y + .05 && (gy - d.y > 1.1 || w.solid(fx, Math.floor(gy), fz) || w.solid(fx, Math.floor(gy) + 1, fz))) gy = d.y;
+      gy = Math.min(gy, STREET_Y + 1);
       d.y += Math.sign(gy - d.y) * Math.min(Math.abs(gy - d.y), dt * 10);
     }
+    if (d.y > STREET_Y + 1) d.y = STREET_Y;
   }
 
   // Where to head right now: the target itself if nothing is in the way, or the next point on a path round whatever is.

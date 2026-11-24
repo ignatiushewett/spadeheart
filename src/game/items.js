@@ -213,7 +213,7 @@ export const RUMORS = [
   'If you get bitten, get antibiotics. It does not cure it, but it buys you time.',
   'I saw the Rock light from the Landing last night. Lamp was lit. Who is out there?',
   'Nobody leaves by road. The Army blew the state line crossings the first week, and the Weston Tunnel is black from end to end.',
-  'Gibson still has doctors. The Abbey still has guns. Nobody has both.',
+  'Gibson still has doctors. St. Brigid\'s still has guns. Nobody has both.',
   'It is quiet out in the farm country. Quiet is not the same as empty.',
   'You can see Mt. Page from anywhere in Ballarat. If you are lost, put it on your west and walk to the sea.',
   'The Guard said they would hold the line at the Florida border. Nobody has heard from the Guard.',

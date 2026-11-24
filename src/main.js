@@ -54,7 +54,7 @@ const DB_NAME = 'acez';
 const MENU_VIEW = 704;
 const MENU_VEIL_MAX = 45;   // seconds the title screen waits on black for the view to build, at most
 const MENU_SHOT = { angle: -.18, dist: 185, height: 88, turn: -.32, pitch: -.14, fov: 1.05, flight: 125, startHeight: 30, startOff: 44, startPitch: -.1 };
-export const VERSION = 'v0.97';
+export const VERSION = 'v0.98';
 const SAVE_KEY = 'slot15';  // bumped whenever the map changes: old voxel edits no longer line up
 export const SLOTS = 3;
 // Slot 1 keeps the plain key, so a save from before there were slots simply becomes the first character.
@@ -949,8 +949,11 @@ class Game {
       this.bikes.mount(it.bike);
     } else if (it.kind === 'bed') this.sleepHere();
     else if (it.kind === 'seat') {
+      // Onto the seat itself, facing the way it faces (the table, the fire, the counter), and it is yours until you get up.
       P.sitting = true;
-      P.vx = P.vz = 0;
+      P.vx = P.vz = P.vy = 0;
+      P.x = it.hit.x + .5; P.z = it.hit.z + .5; P.y = it.hit.y + 1;
+      if (it.seat) { P.yaw = Math.PI - it.seat.yaw; it.seat.by = P; P.seatPoi = it.seat; }
       this.ui.toast('You sit down for a while. Move to get up.');
     }
     else if (it.kind === 'loot') this.searchContainer(it.hit);
@@ -1206,6 +1209,16 @@ class Game {
 
   // --- Destruction ----------------------------------------------------------------------------------
   // `hostile` means someone else threw it: no salvage, no kills on your tally, and nobody blames you.
+  // A real seat at this block, in whichever camp it is: one of the places the people there sit (benches, stools, pews), or nothing.
+  seatAt(x, z) {
+    for (const c of this.layout.camps) {
+      if (x < c.x0 || x > c.x1 || z < c.z0 || z > c.z1) continue;
+      const hit = (p) => p.kind === 'sit' && p.seat && Math.floor(p.x) === x && Math.floor(p.z) === z;
+      return c.pois.find(hit) || (c.hallPois && c.hallPois.find(hit)) || null;
+    }
+    return null;
+  }
+
   // Part of a settlement's wall or one of its gates: the line of the wall, a few blocks either side of it, up to the top of the gate gear.
   // Built to keep the dead out, it takes a lot more than the average wall to get through.
   campWall(x, y, z) {
@@ -3387,7 +3400,17 @@ class Game {
         this.actors.draw(g, r);
         this.bikes.build();
         { const rd = this.bikes.ride; r.rideSpeed = rd ? Math.hypot(rd.vx || 0, rd.vz || 0) : 0; }
-        this.particles.drawCubes(g, r, this.bikes.cubes, this.bikes.n);
+        // Bikes, and the outline of where a block would go if you are holding some.
+        let ex = this.bikes.cubes, en = this.bikes.n;
+        const pn = this.state === 'play' ? P.blockPreview() : 0;
+        if (pn) {
+          const need = (en + pn) * 9;
+          if (!this.cubeMix || this.cubeMix.length < need) this.cubeMix = new Float32Array(need + 4096);
+          if (en) this.cubeMix.set(ex.subarray(0, en * 9));
+          this.cubeMix.set(P.pvCubes.subarray(0, pn * 9), en * 9);
+          ex = this.cubeMix; en += pn;
+        }
+        this.particles.drawCubes(g, r, ex, en);
         if (this.state === 'play') this.viewModel.drawThrown(g, r, P);
       },
       (g) => { this.particles.drawSprites(g, r); r.drawBeams(); r.drawRain(); });

@@ -1266,7 +1266,7 @@ export class UI {
 
   crewStory(n, fac) {
     const day = n.joined ?? this.g.day, when = `day ${OUTBREAK_DAYS + day}`;
-    if (n.hired) return `A gun for hire, found waiting at the ${fac.name} bar. Took your money on ${when}.`;
+    if (n.hired) return n.marketHire ? `A gun for hire, found walking the ${fac.name} market looking for work. Took your money on ${when}.` : `A gun for hire, found waiting at the ${fac.name} bar. Took your money on ${when}.`;
     if (fac.left) return `Was on the road out of ${fac.name} when you met, and threw in with you on ${when}.`;
     if (fac.col) return `Left ${fac.name} to come with you on ${when}.`;
     return `Met out on the road, with nowhere in particular to be. With you since ${when}.`;

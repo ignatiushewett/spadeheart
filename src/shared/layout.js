@@ -386,7 +386,7 @@ export function buildLayout(seed = 1609) {
     tompkins: around(4380, 1400, 86, 128),      // Cannery Collective: the old cannery lots in south Dayton, back from the shore
     morning: around(2900, 560, 138, 92),      // Gibson Redoubt, on the north side at the head of the valley
     garvey: around(1740, 3350, 128, 96),      // Carver Yard: the old mill village in the valley below Esperance, where a new life starts
-    tryon: around(560, 900, 90, 124),         // Abbey Keep: the old abbey, walled into Westmoor on Albion's west side
+    tryon: around(560, 900, 90, 124),         // St. Brigid's: the stone parish in the Westmoor tenements, on Albion's west side
   };
   // The walls stand a block further out than the plots above: the yard inside and the walkway get the room.
   for (const k in campRects) { const r = campRects[k]; r.x0--; r.z0--; r.x1++; r.z1++; }

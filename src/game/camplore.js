@@ -420,32 +420,32 @@ export const LORE = {
 
   tryon: {
     motto: 'Keep it quiet. Keep it standing.',
-    jobIntro: 'Finch keeps the work list in a ledger, in a very nice hand. Here is what is left on it.',
+    jobIntro: 'Father Rourke keeps the work list in the back of the parish ledger. Here is what is left on it.',
     cast: [
       {
-        id: 'finch', name: 'Tobias Finch', role: 'leader', title: 'Warden of the Keep', weapon: 'machete', wardrobe: 'civ',
+        id: 'finch', name: 'Declan Rourke', role: 'leader', title: 'Pastor of St. Brigid\'s', weapon: 'machete', wardrobe: 'civ',
         greet: {
-          first: 'You came in off the west side, then. Most do not. Tobias Finch. I was Assistant Curator of Medieval Art at the Abbey Museum, and now I run the place, and they call me Warden because someone has to be. A railroad man shipped these stones from France for the view. I am pleased to report they still work.',
-          again: ['What news from outside the walls?', 'You find us in good order. We have just re-roofed the chapter house.'],
-          hurt: 'You are bleeding on eight hundred years of masonry. Go and see the nurse. She is very good.',
-          night: 'The watch is set. I still walk the wall myself. It is the only time I sleep afterwards.',
+          first: 'You came in off the west side, then. Most do not. Father Declan Rourke. I have had this parish twenty-two years: christenings, funerals, bingo on a Thursday. When it started, the whole street came to the church, because that is what this street has always done in a bad winter. So now I run a fortress. God has a sense of humour.',
+          again: ['What news from outside the walls?', 'You find us in good order. We have just patched the roof on the bell tower.'],
+          hurt: 'You are bleeding on my steps. Go and see the nurse in the school hall. She is very good.',
+          night: 'The watch is set. I still walk the wall myself, and say the office up there. It is the only time I sleep afterwards.',
           trusted: 'Good to see you. People here ask after you, you know.',
         },
         topics: [
-          { id: 'real', ask: 'Warden? The stone walls? You really run it like a castle?', say: 'Partly because it is one. And partly because of what these people were, six weeks ago: accountants, frightened ones. Give someone a post on a wall with a name and a history, and they will stand on it against a thousand dead. I had three years of graduate theory, and nothing else I tried worked as well.', then: ['actor', 'alone'] },
-          { id: 'actor', sub: true, ask: 'So it is all an act.', say: 'Of course it is. What do you think a garrison ever was? Frightened men telling each other a story about who they are. It holds, though. And now, if you will excuse me, I have the east wall to look at.', standing: 2, set: 'finch_real' },
-          { id: 'alone', sub: true, ask: 'Do you ever get to stop being the Warden?', say: 'My husband used to tell me when to stop. The first night, he went back for the cat. I find that if I am the Warden from dawn until dusk, there are only a few hours in which I have to be Toby. So. Yes. At those times.', standing: 2 },
-          { id: 'why', ask: 'Why crossbows? You have guns.', say: 'Sound. Gunfire travels for miles, and this city is full of things that come to it. We are a small quiet island in the middle of Albion, and we would like to keep it that way. Also, you can get a bolt back. The rifles are for when it has already gone wrong.' },
-          { id: 'tapestry', ask: 'Does the Keep need anything?', req: { standing: 10 }, say: 'There is one thing, and I know how it sounds. The Unicorn Tapestries were crated in May for restoration, and they were last seen at a conservator\'s lab on 175th. I have told these people that we are the ones who kept something of the old world safe. I would like to have actually done it.', then: ['tap_yes'], once: true },
-          { id: 'tap_yes', sub: true, ask: 'I will go and get them.', say: 'Thank you. I mean that. Do bring them back flat.', job: 'tryon_tapestry' },
-          { id: 'tap_done', pay: 'tryon_tapestry', req: { flag: 'tryon_tapestry_done', notFlag: 'tryon_tapestry_paid' }, ask: 'I have your Unicorn Tapestries.', say: 'Oh. Oh, look at them. Five hundred years. They survived the French Revolution in a barn, you know, covering potatoes. Here. Take these, from the armory, you have earned them. I am going to go somewhere private now for a few moments.', standing: 18, give: { axe: 1, stim: 2, dynamite: 2 } },
+          { id: 'real', ask: 'A priest, running a place like a garrison?', say: 'The people who built this church came off the boats with nothing and cut the stone themselves, out of the quarry up behind the Yards. It was built to last, and it has. As for the garrison: give a frightened man a post on a wall with a name and a history, and he will stand on it against a thousand dead. I have been telling people who they are from a pulpit for twenty years. It turns out it works on a wall as well.', then: ['actor', 'alone'] },
+          { id: 'actor', sub: true, ask: 'So it is all a sermon.', say: 'Of course it is. What do you think a garrison ever was? Frightened men telling each other a story about who they are. It holds, though. And now, if you will excuse me, I have the east wall to look at.', standing: 2, set: 'finch_real' },
+          { id: 'alone', sub: true, ask: 'Do you ever get to stop being Father Rourke?', say: 'My sister used to tell me when to stop. The first night, she went back for her boy. I find that if I am Father Rourke from dawn until dusk, there are only a few hours in which I have to be Declan. So. Yes. At those times.', standing: 2 },
+          { id: 'why', ask: 'Why crossbows? You have guns.', say: 'Sound. Gunfire travels for miles, and these streets are full of things that come to it. We are a small quiet island in the middle of the tenements, and we would like to keep it that way. Also, you can get a bolt back. The rifles are for when it has already gone wrong.' },
+          { id: 'tapestry', ask: 'Does St. Brigid\'s need anything?', req: { standing: 10 }, say: 'There is one thing, and I know how it sounds. Every christening, wedding and burial on this street since 1880 is in the parish registers, and the diocese took them away in May to be copied, to its archive in the Old Quarter. Half the people on that wall are in those books, and their parents, and theirs. I would like them home.', then: ['tap_yes'], once: true },
+          { id: 'tap_yes', sub: true, ask: 'I will go and get them.', say: 'Thank you. I mean that. Do mind the bindings.', job: 'tryon_tapestry' },
+          { id: 'tap_done', pay: 'tryon_tapestry', req: { flag: 'tryon_tapestry_done', notFlag: 'tryon_tapestry_paid' }, ask: 'I have your parish registers.', say: 'Oh. Oh, look at them. A hundred and forty years of this street, every one of them written down. Here. Take these, from the armory, you have earned them. I am going to go somewhere quiet now for a few moments.', standing: 18, give: { axe: 1, stim: 2, dynamite: 2 } },
           { id: 'trust', ask: 'Could you spare anything from the armory?', req: { standing: 25 }, say: 'For you, within reason. Reggie! The usual for our friend!', give: { ammo_rifle: 40, grenade: 1, medkit: 1 }, daily: true },
         ],
-        favours: { tryon_tapestry: { title: 'The Unicorn Tapestries', type: 'fetch', u: .354, v: .1367, reward: 450, bonus: 'stim', desc: 'Recover the crated Unicorn Tapestries from a conservator\'s studio in the Old Quarter, across town, for reasons the Warden finds obvious.' } },
+        favours: { tryon_tapestry: { title: 'The Parish Registers', type: 'fetch', u: .354, v: .1367, reward: 450, bonus: 'stim', desc: 'Recover the parish registers of St. Brigid\'s from the diocesan archive in the Old Quarter, across town: every christening, wedding and burial in Westmoor since 1880.' } },
       },
       {
         id: 'reginald', name: 'Reggie Marsh', role: 'captain', title: 'North Gate Watch', weapon: 'spear', wardrobe: 'mil', spot: 'gate',
-        greet: { first: 'Stop there. Let me see your hands. Fine, you are all right. Reggie Marsh. I did tax compliance at Deloitte, if you can believe it. Please do say something if I am doing this wrong.', again: ['Pass. Was that all right?', 'All quiet on this side.'] },
+        greet: { first: 'Stop there. Let me see your hands. Fine, you are all right. Reggie Marsh. I did tax compliance at Deloitte, if you can believe it, and I was an altar boy here, which you probably can. Please do say something if I am doing this wrong.', again: ['Pass. Was that all right?', 'All quiet on this side.'] },
         topics: [
           { id: 'deloitte', ask: 'How is the gate treating you?', say: 'Do you know, I have killed more than two hundred of them with this thing? It is a pike. I built it out of a parking sign. In all my years at Deloitte I never had a single day when I knew I had helped anybody. I actually have a sense of purpose now. It is awful. I love it.', standing: 1 },
         ],
@@ -453,16 +453,16 @@ export const LORE = {
       {
         id: 'bronwyn', name: 'Bronwyn', role: 'arms', title: 'Fletcher and Smith', weapon: 'crossbow', wardrobe: 'civ',
         greet: { first: 'I was a set designer at the Albion Opera. I can build most things from most other things, so now I build crossbows. The bolts are parking meter poles. They go through a skull very quietly.', again: ['Need something that goes through a skull? Quietly?', 'Bring me scrap. I can always use scrap.'] },
-        topics: [{ id: 'finch', ask: 'What do you really think of him?', say: 'Toby? Everyone thinks he is a bit much. He is a bit much. And he has got three hundred people who should all be dead sleeping safely every night. I would follow him anywhere. Just do not ever tell him.', standing: 1 }],
+        topics: [{ id: 'finch', ask: 'What do you really think of him?', say: 'Father Declan? Everyone thinks he is a bit much. He is a bit much. And he has got three hundred people who should all be dead sleeping safely every night. I would follow him anywhere. Just do not ever tell him.', standing: 1 }],
       },
       {
         id: 'sister', name: 'Sister Agnes', role: 'general', title: 'Cellarer', weapon: 'machete', wardrobe: 'civ',
-        greet: { first: 'Sister Agnes. Yes, a real one, with the Sisters of Charity in Dayton. I was the only one here who knew what these rooms were for. Mr. Finch asks me to keep the stores. I do so, and I pray for whoever is on the wall.', again: ['God keep you. Cellar is open.', 'Yes, it is real wine, and no.'] },
-        topics: [{ id: 'real', ask: 'What do you make of this place?', say: 'A real cloister was once a place where frightened people shut the door on a terrible world, copied out the old books by hand, and waited for it all to be over. That seems to me fairly accurate. It is the first place in forty years I have felt entirely at home.', standing: 1 }],
+        greet: { first: 'Sister Agnes. Yes, a real one. I taught the third grade in that school across the yard for thirty-one years, and I lived in the convent behind it. I was the only one here who knew where everything was kept. Father Rourke asks me to keep the stores. I do so, and I pray for whoever is on the wall.', again: ['God keep you. The stores are open.', 'Yes, it is the altar wine, and no.'] },
+        topics: [{ id: 'real', ask: 'What do you make of this place now?', say: 'A convent was always a place where frightened people shut the door on a terrible world, kept the old books, and waited for it all to be over. That seems to me fairly accurate. I have never in my life felt so useful.', standing: 1 }],
       },
     ],
     barks: {
-      guard: ["Bolt away.", "Save your rounds, use the bolts.", "Nothing moving in the Heather Garden.", "Phil, I need a relief, my feet are killing me.", "Quiet on the east side."],
+      guard: ["Bolt away.", "Save your rounds, use the bolts.", "Nothing moving in the schoolyard.", "Phil, I need a relief, my feet are killing me.", "Quiet on the east side."],
       folk: ["Morning.", "I was in tax. Now I make arrows.", "Don't step on the herbs.", "Keep your voice down, it carries in here.", "Who took the good whetstone?"],
     },
   },
@@ -823,10 +823,10 @@ export const CAMP_TALK = {
     ["Did you save me a plate?", "I saved you half a plate.", "Who got the other half?", "Don't worry about it."],
   ],
   tryon: [
-    ["Finch wants another count of the bolts.", "We counted yesterday.", "He wants another count."],
+    ["Father Rourke wants another count of the bolts.", "We counted yesterday.", "He wants another count."],
     ["I did taxes for a living, you know.", "You've mentioned.", "Now I make arrows.", "You've mentioned that too."],
     ["Reggie says the east side's quiet.", "Reggie says that every day.", "It's usually true."],
-    ["Who keeps going through the cloister garden?", "Kids, probably.", "The kids don't eat rosemary."],
+    ["Who keeps going through the convent garden?", "Kids, probably.", "The kids don't eat rosemary."],
   ],
 };
 
@@ -841,7 +841,7 @@ const SHORT_FIRST = {
   tompkins: 'Nobody is in charge of the Collective. Which means you talk to me. They call me Mother Rat.',
   morning: 'You are not hurt? Good, then you can wait. Imani Brandt. The Redoubt is a clinic first and a settlement second.',
   garvey: 'Look who walked in. Everybody here pulls their weight, and so will you. I am Odessa Calloway; I run Carver Yard.',
-  tryon: 'Welcome to Abbey Keep. We kept these old stones standing, and we will keep you too. Tobias Finch, at your service.',
+  tryon: 'Welcome to St. Brigid\'s. This street has always come to the church in a bad winter, and so can you. Father Declan Rourke.',
 };
 for (const key in LORE) {
   const lead = LORE[key].cast.find((m) => m.role === 'leader');

@@ -315,6 +315,8 @@ export class Player {
 
     // Sitting: stay put until you try to move.
     if (this.sitting && (fw !== 0 || st !== 0 || (locked && input.keys.Space))) { this.sitting = false; }
+    // Off the seat: it is free for whoever wants it next.
+    if (!this.sitting && this.seatPoi) { if (this.seatPoi.by === this) this.seatPoi.by = null; this.seatPoi = null; }
     if (this.sitting) { fw = 0; st = 0; if (this.loadout !== 'survival') this.health = Math.min(100, this.health + dt * 1.5); }
     // Held, or tapped on and off if that is how you like it.
     if (input.toggleCrouch) { if (locked && input.pressed.KeyC) this.crouchOn = !this.crouchOn; } else this.crouchOn = false;
@@ -953,6 +955,31 @@ export class Player {
     this.g.audio.simple('swing');
   }
 
+  // Where a block would go if you placed one now: its edges traced out in a thin glowing line, white where it can go and red where it
+  // cannot (where you are standing). Nothing when you are not holding blocks or not pointing at anything in reach.
+  blockPreview() {
+    const g = this.g, it = ITEMS[this.weapon];
+    if (!this.alive || !it || it.type !== 'block' || g.ui.modal || (g.bikes && g.bikes.ride)) return 0;
+    const w = g.world, o = this.eyePos(), f = this.forward();
+    const hit = w.raycast(o[0], o[1], o[2], f[0], f[1], f[2], 9);
+    if (!hit) return 0;
+    const x = hit.x + hit.nx, y = hit.y + hit.ny, z = hit.z + hit.nz;
+    if (w.get(x, y, z)) return 0;
+    const inside = x + 1 > this.x - R && x < this.x + R && z + 1 > this.z - R && z < this.z + R && y + 1 > this.y && y < this.y + this.height;
+    const out = this.pvCubes || (this.pvCubes = new Float32Array(12 * 11 * 9));
+    const [cr, cg, cb] = inside ? [1.6, .25, .2] : [1.25, 1.25, 1.15];
+    let n = 0;
+    const edge = (ax, ay, az, dx, dy, dz) => {
+      for (let k = 0; k <= 10; k++) {
+        const t = k / 10, q = n++ * 9;
+        out[q] = x + ax + dx * t; out[q + 1] = y + ay + dy * t; out[q + 2] = z + az + dz * t;
+        out[q + 3] = .1; out[q + 4] = cr; out[q + 5] = cg; out[q + 6] = cb; out[q + 7] = 0; out[q + 8] = .45;
+      }
+    };
+    for (const a of [0, 1]) for (const b of [0, 1]) { edge(0, a, b, 1, 0, 0); edge(a, 0, b, 0, 1, 0); edge(a, b, 0, 0, 0, 1); }
+    return n;
+  }
+
   placeBlock(it, id) {
     const g = this.g, w = g.world;
     const o = this.eyePos(), f = this.forward();
@@ -1068,7 +1095,9 @@ export class Player {
         this.interact = { kind: 'bed', label: no || `${g.sleepingUntilNight() ? 'Sleep until night' : 'Sleep until morning'}${this.sedated ? ' (pills)' : ''}` };
         return;
       }
-      if (hit.id === M.LOG || hit.id === M.WOOD_D) { if (this.g.world.get(hit.x, hit.y + 1, hit.z) === 0 && hit.y === 12) { this.interact = { kind: 'seat', label: 'Sit down', hit }; return; } }
+      // Only what is really a seat (a stool, a bench, a pew: somewhere the people here sit), and only when nobody is on it already.
+      const seat = g.seatAt(hit.x, hit.z);
+      if (seat && !seat.by && this.g.world.get(hit.x, hit.y + 1, hit.z) === 0) { this.interact = { kind: 'seat', label: 'Sit down', hit, seat }; return; }
     }
     // A fire somebody let go out, or the rain did.
     if (hit && hit.id === M.BURNT && hit.dist < 3.9) {

@@ -11,8 +11,9 @@ for (const k in MORE_TALK) if (CONVERSATIONS[k]) CONVERSATIONS[k].push(...MORE_T
 for (const k in MORE_BARKS) if (COMMON_BARKS[k]) COMMON_BARKS[k].push(...MORE_BARKS[k]);
 // Lines that belong to one camp or one person: heard twice, they give the game away, so they come round rarely.
 const BAR_HIRES = 3;           // guns for hire waiting at each bar
-const BAR_REGULARS = 1;        // regulars per seat or spot at the bar
-const BAR_DROP_IN = .08;       // the chance anyone else, choosing what to do next, thinks of the bar
+const MARKET_HIRES = 2;        // and more of them hanging about the market lanes, looking for work
+const BAR_REGULARS = .65;      // regulars per seat or spot at the bar
+const BAR_DROP_IN = .06;       // the chance anyone else, choosing what to do next, thinks of the bar
 const HIRE_RESTOCK_DAYS = 4;   // days before someone else turns up to take a hired gun's place
 // A hired gun's price: the worth of what they carry, and their time on top.
 const hireFee = (weapon) => Math.round((150 + ((ITEMS[weapon] && ITEMS[weapon].value) || 300) * .6) / 10) * 10;
@@ -415,11 +416,13 @@ export class NPCs {
     if (c.bar) {
       for (let k = 0; k < c.bar.pois.length * BAR_REGULARS; k++) { const q = adults.pop(); if (q) q.barGoer = true; }
       const taken = (S.hired || []).filter((d) => this.g.day - d < HIRE_RESTOCK_DAYS).length;
-      for (let k = 0; k < BAR_HIRES - taken; k++) {
-        const weapon = pickOf(c.guardWeapons);
+      // The bar is where most of them wait. The rest walk the market lanes, looking over the stalls and waiting to be asked.
+      const total = BAR_HIRES + MARKET_HIRES - taken;
+      for (let k = 0; k < total; k++) {
+        const weapon = pickOf(c.guardWeapons), market = k >= BAR_HIRES - Math.min(BAR_HIRES, taken) && stalls.length > 0;
         const n = add(new NPC('resident', 0, STREET_Y, 0, { weapon, variant: row([rand() < .5 ? 'heavy' : 'medium']), hp: 420 }));
-        n.barGoer = true;
         n.hire = { fee: hireFee(weapon) };
+        if (market) { const lanes = stalls.filter((v) => v.role !== 'bar' && !v.doctor && !v.yard); n.marketHire = true; n.browser = true; n.home = pickOf(lanes.length ? lanes : stalls); } else n.barGoer = true;
       }
     }
     this.holdGround(c, st);
@@ -774,12 +777,13 @@ export class NPCs {
     else if (kind === 'warm') { poi = this.fireSpot(c); if (!poi) kind = 'stand'; }
     else poi = this.freePoi(c, kind, n);
     // Off to the bar: always, for a gun waiting to be hired; often of an evening for the regulars, and now and then for anyone else.
-    if (c.bar && kind !== 'sleep' && !n.kid && (n.hire || n.barGoer || n.kind === 'follower' || (kind !== 'work' && kind !== 'farm' && rand() < BAR_DROP_IN))) {
+    const barHire = n.hire && !n.marketHire;
+    if (c.bar && kind !== 'sleep' && !n.kid && (barHire || n.barGoer || n.kind === 'follower' || (kind !== 'work' && kind !== 'farm' && rand() < BAR_DROP_IN))) {
       const evening = this.g.tod > .7 || this.g.tod < .05;
-      const go = n.hire ? 1 : n.barGoer ? (evening ? .9 : .6) : n.kind === 'follower' ? .3 : evening ? .6 : .35;
+      const go = barHire ? 1 : n.barGoer ? (evening ? .72 : .4) : n.kind === 'follower' ? .3 : evening ? .5 : .28;
       const free = rand() < go ? c.bar.pois.filter((q) => !q.by && q.kind !== 'browse') : [];
       // A few places are always left for the guns waiting to be hired, who have nowhere else to be.
-      if (free.length > (n.hire ? 0 : BAR_HIRES)) { poi = pickOf(free); kind = poi.kind; loose = false; }
+      if (free.length > (barHire ? 0 : BAR_HIRES)) { poi = pickOf(free); kind = poi.kind; loose = false; }
     }
     if (n.hallGoer && kind !== 'sleep' && c.hallPois) {
       const free = c.hallPois.filter((q) => !q.by);
@@ -999,14 +1003,27 @@ export class NPCs {
     let left = speed * dt, hx = 0, hz = 0;
     n.phase += left * 2.1;
     n.state = .7;
+    // Along the path, never into anything solid at their feet or their chest: they slide along it, or stop and find another way. The last
+    // step onto the seat or the bed itself is the only one allowed onto something.
+    const Wd = g.world, clear = (x, z) => !Wd.solid(Math.floor(x), STREET_Y, Math.floor(z)) && !Wd.solid(Math.floor(x), STREET_Y + 1, Math.floor(z));
+    // Getting up off a seat or out of a bed, they are already in the block: nothing stops them stepping out of it.
+    const leaving = !clear(n.x, n.z);
     while (left > 0) {
       let tx, tz;
+      const onPath = n.pathI < n.path.length && !leaving;
       if (n.pathI < n.path.length) { tx = n.path[n.pathI]; tz = n.path[n.pathI + 1]; }
       else if (t.loose) { n.arrived = true; n.state = POSE[t.kind] ?? 0; return; }  // a spot in the open: the end of the path will do
       else { tx = t.poi.x; tz = t.poi.z; }
       const dx = tx - n.x, dz = tz - n.z, d = Math.hypot(dx, dz);
       if (d > .001) { hx = dx / d; hz = dz / d; }
-      if (d > left) { n.x += dx / d * left; n.z += dz / d * left; break; }
+      if (d > left) {
+        const nx = n.x + dx / d * left, nz = n.z + dz / d * left;
+        if (!onPath || clear(nx, nz)) { n.x = nx; n.z = nz; }
+        else if (clear(nx, n.z)) n.x = nx;
+        else if (clear(n.x, nz)) n.z = nz;
+        break;
+      }
+      if (onPath && !clear(tx, tz)) break;
       n.x = tx; n.z = tz;
       left -= d;
       if (n.pathI < n.path.length) n.pathI += 2;
@@ -1357,7 +1374,7 @@ export class NPCs {
     return this.followers.filter((n) => !n.dead).map((n) => ({
       name: n.name, weapon: n.weaponName || null, variant: n.variant, hp: n.hp, maxHp: n.maxHp, title: n.title || null,
       camp: n.camp, home: n.home ?? n.camp, campKey: n.campKey, campName: n.campName, personaSeed: n.personaSeed, hired: !!n.hired,
-      purse: n.purse || 0, joined: n.joined ?? null, kills: n.kills || 0, gunFrom: n.gunFrom || null,
+      purse: n.purse || 0, joined: n.joined ?? null, kills: n.kills || 0, gunFrom: n.gunFrom || null, marketHire: !!n.marketHire,
       x: n.x, y: n.y, z: n.z,
     }));
   }
@@ -1367,7 +1384,7 @@ export class NPCs {
     for (const d of list || []) {
       const n = new NPC('follower', d.x, d.y, d.z, { name: d.name, weapon: d.weapon, variant: d.variant, hp: d.maxHp || d.hp, title: d.title || undefined, campKey: d.campKey, campName: d.campName, personaSeed: d.personaSeed });
       n.hp = d.hp; n.camp = d.camp ?? -1; n.home = d.home ?? n.camp; n.hired = !!d.hired;
-      n.purse = d.purse || 0; n.joined = d.joined ?? this.g.day; n.kills = d.kills || 0; n.gunFrom = d.gunFrom || null;
+      n.purse = d.purse || 0; n.joined = d.joined ?? this.g.day; n.kills = d.kills || 0; n.gunFrom = d.gunFrom || null; n.marketHire = !!d.marketHire;
       if (n.name && !n.name.includes(' ')) n.name = `${n.name} ${SURVIVOR_SURNAMES[(n.personaSeed >>> 3) % SURVIVOR_SURNAMES.length]}`;
       this.list.push(n);
       this.followers.push(n);

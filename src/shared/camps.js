@@ -2,7 +2,7 @@
 // planCamp turns a definition into plain data; stampCamp turns that data into voxels chunk by chunk.
 // Everything placed reserves its footprint first, so no two pieces of a camp can overlap.
 import { STREET_Y, WX, WZ, G } from './constants.js';
-import { M, CLOTH_OF, FLAGS, F_CLOTH } from './materials.js';
+import { M, CLOTH_OF, FLAGS, F_CLOTH, F_LEAF } from './materials.js';
 import { h2, makeRng } from './rng.js';
 
 // A real bed, a block off the floor: headboard, pillows, the sheet turned down, then the blanket, and maybe a spare folded at the foot.
@@ -43,7 +43,7 @@ export const CAMP_DEFS = [
   { key: 'tompkins', name: 'Cannery Collective', blurb: 'Punks, squatters and a wall they painted themselves, in the old cannery sheds back of Dayton. They were ready for this.', wall: 'scrap', H: 7, door: M.RUST, gates: 'SW', flag: [M.PAINT_K, M.RUST], emblem: 'anarchy', faction: [.27, .25, .25], wardrobe: ['scrap', 'scrap', 'civ'], stalls: ['junk', 'general', 'food', 'builder'], stallCount: 22, guardWeapons: ['shotgun', 'smg', 'crossbow', 'rifle'], folkWeapons: ['bat', 'machete', 'axe', 'crossbow', 'pistol', 'spear'], folk: 240, shackMats: [M.RUST, M.CONT_R, M.PLANK, M.RUST, M.PAINT_K, M.BRICK_B], mix: { shack: 6, tent: 2, shelter: 4, fire: 4, table: 2, kitchen: 1, workshop: 3, garden: 1, laundry: 1, well: 1, school: .2 } },
   { key: 'morning', name: 'Gibson Redoubt', blurb: 'The last working clinic this side of the mountain, ringed by ambulances and white tents.', wall: 'white', H: 7, door: M.CAR_W, gates: 'NS', flag: [M.TENT_W, M.AWN_R], emblem: 'cross', faction: [.72, .14, .12], wardrobe: ['med', 'med', 'civ'], stalls: ['medic', 'general', 'food', 'builder'], stallCount: 24, guardWeapons: ['rifle', 'shotgun', 'smg', 'rifle'], folkWeapons: ['pistol', 'pistol', 'smg', 'bat'], folk: 280, tentCols: [M.TENT_W], shackMats: [M.TENT_W, M.CAR_W], mix: { shack: 2, tent: 7, shelter: 2, fire: 1, table: 2, kitchen: 1, workshop: 1, garden: 1, laundry: 3, well: 1, school: .4 } },
   { key: 'garvey', lowCorners: true, clearCorners: 30, name: 'Carver Yard', blurb: 'Block captains, a church and a basketball court, in the old mill village down the valley from Esperance. The valley looks after its own.', wall: 'brick', H: 7, door: M.TAXI, gates: 'NSE', flag: [M.AWN_R, M.AWN_G], emblem: 'fist', faction: [.72, .42, .12], wardrobe: ['civ', 'civ', 'scrap'], stalls: ['arms', 'junk', 'general', 'food', 'builder'], stallCount: 28, guardWeapons: ['rifle', 'shotgun', 'sniper', 'lmg'], folkWeapons: ['shotgun', 'pistol', 'bat', 'rifle', 'smg'], folk: 430, shackMats: [M.BRICK_R, M.BRICK_B, M.PLANK, M.RUST], tentCols: [M.TENT_G, M.CANVAS, M.TENT_W, M.CANVAS], mix: { tenement: 5, wreck: .8, shack: 4, tent: 1, shelter: 2, fire: 4, table: 5, kitchen: 2, workshop: 1, garden: 1, laundry: 2, well: 1, school: 1 } },
-  { key: 'tryon', name: 'Abbey Keep', blurb: 'The museum staff held the old abbey in Westmoor, on Albion\'s west side, and built out from its stone. Crossbows, because gunfire carries.', wall: 'stone', H: 11, door: M.WOOD_D, gates: 'SW', flag: [M.STAINED, M.PAINT_Y], emblem: 'tower', faction: [.38, .33, .42], wardrobe: ['civ', 'mil', 'civ'], stalls: ['general', 'arms', 'food', 'builder'], stallCount: 22, guardWeapons: ['crossbow', 'rifle', 'sniper', 'rifle'], folkWeapons: ['crossbow', 'spear', 'crossbow', 'axe', 'machete'], folk: 270, shackMats: [M.GRANITE, M.WOOD_D, M.SCHIST], mix: { shack: 5, tent: 2, shelter: 2, fire: 3, table: 3, kitchen: 1, workshop: 2, garden: 2, laundry: 1, well: 1, school: .4 } },
+  { key: 'tryon', name: 'St. Brigid\'s', blurb: 'The old stone parish in the Westmoor tenements: church, school and convent round their yards, walled in by the street that grew up in its pews. Crossbows, because gunfire carries.', wall: 'stone', H: 11, door: M.WOOD_D, gates: 'SW', flag: [M.STAINED, M.PAINT_Y], emblem: 'tower', faction: [.38, .33, .42], wardrobe: ['civ', 'mil', 'civ'], stalls: ['general', 'arms', 'food', 'builder'], stallCount: 22, guardWeapons: ['crossbow', 'rifle', 'sniper', 'rifle'], folkWeapons: ['crossbow', 'spear', 'crossbow', 'axe', 'machete'], folk: 270, shackMats: [M.GRANITE, M.WOOD_D, M.SCHIST], mix: { shack: 5, tent: 2, shelter: 2, fire: 3, table: 3, kitchen: 1, workshop: 2, garden: 2, laundry: 1, well: 1, school: .4 } },
 ];
 
 // Uptown's brick, the same as the blocks outside the wall. These ones are lived in and patched up with whatever came to hand.
@@ -1001,6 +1001,43 @@ export function planCamp(def, id, r, ground) {
     }
   }
 
+  // The ground floor as it is actually built. The whole camp is stamped once, and every solid block at foot or body height blocks the
+  // way; leaves and crops do not. Homes, tents and halls are no longer solid right through: their walls are, their doorways are not,
+  // and the floor inside is as walkable as the street, so people go in at the door instead of through the wall.
+  {
+    const HOUSES = new Set(['shack', 'hall', 'rowhouse', 'tent', 'bunk', 'shelter']);
+    for (const p of c.parts) if (HOUSES.has(p.t)) {
+      for (let z = Math.max(r.z0, p.z0); z <= Math.min(r.z1, p.z1); z++) for (let x = Math.max(r.x0, p.x0); x <= Math.min(r.x1, p.x1); x++) solid[(x - r.x0) + (z - r.z0) * W] = 0;
+    }
+    const layer = new Uint8Array(W * D * 2);
+    const at = (x, y, z) => (x < r.x0 || x > r.x1 || z < r.z0 || z > r.z1 || (y !== YB && y !== YB + 1)) ? -1 : (x - r.x0) + (z - r.z0) * W + (y - YB) * W * D;
+    stampCamp(c, {
+      ox: r.x0 - 16, oy: 0, oz: r.z0 - 16, CS: 1 << 14, ground, car: () => {}, letterAt: () => false,
+      put: (x, y, z, id) => { const i = at(x, y, z); if (i >= 0) layer[i] = id; },
+      box: (x0, y0, z0, x1, y1, z1, id) => {
+        for (let y = Math.max(y0, YB); y <= Math.min(y1, YB + 1); y++) for (let z = Math.max(z0, r.z0); z <= Math.min(z1, r.z1); z++) for (let x = Math.max(x0, r.x0); x <= Math.min(x1, r.x1); x++) layer[at(x, y, z)] = id;
+      },
+    });
+    // Crops are walked through: that is where the farm hands work.
+    const blocks = (id) => id && !(FLAGS[id] & F_LEAF) && id !== M.CORN && id !== M.TOMATO;
+    // Plots people work inside, over their low edges and between the beds and desks: those are left as walkable as they were.
+    const YARDS = new Set(['garden', 'crops', 'school']);
+    for (const p of c.parts) if (YARDS.has(p.t)) for (let z = Math.max(r.z0, p.z0); z <= Math.min(r.z1, p.z1); z++) for (let x = Math.max(r.x0, p.x0); x <= Math.min(r.x1, p.x1); x++) { const i = (x - r.x0) + (z - r.z0) * W; layer[i] = 0; layer[i + W * D] = 0; }
+    for (let i = 0; i < W * D; i++) if (blocks(layer[i]) || blocks(layer[i + W * D])) solid[i] = 1;
+    // Every home's doorway is a way in, and the step either side of it, whatever the walking grid makes of a door one or two blocks
+    // wide: otherwise half of them fall between its cells and the people who live there are shut out.
+    const open = (x, z) => { if (inR(x, z)) solid[(x - r.x0) + (z - r.z0) * W] = 0; };
+    for (const p of c.parts) {
+      if (p.t === 'shack' || p.t === 'hall') {
+        const cx = (p.x0 + p.x1) >> 1;
+        for (let x = cx - 1; x <= cx + 1; x++) for (let z = p.z1 - 1; z <= p.z1 + 1; z++) open(x, z);
+      } else if (p.t === 'rowhouse') {
+        const S = p.face === 'S', fz = S ? p.z1 - p.sd : p.z0 + p.sd;
+        for (let u = p.door - 1; u <= p.door + 2; u++) { const x = S ? p.x0 + u : p.x1 - u; for (let k = -1; k <= 1; k++) open(x, fz + k); }
+      }
+    }
+  }
+
   // Walkable grid for the people who live here: 2-voxel cells, 1 means blocked.
   const NW = Math.ceil(W / 2), ND = Math.ceil(D / 2);
   const nav = new Uint8Array(NW * ND);
@@ -1014,7 +1051,7 @@ export function planCamp(def, id, r, ground) {
 
 // --- Voxels ---------------------------------------------------------------------------------------------------
 // Every camp builds its wall the same way now, out of what there is: upright timbers, two blocks to a column, in whatever shade of wood each one
-// happened to be, under a band of grey concrete along the top. Abbey Keep alone still has its old stone.
+// happened to be, under a band of grey concrete along the top. St. Brigid's alone still has its old stone.
 const WALL_WOOD = [M.PLANK, M.WOOD, M.WOOD_D, M.PLANK, M.WOOD, M.WOOD_D, M.WOOD];
 function wallVoxel(style, t, h, row, H) {
   if (style !== 'stone') {
@@ -1223,7 +1260,7 @@ function stampPart(p, c, box, put, car, letterAt) {
       break;
     }
     case 'tower': {
-      // Timber towers on log legs, braced every few blocks, to go with the timber walls; the Keep's are stone.
+      // Timber towers on log legs, braced every few blocks, to go with the timber walls; St. Brigid's are stone.
       const mat = p.mat === 'stone' ? M.GRANITE : M.WOOD_D;
       if (p.mat === 'stone') {
         box(x0, YB, z0, x1, YB + h - 1, z1, mat);
