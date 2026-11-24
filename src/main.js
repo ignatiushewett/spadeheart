@@ -37,10 +37,10 @@ const DAY_SECONDS = 1500;
 const GARVEY_V = 5;        // which build of Carver Yard a save's edits belong to
 const WEST_V = 1;          // which lie of the land west of Weston a save's edits belong to (Mt Page and Fort Vigil moved south)
 const CAMPS_V = 3;         // which plan of the camps' insides a save's edits belong to (3: the bar and clinic face the lanes, St. Brigid's)
-const MAP_V = 2;           // where the settlements stand (2: B.S.R.C., St. Brigid's, Fort Vigil, Providence and the Docks moved)
-// The ground that changed when they moved: Albion and Severn Bay, whose streets go round the walls inside them, and the fields Providence
-// moved across. (Out west is WEST_AREA's.)
-const MAP_AREAS = [{ town: 'albion' }, { town: 'severn' }, { x0: 2380, z0: 3570, x1: 3020, z1: 3870 }];
+const MAP_V = 4;           // where the settlements stand (2: B.S.R.C., St. Brigid's, Fort Vigil, Providence and the Docks moved; 3: and again, with Triage and Dayton Exchange; 4: Concord)
+// The ground that changed when they moved: Albion, Severn Bay and Dayton, whose streets go round the walls inside them, the fields Providence
+// moved across, and Triage's old and new ground by Gibson. (Out west is WEST_AREA's.)
+const MAP_AREAS = [{ town: 'albion' }, { town: 'severn' }, { town: 'dayton' }, { town: 'weston' }, { x0: 1990, z0: 1950, x1: 2330, z1: 2320 }, { x0: 2380, z0: 3570, x1: 3400, z1: 3870 }, { x0: 2700, z0: 420, x1: 3060, z1: 1080 }];
 const WEST_AREA = { x0: 0, z0: 1350, x1: 2250, z1: 2850 };
 const INTRO_TIME = 7.5;    // seconds of words on black before the wake-up
 const INTRO_FADE = 1.3;    // the last of that is them fading out, and a beat of nothing
@@ -3250,6 +3250,16 @@ class Game {
     for (const c of this.layout.camps) {
       const dx = c.cx - px, dz = c.cz - pz;
       if (dx * dx + dz * dz > 300 * 300) continue;
+      // Up in the Refuge's blocks, the room lamps nearest you on your own floor light their rooms.
+      if (c.roomLamps && c.roomLamps.length && px > c.x0 - 10 && px < c.x1 + 10 && pz > c.z0 - 10 && pz < c.z1 + 10) {
+        const py = this.player.y, near = [];
+        for (const l of c.roomLamps) {
+          const d = Math.abs(l.x - px) + Math.abs(l.z - pz);
+          if (d < 16 && l.y > py - 1 && l.y < py + 5.5) near.push([d, l]);
+        }
+        near.sort((a, b) => a[0] - b[0]);
+        for (const [, l] of near.slice(0, 4)) this.queueLight(l.x, l.y - .6, l.z, 8, 2.4, 1.85, 1.15);
+      }
       // The beacon lights its own pole. A light straight above a pole only grazes its sides, so the glow is set either side of it, just under the lamp.
       let beam = 0;
       if (raised === c) {

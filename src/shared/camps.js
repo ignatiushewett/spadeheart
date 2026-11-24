@@ -35,7 +35,7 @@ const E = {
 };
 
 export const CAMP_DEFS = [
-  { key: 'bryant', name: 'B.S.R.C.', blurb: 'The Ballarat State Refuge Community: the state\'s last quarantine zone, between the Old Quarter and the mills. Concrete walls, curfew, ration lines, and a market floor where nobody shoots.', wall: 'qz', H: 10, door: M.STEEL_D, gates: 'NSEW', flag: [M.PAINT_Y, M.PAINT_K], emblem: 'dollar', faction: [.78, .62, .14], wardrobe: ['civ', 'scrap', 'civ'], stalls: ['general', 'arms', 'medic', 'junk', 'food', 'builder'], stallCount: 44, guardWeapons: ['rifle', 'shotgun', 'smg', 'rifle', 'sniper'], folkWeapons: ['pistol', 'shotgun', 'smg', 'bat', 'machete', 'pistol'], folk: 330, mix: { shack: 5, tent: 2, shelter: 3, fire: 2, table: 3, kitchen: 1, workshop: 2, garden: 0, laundry: 1, well: 1, school: .4 } },
+  { key: 'bryant', name: 'B.S.R.C.', blurb: 'The Ballarat State Refuge Community: the state\'s last quarantine zone, between the Old Quarter and the mills. Concrete walls, curfew, ration lines, and a market floor where nobody shoots.', wall: 'qz', H: 10, door: M.STEEL_D, gates: 'NSEW', flag: [M.PAINT_Y, M.PAINT_K], emblem: null, kit: { outer: 'heavy', inner: 'qz', guard: 'qz' }, faction: [.78, .62, .14], wardrobe: ['civ', 'light', 'medium', 'civ', 'light'], stalls: ['general', 'arms', 'medic', 'junk', 'food', 'builder'], stallCount: 44, guardWeapons: ['rifle', 'shotgun', 'smg', 'rifle', 'sniper'], folkWeapons: ['pistol', 'smg', 'shotgun', 'rifle', 'smg', 'pistol'], folk: 590, mix: { block: 9, shack: 1, tent: 1, shelter: 2, fire: 2, table: 3, kitchen: 1, workshop: 2, garden: 0, laundry: 1, well: 1, school: .4 } },
   { key: 'battery', name: 'The Docks', blurb: 'Containers, ferries and people still watching the bay for a ship.', wall: 'containers', H: 8, door: M.RUST, gates: 'NW', flag: [M.AWN_B, M.TENT_W], emblem: 'anchor', faction: [.2, .42, .72], wardrobe: ['scrap', 'civ'], stalls: ['general', 'junk', 'food', 'builder'], stallCount: 26, guardWeapons: ['rifle', 'shotgun', 'lmg', 'rifle'], folkWeapons: ['shotgun', 'pistol', 'axe', 'machete'], folk: 240, shackMats: [M.CONT_R, M.CONT_B, M.CONT_O, M.CONT_G], mix: { shack: 7, tent: 1, shelter: 3, fire: 2, table: 2, kitchen: 1, workshop: 2, garden: 0, laundry: 2, well: 1, school: .3 } },
   { key: 'wash', name: 'Concord', blurb: 'A log palisade around the old fairground and its arch. Everything here is decided by vote.', wall: 'palisade', H: 7, door: M.LOG, gates: 'NSE', flag: [M.BARN_R, M.TENT_W], emblem: 'arch', faction: [.52, .27, .2], wardrobe: ['civ', 'civ', 'med'], stalls: ['general', 'medic', 'food', 'builder'], stallCount: 24, guardWeapons: ['rifle', 'crossbow', 'shotgun', 'crossbow'], folkWeapons: ['crossbow', 'bat', 'machete', 'pistol', 'spear'], folk: 280, mix: { shack: 2, tent: 5, shelter: 3, fire: 3, table: 3, kitchen: 1, workshop: 1, garden: 3, laundry: 1, well: 1, school: 1 } },
   { key: 'union', name: 'Fort Vigil', blurb: 'National Guard who stopped taking orders. Sandbags, drills and a straight flagpole.', wall: 'hesco', H: 7, door: M.STEEL_D, gates: 'NSE', flag: [M.CONT_G, M.TENT_W], emblem: 'star', faction: [.82, .82, .78], wardrobe: ['mil', 'mil', 'mil', 'civ'], stalls: ['arms', 'junk', 'food', 'builder'], stallCount: 20, guardWeapons: ['rifle', 'rifle', 'lmg', 'sniper', 'rifle'], folkWeapons: ['rifle', 'rifle', 'smg', 'pistol'], folk: 300, tentCols: [M.TENT_G, M.TENT_G, M.CANVAS], shackMats: [M.CONT_G, M.CONCRETE_D], mix: { shack: 1, tent: 7, shelter: 1, fire: 1, table: 2, kitchen: 1, workshop: 2, garden: 0, laundry: .5, well: 1, school: .2 } },
@@ -53,7 +53,11 @@ const ROW_STYLES = [
   { wall: M.BROWNSTONE, trim: M.BRICK_B, p: 4, w: 2 },
   { wall: M.BRICK_R, trim: M.BRICK_R2, p: 4, w: 2 },
   { wall: M.BRICK_R2, trim: M.BRICK_B, p: 3, w: 1, esc: true },
+  // The Refuge's housing blocks: poured concrete, the floors banded dark, ribbon windows set back behind deep fins. The state built them.
+  { wall: M.CONCRETE, trim: M.CONCRETE_D, p: 4, w: 2, brut: true },
+  { wall: M.CONCRETE_D, trim: M.CONCRETE, p: 3, w: 2, brut: true },
 ];
+const BRUT = ROW_STYLES.map((s, i) => (s.brut ? i : -1)).filter((i) => i >= 0);
 
 const ROLE_SIGN = { general: M.AWN_G, arms: M.AWN_R, medic: M.AWN_B, junk: M.CANVAS, food: M.CONT_O, builder: M.PLANK, mechanic: M.PAINT_Y };
 // Nobody built these from the same plan. Each trade tends towards what suits it, and what they could get hold of.
@@ -61,7 +65,7 @@ const STALL_STYLES = { general: ['awning', 'kiosk', 'tarp', 'awning'], arms: ['c
 const WARM = 0, FIRE = 1, COOL = 2;
 const GATE_WINCH = 2;   // how far either side of a gate's middle its two winches stand, on the platform over it
 const WORK_KINDS = new Set(['work', 'shop', 'class', 'teach']);
-const HOMES = new Set(['shack', 'tenement', 'tent', 'shelter']);   // plots whose doors are all on the alleys   // spots tucked in against a building, which a divider could shut off
+const HOMES = new Set(['shack', 'tenement', 'block', 'tent', 'shelter']);   // plots whose doors are all on the alleys   // spots tucked in against a building, which a divider could shut off
 
 // The bar, in its own terms (u along the front, v from the back wall out to the yard). It is lined up with the camp's 2x2 nav cells,
 // which pair u and v as (0,1), (2,3) and so on, so the doorway and the gaps between things leave whole cells free.
@@ -88,7 +92,7 @@ export function planCamp(def, id, r, ground) {
   const rng = makeRng(9000 + id * 77);
   const c = {
     id, key: def.key, name: def.name, blurb: def.blurb, wall: def.wall, H: def.H, door: def.door, flag: def.flag, emblem: def.emblem, faction: def.faction,
-    wardrobe: def.wardrobe, guardWeapons: def.guardWeapons, folkWeapons: def.folkWeapons, folk: def.folk,
+    wardrobe: def.wardrobe, kit: def.kit || null, guardWeapons: def.guardWeapons, folkWeapons: def.folkWeapons, folk: def.folk,
     x0: r.x0, x1: r.x1, z0: r.z0, z1: r.z1, cx: (r.x0 + r.x1) >> 1, cz: (r.z0 + r.z1) >> 1,
     parts: [], gates: [], guards: [], sentries: [], vendors: [], fires: [], pois: [], lights: [], floods: [], spots: {}, maxY: YB + def.H + 12,
   };
@@ -224,6 +228,14 @@ export function planCamp(def, id, r, ground) {
     reserve(tx - 4, tz - 4, tx + 4, tz + 4);
     c.guards.push({ x: tx + .5 + Math.sign(tx - c.cx) * 2.4, y: YB + def.H + 9, z: tz + .5 + Math.sign(tz - c.cz) * 2.4, yaw: Math.atan2(tx - c.cx, tz - c.cz), sniper: true });
     light(tx, tz, 22);
+    if (def.wall === 'qz') {
+      // The Refuge lights its corners too: a bank of floods on the roof looking out along each face.
+      const ox = Math.sign(tx - c.cx), oz = Math.sign(tz - c.cz), fy = def.H + 14;
+      c.parts.push({ t: 'flood', x0: tx + ox * 4 - 1, z0: tz + oz * 2 - 1, x1: tx + ox * 4 + 1, z1: tz + oz * 2 + 1, h: fy, dx: ox, dz: 0, roof: true });
+      c.floods.push({ x: tx + ox * 5 + .5, y: YB + fy, z: tz + oz * 2 + .5, dx: ox, dz: 0 });
+      c.parts.push({ t: 'flood', x0: tx + ox * 2 - 1, z0: tz + oz * 4 - 1, x1: tx + ox * 2 + 1, z1: tz + oz * 4 + 1, h: fy, dx: 0, dz: oz, roof: true });
+      c.floods.push({ x: tx + ox * 2 + .5, y: YB + fy, z: tz + oz * 5 + .5, dx: 0, dz: oz });
+    }
   }
   c.maxY = Math.max(c.maxY, YB + def.H + 14);
   const nearGate = (side, t) => c.gates.some((g) => g.side === side && Math.abs(g.tc - t) < gateHalf + 7);
@@ -503,10 +515,9 @@ export function planCamp(def, id, r, ground) {
       sig('humvee', 5, 9, -56, -14, 5);
       sig('humvee', 5, 9, -46, -14, 5);
       hall(-40, -48, 36, 16, 8, M.CONCRETE_D, M.ROOF_GRAVEL);
-      sig('mural', 22, 1, 40, -44, 12, { seed: 3 });
       break;
     case 'battery':
-      sig('crane', 15, 9, 40, 48, 58);
+      sig('crane', 42, 17, 40, 48, 60);
       sig('ferry', 46, 20, -70, 56, 13);
       hall(-44, -44, 34, 14, 7, M.CONT_B, M.RUST);
       sig('racks', 20, 9, 40, -44, 4);
@@ -542,6 +553,8 @@ export function planCamp(def, id, r, ground) {
       sig('mural', 30, 1, 26, -40, 14, { seed: 8 });
       sig('mural', 40, 1, -20, 44, 10, { seed: 2 });
       hall(-16, -44, 30, 14, 7, M.BRICK_B, M.PAINT_K);
+      // The cannery's old dockside crane, walked up from the harbour on its own tracks and left standing in the yard.
+      sig('crane', 42, 17, 30, 62, 60);
       break;
     case 'morning':
       for (let k = 0; k < 4; k++) sig('bigtent', 27, 18, -70 + k * 36, -62, 7, { col: M.TENT_W, cross: true });
@@ -792,11 +805,14 @@ export function planCamp(def, id, r, ground) {
           reserve(x, z, x1, z1);
           break;
         }
+        case 'block':
         case 'tenement': {
           // An old walk-up someone kept standing. Its door is on the alley to the south or the north, whichever it happened to have.
-          const face = rng() < .7 ? 'S' : 'N', floors = rng() < .45 ? 2 : 3, pal = Math.floor(rng() * ROW_STYLES.length), seed = x * 31 + z * 7;
+          // A block is the Refuge's: concrete, two to four storeys, all alike.
+          const blk = kind === 'block', face = rng() < .7 ? 'S' : 'N', f = rng();
+          const floors = blk ? (f < .25 ? 2 : f < .65 ? 3 : 4) : f < .45 ? 2 : 3, pal = blk ? BRUT[Math.floor(rng() * BRUT.length)] : Math.floor(rng() * (ROW_STYLES.length - BRUT.length)), seed = x * 31 + z * 7;
           const beds = w >= 10 ? [2, 4] : [2];
-          add('rowhouse', x, z, x1, z1, floors * 5, { face, floors, pal, door: 1 + (seed % Math.max(1, w - 6)), sd: 1, seed, lit: seed % 5 < 3, mat: ROW_STYLES[pal].wall, roof: M.ROOF_TAR, far: ROW_STYLES[pal].wall });
+          add('rowhouse', x, z, x1, z1, floors * 5, { face, floors, pal, door: 1 + (seed % Math.max(1, w - 6)), sd: 1, seed, lit: seed % 5 < 3, mat: ROW_STYLES[pal].wall, roof: blk ? M.ROOF_GRAVEL : M.ROOF_TAR, far: ROW_STYLES[pal].wall });
           c.maxY = Math.max(c.maxY, YB + floors * 5 + 11);
           const at = (u, back) => (face === 'S' ? [x + u, z + back] : [x1 + 1 - u, z1 + 1 - back]);
           for (const b of beds) { const [a, d] = at(b, 5.6); c.pois.push({ x: a, z: d, kind: 'sleep', yaw: face === 'S' ? 0 : Math.PI }); }
@@ -1102,6 +1118,11 @@ const GLOW = new Map([
 ]);
 export function glowLights(c, ground) {
   const cells = new Map();
+  // The lights on the upper floors of the Refuge's blocks are kept out of the map: it lights everything in its column, so they would
+  // light the blocks from outside, all the way up. They are kept as room lamps instead, which light only the room they hang in.
+  const brut = c.parts.filter((p) => p.t === 'rowhouse' && ROW_STYLES[p.pal].brut), rooms = new Map();
+  const upper = (x, y, z) => y > YB + 4 && brut.some((p) => x >= p.x0 && x <= p.x1 && z >= p.z0 && z <= p.z1);
+  c.roomLamps = [];
   const note = (x, z, id) => {
     const g = GLOW.get(id);
     if (!g) return;
@@ -1110,7 +1131,10 @@ export function glowLights(c, ground) {
   };
   stampCamp(c, {
     ox: c.x0 - 16, oy: 0, oz: c.z0 - 16, CS: 1 << 14, ground, car: () => {}, letterAt: () => false,
-    put: (x, y, z, id) => note(x, z, id),
+    put: (x, y, z, id) => {
+      if (id === M.LAMP && upper(x, y, z)) { const k = `${x},${y},${z}`; if (!rooms.has(k)) { rooms.set(k, 1); c.roomLamps.push({ x: x + .5, y: y + .2, z: z + .5 }); } return; }
+      note(x, z, id);
+    },
     box: (x0, y0, z0, x1, y1, z1, id) => { if (GLOW.has(id)) for (let z = z0; z <= z1; z++) for (let x = x0; x <= x1; x++) note(x, z, id); },
   });
   return [...cells.values()].filter((g) => !c.lights.some((l) => Math.hypot(l.x - g.x, l.z - g.z) < l.r * .45));
@@ -1174,7 +1198,7 @@ export function stampCamp(c, ctx) {
         P(t, YB + 3, -4, M.LOG);
       }
       // Faction banners hang off the outside of the wall, large enough to read from down the street.
-      if (clearOfGate && t > a0 + 12 && t < a1 - 12) {
+      if (c.emblem && clearOfGate && t > a0 + 12 && t < a1 - 12) {
         const u = ((t % 56) + 56) % 56;
         if (u < 9) {
           const top = YB + H - 1;
@@ -1687,12 +1711,14 @@ function stampPart(p, c, box, put, car, letterAt) {
         put(x1 - 2, YB, z0 + 2, M.CRATE);
         // The camp's mark, above the door.
         const bm = E[p.emblem] || E.star;
-        for (let k = 0; k < 7; k++) for (let a = 0; a < 7; a++) {
+        if (p.emblem) for (let k = 0; k < 7; k++) for (let a = 0; a < 7; a++) {
           if (YB + h + 7 - k < YB + 3) continue;
           put(cx - 3 + a, YB + h + 7 - k, z1, bm[k][a] === '#' ? p.c2 : p.c1);
         }
-        box(cx - 4, YB + h + 1, z1, cx - 4, YB + h + 7, z1, M.WOOD_D);
-        box(cx + 4, YB + h + 1, z1, cx + 4, YB + h + 7, z1, M.WOOD_D);
+        if (p.emblem) {
+          box(cx - 4, YB + h + 1, z1, cx - 4, YB + h + 7, z1, M.WOOD_D);
+          box(cx + 4, YB + h + 1, z1, cx + 4, YB + h + 7, z1, M.WOOD_D);
+        }
       } else {
         // Two sleeping spots, a lamp and a shelf: someone's whole life.
         const b1 = cx - 2, b2 = cx + 2;
@@ -1865,13 +1891,45 @@ function stampPart(p, c, box, put, car, letterAt) {
       for (let a = x0 + 7; a < x1 - 6; a++) { const k = Math.abs(a - cxm); put(a, YB + 16 + Math.round(3 - k * k * .05 + .5), z0, M.LIMESTONE); put(a, YB + 16 + Math.round(3 - k * k * .05 + .5), z1, M.LIMESTONE); }
       break;
     case 'crane': {
-      const tx = x0 + 3 + 12, tz = z0 + 4;
-      for (const [a, b] of [[-2, -2], [2, -2], [-2, 2], [2, 2]]) box(tx + a, YB, tz + b, tx + a, YB + h, tz + b, M.TAXI);
-      for (let y = 4; y < h; y += 5) { box(tx - 2, YB + y, tz - 2, tx + 2, YB + y, tz - 2, M.TAXI); box(tx - 2, YB + y, tz + 2, tx + 2, YB + y, tz + 2, M.TAXI); box(tx - 2, YB + y, tz - 2, tx - 2, YB + y, tz + 2, M.TAXI); box(tx + 2, YB + y, tz - 2, tx + 2, YB + y, tz + 2, M.TAXI); }
-      box(tx - 2, YB + h, tz - 3, tx + 2, YB + h + 3, tz + 3, M.TAXI);
-      box(tx - 26, YB + h + 1, tz, tx + 12, YB + h + 2, tz, M.TAXI);
-      box(tx - 22, YB + 6, tz, tx - 22, YB + h, tz, M.IRON);
-      box(tx - 25, YB, tz - 3, tx - 19, YB + 5, tz + 3, M.CONT_B);
+      // A building site, fenced off, with the crane that is putting it up. Everything stands inside the plot, jib and all, so nothing
+      // else gets built under it and no part of it is lost at the plot's edge. Laid out along x: the frame going up under the hook at
+      // the west end, the materials in the middle, the tower, and the site office under the counterweight at the east end.
+      const top = YB + h - 4, tx = x0 + 31, tz = (z0 + z1) >> 1;
+      // Churned ground: gravel, with the dirt showing through where the trucks turn.
+      for (let z = z0; z <= z1; z++) for (let x = x0; x <= x1; x++) put(x, G0, z, h2(x >> 1, z >> 1) % 3 ? M.GRAVEL : M.DIRT);
+      // The fence: steel posts and a rail, with the way in at the middle of the south side.
+      for (let x = x0; x <= x1; x++) for (const z of [z0, z1]) {
+        if (z === z1 && Math.abs(x - ((x0 + x1) >> 1)) <= 2) continue;
+        if ((x - x0) % 4 === 0) put(x, YB, z, M.STEEL_D);
+        put(x, YB + 1, z, (x - x0) % 4 === 0 ? M.STEEL_D : M.STEEL);
+      }
+      for (let z = z0; z <= z1; z++) for (const x of [x0, x1]) { if ((z - z0) % 4 === 0) put(x, YB, z, M.STEEL_D); put(x, YB + 1, z, (z - z0) % 4 === 0 ? M.STEEL_D : M.STEEL); }
+      // The frame: concrete columns, the first floor slab poured, the second only begun, and scaffold up the east face.
+      const fx0 = x0 + 2, fx1 = x0 + 13, fz0 = z0 + 2, fz1 = z1 - 2;
+      for (let x = fx0; x <= fx1; x += 11) for (let z = fz0; z <= fz1; z += 6) box(x, YB, z, x, YB + 8, z, M.CONCRETE);
+      for (let x = fx0; x <= fx1; x++) for (let z = fz0; z <= fz1; z++) if (!(x > fx0 + 3 && x < fx0 + 7 && z > fz0 + 4 && z < fz0 + 8)) put(x, YB + 4, z, M.CONCRETE_D);
+      box(fx0, YB + 9, fz0, fx0 + 5, YB + 9, fz1, M.CONCRETE_D);
+      for (let z = fz0; z <= fz1; z += 3) box(fx1 + 2, YB, z, fx1 + 2, YB + 9, z, M.WOOD_D);
+      for (const y of [YB + 4, YB + 9]) box(fx1 + 1, y, fz0, fx1 + 2, y, fz1, M.PLANK);
+      // What is waiting to go up: planks, concrete block, rebar, and a heap of sand.
+      box(x0 + 17, YB, z0 + 2, x0 + 20, YB + 1, z0 + 4, M.PLANK);
+      box(x0 + 17, YB, z1 - 4, x0 + 19, YB + 1, z1 - 2, M.CONCRETE);
+      for (const z of [z1 - 4, z1 - 2]) box(x0 + 21, YB, z, x0 + 26, YB, z, M.IRON);
+      box(x0 + 22, YB, z0 + 2, x0 + 26, YB, z0 + 5, M.SAND); box(x0 + 23, YB + 1, z0 + 3, x0 + 25, YB + 1, z0 + 4, M.SAND);
+      // The tower, braced every five, the cab on top, the jib out over the frame, and the counterweight on the short end.
+      for (const [a, b] of [[-2, -2], [2, -2], [-2, 2], [2, 2]]) box(tx + a, YB, tz + b, tx + a, top - 1, tz + b, M.TAXI);
+      for (let y = 4; y < top - YB; y += 5) { box(tx - 2, YB + y, tz - 2, tx + 2, YB + y, tz - 2, M.TAXI); box(tx - 2, YB + y, tz + 2, tx + 2, YB + y, tz + 2, M.TAXI); box(tx - 2, YB + y, tz - 2, tx - 2, YB + y, tz + 2, M.TAXI); box(tx + 2, YB + y, tz - 2, tx + 2, YB + y, tz + 2, M.TAXI); }
+      box(tx - 2, top, tz - 3, tx + 2, top + 3, tz + 3, M.TAXI);
+      put(tx, top + 2, tz - 3, M.GLASS_T); put(tx + 1, top + 2, tz - 3, M.GLASS_T);
+      box(x0 + 3, top + 1, tz, x1, top + 2, tz, M.TAXI);
+      box(x1 - 3, top - 2, tz - 1, x1, top, tz + 1, M.CONCRETE_D);
+      // The hook, over the frame, with a bundle of steel on it on its way up.
+      box(x0 + 8, YB + 12, tz, x0 + 8, top, tz, M.IRON);
+      box(x0 + 5, YB + 10, tz - 1, x0 + 11, YB + 11, tz + 1, M.STEEL_D);
+      // The site office: a container, under the counterweight, with a light over its door.
+      box(x1 - 7, YB, z0 + 2, x1 - 2, YB + 2, z0 + 5, M.CONT_O);
+      put(x1 - 5, YB, z0 + 5, 0); put(x1 - 5, YB + 1, z0 + 5, 0); put(x1 - 4, YB + 3, z0 + 5, M.LAMP);
+      put(x1 - 3, YB, z1 - 3, M.CRATE); put(x1 - 3, YB + 1, z1 - 3, M.CRATE); put(x1 - 4, YB, z1 - 3, M.CRATE);
       break;
     }
     case 'ferry': {
@@ -1902,11 +1960,16 @@ function stampPart(p, c, box, put, car, letterAt) {
       const sa = W - 5, sb = D - 7;   // the corner of the stairwell
       // Stained and patched, in blocks rather than speckle: a sheet of tin here, some planks there, a burn nobody painted over.
       const brick = (u, y, v) => {
+        if (S.brut) {
+          // Concrete: a fin of the darker pour at every bay, and the rain's streaks down from the roof in a few places.
+          if ((u + (seed & 3)) % S.p === S.w && !(u === 0 || u === W - 1)) return S.trim;
+          return h2((u >> 1) + seed, 3) % 7 === 0 && y > top - 4 ? M.CONCRETE_D : S.wall;
+        }
         const k = h2(((u + v) >> 2) + seed, (y >> 2) * 3) % 41;
         return k === 0 ? M.PLANK : k === 1 ? M.BURNT : S.wall;
       };
       // Most windows still have glass, which is more than can be said for outside. The rest got what was available.
-      const pane = (u, fl) => { if (p.wake && fl === 1) return M.GLASS_K; const k = h2(((u / S.p) | 0) + seed, fl * 5) % 10; return k < 2 ? M.WIN_LIT : k < 4 ? M.BARRICADE : M.GLASS_K; };
+      const pane = (u, fl) => { if (p.wake && fl === 1) return M.GLASS_K; if (S.brut) return h2(((u / S.p) | 0) + seed, fl * 5) % 10 < 4 ? M.GLASS_T : M.GLASS_K; const k = h2(((u / S.p) | 0) + seed, fl * 5) % 10; return k < 2 ? M.WIN_LIT : k < 4 ? M.BARRICADE : M.GLASS_K; };
       for (let v = sd; v < D; v++) for (let u = 0; u < W; u++) {
         const front = v === sd, back = v === D - 1, side = u === 0 || u === W - 1;
         T(u, G0, v, M.WOOD_FLOOR);
@@ -1933,11 +1996,17 @@ function stampPart(p, c, box, put, car, letterAt) {
           if (id) T(u, y, v, id);
         }
         // Whatever is left of the parapet.
-        if ((front || back || side) && h2(u * 5 + seed, v) % 9) T(u, top, v, S.trim);
+        if ((front || back || side) && (S.brut || h2(u * 5 + seed, v) % 9)) T(u, top, v, S.trim);
       }
+      if (S.brut) {
+        // A concrete canopy over the door, and on every floor above it a balcony slab with a solid concrete parapet, all down the front.
+        for (let u = 0; u < W; u++) T(u, YB + 3, 0, S.trim);
+        for (let f = 1; f < p.floors; f++) for (let u = 1; u < W - 1; u++) { T(u, YB + f * 5 - 1, 0, S.trim); T(u, YB + f * 5, 0, S.wall); }
+      } else {
       // Out front, a lean-to of tin and tarp over the door, on a couple of poles.
       for (let u = 0; u < W; u++) for (let v = 0; v < sd; v++) T(u, YB + 3, v, seed % 2 ? M.RUST : M.CANVAS);
       for (const u of [0, W - 1]) for (let y = YB; y < YB + 3; y++) T(u, y, 0, M.WOOD_D);
+      }
       // Rusted iron balconies down the fronts of the old walk-ups, with someone's washing on them.
       if (S.esc) {
         const a = 1 + (seed & 3), b = Math.min(W - 2, a + 4);
@@ -1950,10 +2019,13 @@ function stampPart(p, c, box, put, car, letterAt) {
       for (let f = 0; f < p.floors; f++) {
         const off = f * 5;
         for (const b of beds) layBed((row, col, y, id) => T(b + col, y + off, D - 2 - row, id), rows, 2, seed + b + f * 11);
-        if (p.lit || f) T(2, YB + 3 + off, sd + 1, M.LAMP);
+        if (S.brut) {
+          // The Refuge keeps its blocks lit: a row of ceiling lights down every floor, front and back, clear of the stairwell.
+          for (let u = 2; u < W - 1; u += 4) for (const v of [sd + 1, D - 3]) if (!(u >= sa - 1 && u < sa + 5 && v >= sb - 1 && v < sb + 7)) T(u, YB + 3 + off, v, M.LAMP);
+        } else if (p.lit || f) T(2, YB + 3 + off, sd + 1, M.LAMP);
       }
-      // Up top: a chimney.
-      for (let y = top; y < top + 2; y++) T(1, y, D - 2, S.wall);
+      // Up top: a chimney, or on a block a steel vent stack.
+      for (let y = top; y < top + 2; y++) T(1, y, D - 2, S.brut ? M.STEEL_D : S.wall);
       break;
     }
     case 'hallchurch': {

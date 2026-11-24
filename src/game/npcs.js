@@ -386,7 +386,7 @@ export class NPCs {
     }
     // The gate watch. Every gate has someone on it, day and night.
     for (const s of c.sentries) {
-      const sentryN = add(new NPC('sentry', s.x, s.outer ? this.g.world.terrainTop(Math.floor(s.x), Math.floor(s.z)) : STREET_Y, s.z, { weapon: pickOf(c.guardWeapons), variant: row(s.outer ? ['medium'] : ['light']), hp: 400, yaw: s.yaw, title: s.outer ? 'Outer watch' : 'Gate watch' }));
+      const sentryN = add(new NPC('sentry', s.x, s.outer ? this.g.world.terrainTop(Math.floor(s.x), Math.floor(s.z)) : STREET_Y, s.z, { weapon: pickOf(c.guardWeapons), variant: row(s.outer ? [c.kit ? c.kit.outer : 'medium'] : [c.kit ? c.kit.inner : 'light']), hp: 400, yaw: s.yaw, title: s.outer ? 'Outer watch' : 'Gate watch' }));
       // The outer watch walk a stretch of the wall's foot, out and back, rather than standing at one spot all day.
       if (s.outer) sentryN.walk = { x: s.x, z: s.z, ax: Math.cos(s.yaw), az: -Math.sin(s.yaw), at: (rand() - .5) * 2 * SENTRY_BEAT, dir: rand() < .5 ? 1 : -1, wait: rand() * 4 };
     }
@@ -449,7 +449,7 @@ export class NPCs {
 
   postGuard(c, st, s) {
     const weapon = s.sniper ? 'sniper' : pickOf(c.guardWeapons);
-    const n = new NPC('guard', s.x, s.y, s.z, { name: pickName(), weapon, variant: wardrobeRow(['light']), hp: 620, yaw: s.yaw, title: 'on watch' });
+    const n = new NPC('guard', s.x, s.y, s.z, { name: pickName(), weapon, variant: wardrobeRow([c.kit ? c.kit.guard : 'light']), hp: 620, yaw: s.yaw, title: 'on watch' });
     n.camp = c.id; n.campKey = c.key; n.campName = c.name;
     n.post = s;
     st.npcs.push(n);

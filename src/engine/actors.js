@@ -7,7 +7,7 @@ export const SLOT = { SKIN: 0, SHIRT: 1, SHIRT2: 2, PANTS: 3, SHOES: 4, HAIR: 5,
 export const HUMAN_VARIANT_START = 192;
 // heavy, medium and light are armour for the watch, by how far out they work: the pair in front of each gate, the patrols, and the
 // people on the gates and walls. Only how they look: what armour actually does is the same for all of them.
-export const WARDROBE = { civ: [192, 16], mil: [208, 16], scrap: [224, 8], raider: [232, 8], med: [240, 16], heavy: [256, 16], medium: [272, 16], light: [288, 16], grease: [304, 8], clergy: [312, 4] };
+export const WARDROBE = { civ: [192, 16], mil: [208, 16], scrap: [224, 8], raider: [232, 8], med: [240, 16], heavy: [256, 16], medium: [272, 16], light: [288, 16], grease: [304, 8], clergy: [312, 4], qz: [316, 8] };
 // Carried weapons, drawn from the actor mesh. The id travels in the instance data.
 export const NPC_WEAPON = { pistol: 1, rifle: 2, shotgun: 3, smg: 4, sniper: 5, lmg: 6, crossbow: 7, bat: 8, machete: 9, katana: 10, axe: 11, spear: 12 };
 const SCALE = .1;
@@ -248,7 +248,7 @@ const dogBody = (part, box) => {
 
 // One row per variant. Rows below HUMAN_VARIANT_START are infected.
 function buildVariantTexture(gl) {
-  const W = 16, H = 316;
+  const W = 16, H = 324;
   const tex = new Uint8Array(W * H * 4);
   const rng = makeRng(90210);
   const SKINS = [[230, 190, 160], [200, 150, 115], [150, 100, 70], [100, 68, 48], [70, 48, 36]];
@@ -297,6 +297,8 @@ function buildVariantTexture(gl) {
     },
     // Coveralls, worn black at the knees and cuffs, and a cap now and then: whoever keeps the bikes going.
     // A minister: a black suit, a white collar at the throat, polished shoes, no hat.
+    // The Refuge's watch: state-issue riot kit, near black, a plate vest, and always a helmet.
+    qz: (o) => { const s = rng.pick([[34, 36, 42], [28, 30, 34], [42, 44, 48]]); o.shirt = s; o.vest = rng.pick([[24, 26, 30], [48, 50, 54]]); o.shirt2 = [30, 32, 38]; o.pants = s; o.shoes = [20, 18, 18]; o.hat = rng.pick([[30, 32, 36], [52, 54, 58]]); o.flags = 1 | 8 | 32 | (rng() < .4 ? 4 : 0); },
     clergy: (o) => { const s = rng.pick([[26, 26, 30], [34, 32, 36]]); o.shirt = s; o.vest = s; o.shirt2 = [226, 224, 218]; o.pants = s; o.shoes = [18, 16, 15]; o.hat = [0, 0, 0]; o.flags = 0; },
     grease: (o) => { const s = rng.pick([[84, 104, 138], [156, 86, 44], [132, 108, 74], [116, 114, 106], [128, 62, 46]]); o.shirt = s; o.shirt2 = rng.pick([[176, 170, 156], [150, 60, 50], [70, 90, 120]]); o.vest = s; o.pants = s.map((v) => v * .88); o.shoes = [62, 44, 30]; if (rng() < .5) { o.hat = rng.pick([[150, 40, 32], [44, 70, 130], [190, 150, 60]]); o.flags |= 1; } },
     med: (o) => { const s = rng.pick([[150, 148, 138], [92, 112, 108], [138, 136, 128]]); o.shirt = s; o.vest = s; o.shirt2 = [118, 56, 50]; o.pants = rng.pick([[84, 102, 98], [60, 66, 72]]); o.shoes = [72, 68, 62]; if (rng() < .3) o.flags |= 4; },
@@ -308,7 +310,7 @@ function buildVariantTexture(gl) {
     // Whatever stops a bite: a padded jacket or a cut-down vest over everyday clothes, maybe a cap. The ones behind the wall.
     light: (o) => { o.shirt = rng.pick([...FLANNEL, ...WORN]); o.vest = rng.pick([[74, 70, 58], [58, 54, 48], [88, 76, 56], ...LEATHER]); o.shirt2 = rng.pick(WORN); o.pants = rng.pick([...JEANS, ...CAMO]); o.shoes = [44, 34, 26]; if (rng() < .45) { o.hat = rng.pick([...WORN, ...CAMO]); o.flags |= 1; } if (rng() < .4) o.flags |= 4; },
   };
-  const wardrobeOf = (row) => (row < 208 ? 'civ' : row < 224 ? 'mil' : row < 232 ? 'scrap' : row < 240 ? 'raider' : row < 256 ? 'med' : row < 272 ? 'heavy' : row < 288 ? 'medium' : row < 304 ? 'light' : row < 312 ? 'grease' : 'clergy');
+  const wardrobeOf = (row) => (row < 208 ? 'civ' : row < 224 ? 'mil' : row < 232 ? 'scrap' : row < 240 ? 'raider' : row < 256 ? 'med' : row < 272 ? 'heavy' : row < 288 ? 'medium' : row < 304 ? 'light' : row < 312 ? 'grease' : row < 316 ? 'clergy' : 'qz');
   for (let row = 0; row < H; row++) {
     const zombie = row < HUMAN_VARIANT_START;
     const base = rng.pick(SKINS);

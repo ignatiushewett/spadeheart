@@ -379,12 +379,12 @@ export function buildLayout(seed = 1609) {
   const P_LIBRARY = { x0: 2036, x1: 2070, z0: 1348, z1: 1412 };
   const campRects = {
     bryant: around(1700, 450, 136, 140),       // B.S.R.C.: in Albion between the Old Quarter and the Millrace, west of the river
-    battery: around(4572, 2650, 105, 96),      // The Docks: at the top of the Strand, where it leaves the end of town above Lagoon Front
-    wash: around(2150, 2120, 122, 84),         // Concord, under the ridge on the north side of Weston: the road from the valley runs through town to it
-    union: around(108, 2140, 94, 140),        // Fort Vigil, off the west road just above the truck stop, well clear of Albion
-    sheep: around(2830, 3720, 150, 104),       // Providence, out among the fields
-    tompkins: around(4380, 1400, 86, 128),      // Dayton Exchange: the old cannery lots in south Dayton, back from the shore
-    morning: around(2900, 560, 138, 92),      // Mercy, on the north side at the head of the valley
+    battery: around(4474, 2738, 105, 100),     // The Docks: in the north-east corner of Severn, where the town gives out above Lagoon Front
+    wash: around(2178, 2215, 122, 84),         // Concord, in the corner of the north Weston roads, under the ridge, with its own fields to the north
+    union: around(108, 2050, 94, 140),        // Fort Vigil, off the west road just above the truck stop, well clear of Albion
+    sheep: around(3200, 3720, 150, 104),       // Providence, out among the fields
+    tompkins: around(4300, 1400, 70, 128),      // Dayton Exchange: the old cannery lots in south Dayton, one block back from the shore, against the avenue
+    morning: around(2870, 945, 138, 92),      // Mercy, on the north side at the head of the valley
     garvey: around(1740, 3350, 128, 96),      // Carver Yard: the old mill village in the valley below Esperance, where a new life starts
     tryon: around(560, 1150, 90, 124),         // St. Brigid's: the stone parish in the Westmoor tenements, on Albion's west side
   };
@@ -516,7 +516,7 @@ export function buildLayout(seed = 1609) {
   const DISTRICTS = [];
   const leaves = [];
   // Settlements built into a town take whole blocks of it: the streets go round them, not through them.
-  const INTOWN = ['bryant', 'tompkins', 'tryon', 'battery'].map((k) => campRects[k]);
+  const INTOWN = ['bryant', 'tompkins', 'tryon', 'battery', 'wash'].map((k) => campRects[k]);
   TOWNS.forEach((t, ti) => {
     t.ds = t.districts.map(([n, x, z, zk]) => { const d = { n, x, z, zone: Z[zk], town: t }; DISTRICTS.push(d); d.id = DISTRICTS.length; return d; });
     const ds = t.ds, nd = ds.length;
@@ -844,7 +844,14 @@ export function buildLayout(seed = 1609) {
   const SW = 276, SD = 198, SECW = Math.ceil((WX + 30) / SW) + 1, SECD = Math.ceil((WZ + 800) / SD) + 1;
   const fieldMemo = new Int8Array(SECW * SECD * 16).fill(-1);
   const CROPS = [1, 1, 2, 2, 2, 3, 4, 6, 6, 7, 7, 5, 1, 6];
+  // Concord farms its own ground, right up to the north wall: three fields, corn, beans and tomatoes, with a track round each.
+  const CFARM = { x0: campRects.wash.x0 + 6, x1: campRects.wash.x1 - 6, z0: campRects.wash.z0 - 78, z1: campRects.wash.z0 - 14 };
   const fieldCell = (x, z) => {
+    if (x >= CFARM.x0 && x <= CFARM.x1 && z >= CFARM.z0 && z <= CFARM.z1) {
+      const lx = x - CFARM.x0, fw = (CFARM.x1 - CFARM.x0) / 3, k = Math.min(2, Math.floor(lx / fw)), u = lx - k * fw;
+      if (u < 3 || z - CFARM.z0 < 3 || CFARM.z1 - z < 2 || CFARM.x1 - x < 2) return -1;
+      return [2, 1, 5][k];
+    }
     const fx = x + 30, sx = Math.floor(fx / SW), sz = Math.floor(z / SD), lx = fx - sx * SW, lz = z - sz * SD;
     const a = r2(sx * 7 + 1, sz * 11 + 5), b = r2(sx * 3 + 9, sz * 5 + 2), c = r2(sx * 13 + 4, sz * 17 + 8), t = Math.floor(a * 6);
     const v0 = t === 1 || t === 3 ? (.3 + b * .4) * SW : t === 4 ? (.26 + b * .12) * SW : 0, v1 = t === 4 ? (.6 + c * .12) * SW : 0;

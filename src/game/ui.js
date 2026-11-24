@@ -1634,7 +1634,7 @@ export class UI {
     const g = this.g;
     const camp = n.camp >= 0 ? g.layout.camps[n.camp] : null;
     $('dlg-name').textContent = n.name;
-    $('dlg-role').textContent = [n.title, camp ? camp.name : n.campName].filter(Boolean).join(', ');
+    { const where = camp ? camp.name : n.campName; $('dlg-role').textContent = [n.title, where && !(n.title || '').includes(where) ? where : null].filter(Boolean).join(', '); }
     if (n.camp >= 0) {
       const v = g.dialogue.standing(n.camp);
       $('dlg-standing').textContent = `Standing: ${standingName(v)}`;
