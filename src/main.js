@@ -46,9 +46,12 @@ const INTRO_TIME = 7.5;    // seconds of words on black before the wake-up
 const INTRO_FADE = 1.3;    // the last of that is them fading out, and a beat of nothing
 // What a broken voxel gives back when you tear it down by hand.
 const SALVAGE = new Map();
-for (const id of [M.PLANK, M.BARRICADE, M.BARRICADE2, M.WOOD, M.WOOD_D, M.LOG, M.TANK, M.DOOR, M.WOOD_FLOOR, M.BLOCK_WOOD, M.TRUNK, M.CRATE_OPEN]) SALVAGE.set(id, 'block_wood');
+for (const id of [M.PLANK, M.BARRICADE, M.BARRICADE2, M.WOOD, M.WOOD_D, M.TANK, M.DOOR, M.WOOD_FLOOR, M.BLOCK_WOOD, M.TRUNK, M.CRATE_OPEN]) SALVAGE.set(id, 'block_wood');
 for (const id of [M.BRICK_O, M.BRICK_P, M.STUCCO, M.STUCCO_B, M.STUCCO_G, M.BRICK_R, M.BRICK_R2, M.BRICK_B, M.BRICK_Y, M.BRICK_W, M.BROWNSTONE, M.LIMESTONE, M.GRANITE, M.CONCRETE, M.CONCRETE_D, M.CASTIRON, M.BLOCK_CONC, M.PLASTER, M.PLASTER2, M.RUBBLE, M.JERSEY, M.WALK, M.ASPHALT, M.TILE]) SALVAGE.set(id, 'block_conc');
 for (const id of [M.STEEL, M.STEEL_D, M.ALUM, M.IRON, M.BLOCK_STEEL, M.CONT_R, M.CONT_B, M.CONT_O, M.CONT_G, M.RUST, M.TAXI, M.CAR_W, M.CAR_K, M.CAR_R, M.CAR_B, M.CAR_S, M.BUS, M.BURNT]) SALVAGE.set(id, 'block_steel');
+for (const id of [M.BRICK_O, M.BRICK_P, M.BRICK_R, M.BRICK_R2, M.BRICK_B, M.BRICK_Y, M.BRICK_W]) SALVAGE.set(id, 'block_brick');
+for (const id of [M.GRANITE, M.LIMESTONE, M.BROWNSTONE]) SALVAGE.set(id, 'block_stone');
+SALVAGE.set(M.LOG, 'block_log'); SALVAGE.set(M.SANDBAG, 'block_sandbag'); SALVAGE.set(M.ROOF_TIN, 'block_tin');
 const SETTINGS_KEY = 'acez.settings.v2';
 const OLD_SETTINGS_KEY = 'acez.settings.v1';
 const DB_NAME = 'acez';
@@ -732,6 +735,13 @@ class Game {
     });
     window.addEventListener('keyup', (e) => { I.keys[e.code] = false; });
     window.addEventListener('mousedown', (e) => {
+      // The build menu, if the mouse is still held by the game: its own pointer clicks the tiles, and right-click shuts it.
+      if (this.ui.modal === 'buildmenu' && this.locked) {
+        e.preventDefault();
+        if (e.button === 0) this.ui.buildClick();
+        else if (e.button === 2) this.resume();
+        return;
+      }
       if (this.state === 'play' && this.locked) {
         if (this.wakeFx) { e.preventDefault(); return; }
         I.mouse[e.button] = true;
@@ -739,8 +749,13 @@ class Game {
         e.preventDefault();
       }
     });
-    window.addEventListener('mouseup', (e) => { I.mouse[e.button] = false; });
+    window.addEventListener('mouseup', (e) => {
+      I.mouse[e.button] = false;
+      // The build menu opened with the button down. Some browsers keep the mouse until it comes up: let it go now.
+      if (this.ui.modal === 'buildmenu' && document.pointerLockElement) document.exitPointerLock();
+    });
     window.addEventListener('mousemove', (e) => {
+      if (this.ui.modal === 'buildmenu') { if (this.locked) this.ui.buildCursor(e.movementX, e.movementY, true); else this.ui.buildCursor(e.clientX, e.clientY, false); return; }
       if (this.locked) { I.mouseDX += e.movementX; I.mouseDY += e.movementY; }
     });
     window.addEventListener('wheel', (e) => {
@@ -750,6 +765,7 @@ class Game {
     document.addEventListener('pointerlockchange', () => {
       const was = this.locked;
       this.locked = document.pointerLockElement === canvas;
+      if (this.ui.modal === 'buildmenu') this.ui.buildCursor(0, 0, this.locked);
       if (was && !this.locked && this.state === 'play' && !this.ui.modal && this.player.alive && !this.devOpen) this.pause();
     });
     canvas.addEventListener('click', () => { if (this.state === 'play' && !this.ui.modal) this.lock(); });
@@ -823,7 +839,14 @@ class Game {
         const s = sim.state[c.id], d = Math.hypot(c.cx - P.x, c.cz - P.z);
         if (s.status === 'holding' && !s.evac && d < bd) { bd = d; best = c; }
       }
-      if (best) { sim.evacuate(best, sim.state[best.id]); note(`${best.name} is evacuating.`); }
+      // The way it really goes: the last wave, the wall coming down all round, and only then the call. Going straight to the call left
+      // nobody outside to come in.
+      if (best) {
+        const s = sim.state[best.id];
+        if (!(s.pool > 0)) sim.startWave(best.id, Math.round((900 + (s.folk + s.guards) * 1.5) * this.horde.settings.horde), { major: true, fatal: true });
+        sim.callEvac(best, s);
+        note(`${best.name} is falling: the wall comes down, then the evacuation.`);
+      }
       else note('No settlement left to evacuate.');
     } else if (kind === 'bike') {
       this.bikes.spawn().owned = true;
@@ -901,6 +924,9 @@ class Game {
       if (n >= 1) P.selectIndex(n - 1);
     }
   }
+
+  // Right-click held with the building out: everything you can build, to pick from.
+  openBuildMenu() { if (!this.ui.modal && this.player.alive && !(this.bikes && this.bikes.ride)) this.openModal(() => this.ui.openBuild()); }
 
   // A modal opens over the game: the sim stops and the view racks out of focus.
   openModal(fn) {
@@ -1298,6 +1324,8 @@ class Game {
     }
     H.noise(x, z, 120, 1);
     H.nearDirty = true;
+    // Where the ground went, people standing there go down with it.
+    this.npcs.noteHole(x, z, radius + 4);
   }
 
   onVoxelBroken(x, y, z, id) {
@@ -2604,19 +2632,23 @@ class Game {
     const P = this.player;
     if (P.loadout === 'survival') { this.rollCharacter(); return; }
     let best = null, bd = 1e9;
-    // The hunt ends with you. Your name does not.
+    // The hunt ends with you. Your name does not: what you owe is forgotten, but a settlement you have killed in still wants you dead.
     P.grief = {};
     P.wanted = {};
-    P.bail = {};
+    P.bail = Object.fromEntries(Object.entries(P.bail || {}).filter(([, v]) => v === 'banned'));
     P.bailExtra = {};
     P.bailLock = {};
     // On the books you died. Whatever you paid for died with you.
     for (const key of Object.keys(CITIZENSHIP)) P.remove(papersFor(key), P.count(papersFor(key)));
     const welcome = (c) => this.campSim.state[c.id].status === 'holding' && !this.npcs.hostileCamp(c.id) && this.npcs.admitted(c.id);
-    for (const c of this.layout.camps) {
-      if (!P.discovered[c.id] || !welcome(c)) continue;
-      const d = Math.hypot(c.cx - P.x, c.cz - P.z);
-      if (d < bd) { bd = d; best = c; }
+    // Somewhere that knows you, nearest first; failing that, anywhere at all that would take you in.
+    for (const known of [true, false]) {
+      for (const c of this.layout.camps) {
+        if ((known && !P.discovered[c.id]) || !welcome(c)) continue;
+        const d = Math.hypot(c.cx - P.x, c.cz - P.z);
+        if (d < bd) { bd = d; best = c; }
+      }
+      if (best) break;
     }
     // Nobody will have you inside: whoever found you left you in the street, outside the wall.
     const spot = best ? null : this.streetSpot();
@@ -2649,6 +2681,8 @@ class Game {
       const x = Math.floor(P.x + Math.cos(a) * r), z = Math.floor(P.z + Math.sin(a) * r);
       if (x < 2 || z < 2 || x >= WX - 2 || z >= WZ - 2) continue;
       if (!W.walk[(x >> 1) + (z >> 1) * W.walkW] || L.lot[z * WX + x] || this.horde.inCamp(x, z, 30)) continue;
+      // Not where anyone who wants you dead can see you from their wall.
+      if (L.camps.some((c) => this.npcs.hostileCamp(c.id) && Math.max(c.x0 - x, x - c.x1, c.z0 - z, z - c.z1) < 220)) continue;
       return { x: x + .5, z: z + .5 };
     }
     return { x: P.x, z: P.z };
@@ -2656,7 +2690,8 @@ class Game {
 
   wokeInStreet(camp) {
     this.npcs.spawnRoamers(16, 14, true);
-    if (this.npcs.hostileCamp(camp.id)) this.ui.banner('Left in the street', `${camp.name} will not have you back. Its patrols will take your bail: ${this.npcs.bailFor(camp.id)} spades.`);
+    if (this.npcs.banned(camp.id)) this.ui.banner('Left in the street', `${camp.name} will never have you back. Its guards will shoot on sight.`);
+    else if (this.npcs.hostileCamp(camp.id)) this.ui.banner('Left in the street', `${camp.name} will not have you back. Its patrols will take your bail: ${this.npcs.bailFor(camp.id)} spades.`);
     else this.ui.banner('Left in the street', 'Nobody you know could take you in. Find a settlement that will have you.');
   }
 

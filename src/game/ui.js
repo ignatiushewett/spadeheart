@@ -1,7 +1,7 @@
 // HTML overlay: HUD, menus, inventory, trading, dialogue, maps.
 import { WX, WZ, CS } from '../shared/constants.js';
 import { ROLES } from '../shared/layout.js';
-import { ITEMS, WEAPON_ORDER, KITS, CAMP_START, TRUST_LOCK, START_CAMP, startingGear } from './items.js';
+import { ITEMS, WEAPON_ORDER, BLOCKS, BUILD_PIECES, KITS, CAMP_START, TRUST_LOCK, START_CAMP, startingGear } from './items.js';
 import { DIFFICULTY } from './horde.js';
 import { standingName, LORE } from './dialogue.js';
 import { OP_PAY, CREW_ARMOUR, CREW_GUNS, CREW_GUN_NAMES, crewArmourTier, crewGunStats } from './npcs.js';
@@ -38,7 +38,9 @@ const clockOf = (t) => {
 // Hotbar icons: the weapon's own first-person model, seen from the side and filled in as a silhouette, so the icon is the thing you
 // hold and not a drawing of it. Guns and throwables lie muzzle to the right; a hand tool lies along its handle with the head to the right.
 // Worked out once per weapon from the model's boxes. Blocks are a swatch of what they are made of.
-const BLOCK_COL = { block_wood: '#b08a55', block_conc: '#9a9a94', block_steel: '#7d8a96' };
+const BLOCK_COL = { block_wood: '#b08a55', block_conc: '#9a9a94', block_steel: '#7d8a96', block_brick: '#a05a46', block_log: '#7a5a38', block_sandbag: '#b0a074', block_tin: '#9aa0a2', block_stone: '#8a8b92', block_glass: '#7fbcbc' };
+// On the hotbar, building is one thing: a plain white block, whatever it is made of.
+const WHITE_BLOCK = '<svg viewBox="0 0 32 16" shape-rendering="crispEdges" aria-hidden="true"><path fill="currentColor" d="M10 2h12v12h-12z"/></svg>';
 const ICON_W = 32, ICON_H = 16, iconCache = {};
 const silhouette = (id) => {
   const boxes = (VM_MODELS[id] || []).concat(id === 'lmg' ? LMG_COVER.concat(LMG_BOX) : []);
@@ -71,14 +73,69 @@ const silhouette = (id) => {
   }
   return d;
 };
+// Everything that is not held in the hand gets a silhouette drawn for it on the same 32 by 16 grid: blocks of pixels to fill, [x, y, w, h],
+// and the holes to cut back out of them (the cross out of a medical kit, the arm holes out of a vest).
+const B3 = (xs, f) => xs.flatMap(f);
+const ART = {
+  ammo_pistol: { fill: B3([10, 15, 20], (x) => [[x, 7, 3, 7], [x, 5, 3, 1], [x + 1, 4, 1, 1]]) },
+  ammo_rifle: { fill: B3([10, 15, 20], (x) => [[x, 6, 3, 8], [x + 1, 2, 1, 4]]) },
+  ammo_shell: { fill: B3([8, 14, 20], (x) => [[x, 3, 4, 8], [x, 12, 4, 2]]) },
+  ammo_rocket: { fill: [[6, 6, 18, 4], [24, 6, 2, 4], [26, 7, 2, 2], [3, 4, 4, 2], [3, 10, 4, 2], [3, 6, 2, 4]] },
+  bandage: { fill: [[8, 3, 10, 10], [18, 8, 9, 3]], holes: [[8, 7, 10, 1]] },
+  medkit: { fill: [[7, 3, 18, 11], [13, 1, 6, 2]], holes: [[15, 5, 2, 7], [12, 7, 8, 2], [14, 2, 4, 1]] },
+  sleeping_pills: { fill: [[12, 5, 8, 10], [11, 1, 10, 3]], holes: [[12, 8, 8, 3]] },
+  antibiotic: { fill: [[8, 6, 13, 4], [21, 7, 7, 1], [4, 7, 4, 2], [3, 5, 1, 6]], holes: [[11, 6, 1, 2], [14, 6, 1, 2], [17, 6, 1, 2]] },
+  stim: { fill: [[6, 6, 17, 4], [24, 6, 3, 4], [3, 7, 3, 2]], holes: [[12, 7, 6, 2]] },
+  beans: { fill: [[10, 2, 12, 13]], holes: [[10, 5, 12, 1], [10, 11, 12, 1]] },
+  water: { fill: [[12, 6, 8, 9], [13, 4, 6, 2], [14, 2, 4, 2], [14, 1, 4, 1]], holes: [[12, 9, 8, 2]] },
+  whiskey: { fill: [[10, 7, 12, 8], [11, 6, 10, 1], [14, 1, 4, 5]], holes: [[12, 9, 8, 3]] },
+  jacket: { fill: [[10, 2, 12, 13], [5, 3, 5, 10], [22, 3, 5, 10]], holes: [[14, 2, 4, 3], [15, 5, 2, 2], [10, 3, 1, 10], [21, 3, 1, 10]] },
+  riot: { fill: [[9, 1, 14, 14]], holes: [[9, 1, 3, 5], [20, 1, 3, 5], [13, 1, 6, 3], [9, 9, 14, 1]] },
+  tactical: { fill: [[9, 1, 14, 14]], holes: [[9, 1, 3, 5], [20, 1, 3, 5], [13, 1, 6, 3], [9, 10, 14, 1], [14, 10, 1, 5], [18, 10, 1, 5]] },
+  flashlight: { fill: [[5, 6, 16, 4], [21, 4, 3, 8], [24, 3, 2, 10]], holes: [[11, 6, 3, 1]] },
+  bike_keys: { fill: [[3, 4, 9, 8], [12, 7, 15, 2], [20, 9, 2, 3], [24, 9, 2, 2]], holes: [[5, 6, 5, 4]] },
+  backpack: { fill: [[9, 3, 14, 12], [13, 1, 6, 2]], holes: [[14, 2, 4, 1], [11, 9, 10, 1]] },
+  scrap: { fill: [[5, 9, 9, 5], [9, 5, 7, 4], [17, 8, 10, 5], [20, 5, 5, 3]], holes: [[8, 11, 3, 1], [21, 10, 3, 1]] },
+  parts: { fill: [[11, 3, 10, 10], [9, 6, 2, 4], [21, 6, 2, 4], [14, 1, 4, 2], [14, 13, 4, 2]], holes: [[15, 7, 2, 2]] },
+  cloth: { fill: [[6, 4, 20, 9], [8, 13, 16, 1]], holes: [[6, 7, 20, 1], [6, 10, 20, 1]] },
+  smokes: { fill: [[10, 4, 12, 11], [12, 1, 2, 3], [15, 2, 2, 2], [18, 1, 2, 3]], holes: [[10, 8, 12, 1]] },
+  jewelry: { fill: [[11, 5, 10, 9], [14, 2, 4, 3]], holes: [[13, 7, 6, 5]] },
+  metrocard: { fill: [[6, 3, 20, 10]], holes: [[6, 5, 20, 2], [20, 9, 4, 2]] },
+  papers: { fill: [[10, 1, 12, 14]], holes: [[12, 4, 8, 1], [12, 7, 8, 1], [12, 10, 5, 1], [18, 10, 2, 3]] },
+};
+const artPath = (id) => {
+  const a = ART[id] || (ITEMS[id]?.type === 'papers' ? ART.papers : null);
+  if (!a) return '';
+  const grid = new Uint8Array(ICON_W * ICON_H);
+  const mark = (rects, v) => { for (const [x0, y0, w, h] of rects) for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) if (x >= 0 && y >= 0 && x < ICON_W && y < ICON_H) grid[x + y * ICON_W] = v; };
+  mark(a.fill, 1); mark(a.holes || [], 0);
+  let d = '';
+  for (let y = 0; y < ICON_H; y++) for (let x = 0; x < ICON_W; x++) {
+    if (!grid[x + y * ICON_W]) continue;
+    let w = 1;
+    while (x + w < ICON_W && grid[x + w + y * ICON_W]) w++;
+    d += `M${x} ${y}h${w}v1h${-w}z`;
+    x += w - 1;
+  }
+  return d;
+};
+// How much of the bag a thing takes, in squares across and down.
+const INV_SIZE = { pistol: [2, 1], revolver: [2, 1], smg: [3, 2], shotgun: [4, 2], rifle: [4, 2], deer: [5, 2], hunting: [5, 2], lmg: [5, 2], rocket: [5, 2],
+  crowbar: [3, 1], axe: [3, 2], sledge: [4, 2], dynamite: [2, 1], medkit: [2, 2], antibiotic: [2, 1], stim: [2, 1], ammo_rocket: [2, 1], jacket: [2, 2], riot: [3, 3],
+  tactical: [3, 3], backpack: [3, 3], flashlight: [2, 1], bike_keys: [2, 1], metrocard: [2, 1], cloth: [2, 1], scrap: [2, 1], whiskey: [1, 2], water: [1, 2] };
+const invSize = (id) => INV_SIZE[id] || [1, 1];
 const iconFor = (id) => {
   const it = ITEMS[id] || {};
   const path = (rects) => rects.map(([x, y, w, h]) => `M${x} ${y}h${w}v${h}h${-w}z`).join('');
   if (it.type === 'block') {
     const col = BLOCK_COL[id] || '#999';
-    return `<svg viewBox="0 0 32 16" shape-rendering="crispEdges" aria-hidden="true"><path fill="${col}" d="${path([[10, 2, 12, 12]])}"/><path fill="#000" fill-opacity=".28" d="${path(id === 'block_wood' ? [[10, 6, 12, 1], [10, 10, 12, 1]] : id === 'block_conc' ? [[10, 7, 12, 1], [15, 2, 1, 5], [18, 8, 1, 6]] : [[11, 3, 1, 1], [20, 3, 1, 1], [11, 12, 1, 1], [20, 12, 1, 1]])}"/></svg>`;
+    // A swatch of the material, with a hint of how it is laid: boards, courses, a bag's seam, ribs, rivets, a pane's glint.
+    const lines = { block_wood: [[10, 6, 12, 1], [10, 10, 12, 1]], block_conc: [[10, 7, 12, 1], [15, 2, 1, 5], [18, 8, 1, 6]], block_brick: [[10, 5, 12, 1], [10, 9, 12, 1], [14, 2, 1, 3], [18, 6, 1, 3], [14, 10, 1, 4]],
+      block_log: [[10, 5, 12, 1], [10, 10, 12, 1], [12, 3, 2, 1]], block_stone: [[10, 8, 12, 1], [16, 2, 1, 6], [13, 9, 1, 5]], block_sandbag: [[10, 7, 12, 2]], block_tin: [[12, 2, 1, 12], [16, 2, 1, 12], [20, 2, 1, 12]],
+      block_glass: [[13, 4, 1, 4], [14, 3, 1, 2]] }[id] || [[11, 3, 1, 1], [20, 3, 1, 1], [11, 12, 1, 1], [20, 12, 1, 1]];
+    return `<svg viewBox="0 0 32 16" shape-rendering="crispEdges" aria-hidden="true"><path fill="${col}" d="${path([[10, 2, 12, 12]])}"/><path fill="${id === 'block_glass' ? '#fff' : '#000'}" fill-opacity="${id === 'block_glass' ? '.5' : '.28'}" d="${path(lines)}"/></svg>`;
   }
-  if (iconCache[id] === undefined) iconCache[id] = silhouette(id);
+  if (iconCache[id] === undefined) iconCache[id] = silhouette(id) || artPath(id);
   return `<svg viewBox="0 0 32 16" shape-rendering="crispEdges" aria-hidden="true"><path fill="currentColor" d="${iconCache[id]}"/></svg>`;
 };
 
@@ -751,16 +808,32 @@ export class UI {
       $('wname').textContent = it.name;
       if (it.type === 'gun') {
         $('ammo').innerHTML = `${P.reloadT > 0 && !(it.perShell || it.cylinder) ? '<small>reloading</small>' : P.mags[P.weapon] ?? 0} <small>/ ${P.count(it.ammo)}</small>`;
+      } else if (it.type === 'block' && P.buildPiece()) {
+        // A piece: what it is and what it is made of, and what you have against what it takes.
+        const pc = P.buildPiece(), have = P.freeBuild() ? Infinity : P.count(P.weapon);
+        $('wname').textContent = `${pc.name}, ${it.name}`;
+        $('ammo').innerHTML = `<span style="color:${have < pc.cost ? 'var(--red)' : 'inherit'}">${have === Infinity ? '&infin;' : have}</span> <small>/ ${pc.cost}</small>`;
+      } else if (it.type === 'block' && P.freeBuild()) {
+        $('ammo').innerHTML = '&infin;';
       } else if (it.type === 'throw' || it.type === 'block') {
         $('ammo').innerHTML = `${P.count(P.weapon)}`;
       } else $('ammo').innerHTML = '';
     } else { $('wname').textContent = ''; $('ammo').innerHTML = ''; }
+    // With the building out, a mouse under the name says what right-click does; held, its button fills until the menu comes up.
+    {
+      const hint = $('rmb-hint'), on = !riding && !!it && it.type === 'block';
+      if (hint.classList.contains('on') !== on) hint.classList.toggle('on', on);
+      if (on) {
+        const v = (P.rmbT != null && !P.rmbMenu ? Math.min(1, P.rmbT / .3) : 0).toFixed(2);
+        if (hint.dataset.p !== v) { hint.dataset.p = v; hint.style.setProperty('--p', v); }
+      }
+    }
     const list = P.weapons();
     const hb = $('hotbar');
     const key = list.join() + P.weapon;
     if (hb.dataset.key !== key) {
       hb.dataset.key = key;
-      hb.innerHTML = list.slice(0, 9).map((id, k) => `<div class="${id === P.weapon ? 'on' : ''}" title="${ITEMS[id].name}"><i>${k + 1}</i>${iconFor(id)}</div>`).join('');
+      hb.innerHTML = list.map((id, k) => `<div class="${id === P.weapon ? 'on' : ''}" title="${ITEMS[id].type === 'block' ? 'Building' : ITEMS[id].name}"><i>${k < 9 ? k + 1 : ''}</i>${ITEMS[id].type === 'block' ? WHITE_BLOCK : iconFor(id)}</div>`).join('');
     }
     const loc = g.layout.describe(P.x, P.z);
     // Under the compass is always where you are: the district out in the city, and inside a wall the settlement's name, set apart from it.
@@ -1383,7 +1456,7 @@ export class UI {
   // pointer (or was last used) laid out in full on the right. Left and right arrows go from tab to tab.
   renderInventory(detail) {
     const P = this.g.player;
-    const TABS = [['weapons', 'Weapons', ['melee', 'gun', 'throw', 'block', 'tool']], ['apparel', 'Apparel', ['armor', 'pack']], ['aid', 'Aid', ['med', 'food']], ['ammo', 'Ammo', ['ammo']], ['misc', 'Misc', ['papers', 'keys']], ['junk', 'Junk', ['junk']]];
+    const TABS = [['weapons', 'Weapons', ['melee', 'gun', 'throw', 'tool']], ['building', 'Building', ['block']], ['apparel', 'Apparel', ['armor', 'pack']], ['aid', 'Aid', ['med', 'food']], ['ammo', 'Ammo', ['ammo']], ['misc', 'Misc', ['papers', 'keys']], ['junk', 'Junk', ['junk']]];
     const idsOf = (types) => Object.keys(P.inventory).filter((id) => types.includes(ITEMS[id]?.type)).sort((a, b) => WEAPON_ORDER.indexOf(a) - WEAPON_ORDER.indexOf(b) || ITEMS[a].name.localeCompare(ITEMS[b].name));
     // Something just used or picked: its own tab comes up.
     if (detail && ITEMS[detail]) { const t = TABS.find((q) => q[2].includes(ITEMS[detail].type)); if (t) this.invTab = t[0]; }
@@ -1402,32 +1475,93 @@ export class UI {
       this.invKeys = true;
       document.addEventListener('keydown', (e) => {
         if (this.modal !== 'inventory' || (e.code !== 'ArrowLeft' && e.code !== 'ArrowRight')) return;
-        const keys = ['weapons', 'apparel', 'aid', 'ammo', 'misc', 'junk'], k = keys.indexOf(this.invTab);
+        const keys = ['weapons', 'building', 'apparel', 'aid', 'ammo', 'misc', 'junk'], k = keys.indexOf(this.invTab);
         this.invTab = keys[(k + (e.code === 'ArrowRight' ? 1 : keys.length - 1)) % keys.length];
         this.g.audio.simple('ui');
         this.renderInventory();
         e.preventDefault();
       });
     }
+    // The bag is a grid, and everything in it takes up the room it takes: a rifle is long, a vest is big, a bandage is one square. You
+    // put things where you like by dragging them; where you put them is remembered. Anything new goes in the first gap that fits it.
+    // The squares are sized to the room there is, so the nine columns always fill it across, with room kept for the scrollbar.
     const box = $('inv-list');
-    box.innerHTML = '<div class="inv-head"><span>Item</span><span>Qty</span><span>Wt</span></div>';
+    const COLS = 9, GAP = 2, CELL = Math.max(34, Math.min(64, Math.floor((box.clientWidth - 24 - 12 - (COLS - 1) * GAP) / COLS))), STEP = CELL + GAP;
+    box.innerHTML = '';
+    box.classList.add('dz');
     const ids = idsOf(TABS.find((t) => t[0] === this.invTab)[2]);
-    if (!ids.length) box.insertAdjacentHTML('beforeend', '<div class="empty">Nothing here.</div>');
     const sel = detail && ids.includes(detail) ? detail : ids.includes(this.invSel) ? this.invSel : ids[0];
+    const pos = P.invPos || (P.invPos = {}), occ = [], at = {};
+    const fits = (x, y, w, h, skip) => {
+      if (x < 0 || y < 0 || x + w > COLS) return false;
+      for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) { const o = occ[yy * COLS + xx]; if (o && o !== skip) return false; }
+      return true;
+    };
+    const take = (id, x, y, w, h) => { for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) occ[yy * COLS + xx] = id; at[id] = [x, y]; };
+    for (const id of ids) { const [w, h] = invSize(id), q = pos[id]; if (q && fits(q[0], q[1], w, h)) take(id, q[0], q[1], w, h); }
     for (const id of ids) {
-      const it = ITEMS[id], n = P.count(id);
-      const b = document.createElement('button');
-      b.className = `item${P.weapon === id || P.armor === id ? ' eq' : ''}${id === sel ? ' sel' : ''}`;
-      const qty = it.type === 'gun' ? `${P.mags[id] ?? 0}/${it.mag}` : n > 1 ? `${n}` : '';
-      b.innerHTML = `<span class="n">${it.name}</span><span class="q">${qty}</span><span class="w">${it.weight ? (it.weight * n).toFixed(it.weight * n < 10 ? 1 : 0) : ''}</span>`;
-      b.addEventListener('mouseenter', () => { this.invSel = id; for (const o of box.querySelectorAll('.item.sel')) o.classList.remove('sel'); b.classList.add('sel'); this.itemDetail('inv-detail', id); });
-      b.addEventListener('click', () => { P.useItem(id); this.renderInventory(id); });
+      if (at[id]) continue;
+      const [w, h] = invSize(id);
+      find: for (let y = 0; y < 400; y++) for (let x = 0; x + w <= COLS; x++) if (fits(x, y, w, h)) { take(id, x, y, w, h); pos[id] = [x, y]; break find; }
+    }
+    let rows = 0;
+    for (const id of ids) rows = Math.max(rows, at[id][1] + invSize(id)[1]);
+    rows = Math.max(rows + 2, 8);
+    const grid = document.createElement('div');
+    grid.className = 'dz-grid';
+    grid.style.width = `${COLS * STEP - GAP}px`; grid.style.height = `${rows * STEP - GAP}px`;
+    let cells = '';
+    for (let y = 0; y < rows; y++) for (let x = 0; x < COLS; x++) cells += `<i class="dz-cell" style="left:${x * STEP}px;top:${y * STEP}px;width:${CELL}px;height:${CELL}px"></i>`;
+    grid.innerHTML = cells;
+    box.appendChild(grid);
+    if (!ids.length) grid.insertAdjacentHTML('beforeend', '<div class="empty">Nothing here.</div>');
+    const drop = document.createElement('div');
+    drop.className = 'dz-drop';
+    grid.appendChild(drop);
+    for (const id of ids) {
+      const it = ITEMS[id], n = P.count(id), [w, h] = invSize(id), [x, y] = at[id];
+      const b = document.createElement('div');
+      b.className = `dz-item${P.weapon === id || P.armor === id ? ' eq' : ''}${id === sel ? ' sel' : ''}`;
+      b.style.left = `${x * STEP}px`; b.style.top = `${y * STEP}px`; b.style.width = `${w * STEP - GAP}px`; b.style.height = `${h * STEP - GAP}px`;
+      const qty = it.type === 'gun' ? `${P.mags[id] ?? 0}/${it.mag}` : it.type === 'block' && P.freeBuild() ? '&infin;' : n > 1 ? `${n}` : '';
+      if (h === 1) b.classList.add('flat');
+      // A block fills its square: the swatch alone, cropped out of the wide icon.
+      if (it.type === 'block') b.classList.add('blk');
+      b.innerHTML = `<span class="q">${qty}</span>${it.type === 'block' ? iconFor(id).replace('viewBox="0 0 32 16"', 'viewBox="10 2 12 12"') : iconFor(id)}${w > 1 && h > 1 ? `<span class="n">${it.name}</span>` : ''}`;
+      b.addEventListener('mouseenter', () => { this.invSel = id; for (const o of grid.querySelectorAll('.dz-item.sel')) o.classList.remove('sel'); b.classList.add('sel'); this.itemDetail('inv-detail', id); });
       b.addEventListener('contextmenu', (e) => {
         e.preventDefault();
         if (it.type === 'papers' || it.type === 'keys') { this.toast('You are keeping those.'); return; }
         if (P.remove(id, 1)) { this.g.addPickup(P.x, P.y + .5, P.z, { id, count: 1 }); this.renderInventory(id); }
       });
-      box.appendChild(b);
+      // Pressed and let go where it was: used or put on. Pressed and moved: picked up, and set down wherever it is let go, if it fits there.
+      b.addEventListener('pointerdown', (e) => {
+        if (e.button !== 0) return;
+        e.preventDefault();
+        const sx = e.clientX, sy = e.clientY;
+        let moving = false, tx = x, ty = y, ok = true;
+        const move = (ev) => {
+          const dx = ev.clientX - sx, dy = ev.clientY - sy;
+          if (!moving && Math.hypot(dx, dy) < 5) return;
+          moving = true;
+          b.classList.add('drag');
+          b.style.transform = `translate(${dx}px, ${dy}px)`;
+          tx = Math.round(x + dx / STEP); ty = Math.round(y + dy / STEP);
+          ok = fits(tx, ty, w, h, id) && ty + h <= rows;
+          drop.className = `dz-drop on ${ok ? 'ok' : 'bad'}`;
+          drop.style.left = `${tx * STEP}px`; drop.style.top = `${ty * STEP}px`; drop.style.width = `${w * STEP - GAP}px`; drop.style.height = `${h * STEP - GAP}px`;
+        };
+        const up = () => {
+          window.removeEventListener('pointermove', move);
+          window.removeEventListener('pointerup', up);
+          if (!moving) { P.useItem(id); this.renderInventory(id); return; }
+          if (ok) { pos[id] = [tx, ty]; this.g.audio.simple('ui'); }
+          this.renderInventory(id);
+        };
+        window.addEventListener('pointermove', move);
+        window.addEventListener('pointerup', up);
+      });
+      grid.appendChild(b);
     }
     this.invSel = sel;
     if (sel) this.itemDetail('inv-detail', sel); else $('inv-detail').innerHTML = '';
@@ -1687,7 +1821,8 @@ export class UI {
       const list = [];
       if (n.kind === 'clerk' || n.kind === 'roamer') {
         const bail = g.npcs.bailFor(owedTo), wait = g.npcs.bailWait(owedTo);
-        if (wait > 0) list.push({ label: `Pay my bail (not for another ${Math.ceil(wait / 60)} min)`, off: true });
+        if (g.npcs.banned(owedTo)) list.push({ label: 'There is no bail for what you did.', off: true });
+        else if (wait > 0) list.push({ label: `Pay my bail (not for another ${Math.ceil(wait / 60)} min)`, off: true });
         else list.push({ label: `Pay my bail (${bail} spades)`, cls: 'quest', fn: () => {
           if (P.scrip < bail) { this.toast('Not enough spades', 'bad'); return; }
           g.npcs.payBail(owedTo);
@@ -2225,6 +2360,81 @@ export class UI {
   }
 
   // --- Map -------------------------------------------------------------------------------------------------------
+  // The building menu: the materials along the top, the pieces under them drawn in the material you have picked. A slot goes red
+  // when you do not have enough for it.
+  openBuild() {
+    this.open('buildmenu', false);
+    const panel = $('bm-panel');
+    if (!panel.dataset.wired) {
+      panel.dataset.wired = 1;
+      panel.addEventListener('contextmenu', (e) => { e.preventDefault(); this.g.resume(); });
+    }
+    this.renderBuild();
+    this.bmCur = null; this.bmHover = null;
+    this.buildCursor(0, 0, !!document.pointerLockElement);
+  }
+
+  // While the game still has the mouse, the build menu draws a pointer of its own and moves it by the mouse's motion; once the mouse
+  // is free, the real cursor does the job and this one goes.
+  buildCursor(a, b, locked) {
+    const el = $('bm-cursor');
+    if (!el) return;
+    if (!locked) { el.style.display = 'none'; this.bmCur = null; return; }
+    const c = this.bmCur || (this.bmCur = { x: innerWidth / 2, y: innerHeight / 2 });
+    c.x = Math.max(0, Math.min(innerWidth - 2, c.x + a)); c.y = Math.max(0, Math.min(innerHeight - 2, c.y + b));
+    el.style.display = 'block'; el.style.left = `${c.x}px`; el.style.top = `${c.y}px`;
+    const slot = document.elementFromPoint(c.x, c.y)?.closest('.bm-slot') || null;
+    if (slot !== this.bmHover) { if (this.bmHover) this.bmHover.classList.remove('hot'); this.bmHover = slot; if (slot) { slot.classList.add('hot'); slot.onmouseenter && slot.onmouseenter(); } }
+  }
+
+  buildClick() { if (this.bmHover && this.bmHover.isConnected) this.bmHover.click(); }
+
+  renderBuild() {
+    const g = this.g, P = g.player, cur = ITEMS[P.weapon]?.type === 'block' ? P.weapon : P.blockPick() || 'block_wood';
+    const col = BLOCK_COL[cur] || '#b08a55', tip = $('bm-tip');
+    // A piece, drawn flat from the side its icon looks at, a square to a block.
+    const pieceIcon = (p) => {
+      const pts = p.cells.map(([u, v, w]) => (p.view === 'top' ? [u, w] : p.view === 'side' ? [w, -v] : [u, -v]));
+      const xs = pts.map((q) => q[0]), ys = pts.map((q) => q[1]), x0 = Math.min(...xs), y0 = Math.min(...ys), wd = Math.max(...xs) - x0 + 1, ht = Math.max(...ys) - y0 + 1;
+      const n = Math.max(wd, ht), ox = (n - wd) / 2, oy = (n - ht) / 2, seen = new Set();
+      let d = '';
+      for (const [a, b] of pts) { const k = `${a},${b}`; if (seen.has(k)) continue; seen.add(k); d += `M${a - x0 + ox + .06} ${b - y0 + oy + .06}h.88v.88h-.88z`; }
+      return `<svg viewBox="0 0 ${n} ${n}"><path fill="${col}" d="${d}"/></svg>`;
+    };
+    const free = P.freeBuild(), many = (n) => (n === Infinity ? '&infin;' : n);
+    $('bm-mats').innerHTML = BLOCKS.map((id) => {
+      const n = free ? Infinity : P.count(id);
+      return `<div class="bm-slot mat${!P.buildPiece() && id === cur ? ' on' : ''}${n ? '' : ' short'}" data-mat="${id}">${iconFor(id)}<b>${many(n)}</b></div>`;
+    }).join('');
+    const have = free ? Infinity : P.count(cur);
+    $('bm-matname').textContent = `in ${ITEMS[cur].name}`;
+    $('bm-pieces').innerHTML = BUILD_PIECES.map((p) => `<div class="bm-slot${P.piece === p.id ? ' on' : ''}${have < p.cost ? ' short' : ''}" data-piece="${p.id}">${pieceIcon(p)}<b>${p.cost}</b></div>`).join('');
+    tip.innerHTML = 'Pick a material to place blocks one at a time, or a structure to put up whole.';
+    const say = (el) => {
+      if (el.dataset.mat) { const id = el.dataset.mat, n = free ? Infinity : P.count(id); tip.innerHTML = `${ITEMS[id].name}<span class="${n ? '' : 'bad'}">${n === Infinity ? 'Unlimited in Creative' : n ? `${n} carried` : 'You have none'}</span>`; return; }
+      const p = BUILD_PIECES.find((q) => q.id === el.dataset.piece);
+      tip.innerHTML = `${p.name}<span class="${have < p.cost ? 'bad' : ''}">${p.cost} ${ITEMS[cur].name}${have === Infinity ? '' : `, you have ${have}`}</span>`;
+    };
+    for (const el of document.querySelectorAll('#bm-mats .bm-slot, #bm-pieces .bm-slot')) {
+      el.onmouseenter = () => say(el);
+      el.onclick = () => {
+        if (el.dataset.mat) {
+          const id = el.dataset.mat;
+          if (!P.has(id)) { say(el); return; }
+          P.piece = null;
+          P.selectWeapon(id);
+        } else {
+          // A piece starts out in timber, if there is any; right-click changes it after.
+          P.piece = el.dataset.piece;
+          const wood = P.has('block_wood') ? 'block_wood' : P.blockPick();
+          if (wood) P.selectWeapon(wood);
+        }
+        g.audio.simple('click');
+        g.resume();
+      };
+    }
+  }
+
   openMap() {
     this.open('map', false);
     const P = this.g.player;

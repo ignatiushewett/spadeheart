@@ -63,6 +63,7 @@ export class Dialogue {
     if (npc.kind === 'roamer' && P.wanted[-1] > 0) return 'You have got some nerve, after that.';
     if (npc.kind === 'roamer' && npc.factionId && this.g.npcs.owesBail(npc.factionId - 1)) {
       const id = npc.factionId - 1, wait = this.g.npcs.bailWait(id);
+      if (this.g.npcs.banned(id)) return `You killed our people inside our own wall. There is no price for that. Get away from me.`;
       if (wait > 0) return `After what you did? Nobody at ${npc.campName} is taking your money today. Come back when it has cooled off, and it will cost you ${this.g.npcs.bailFor(id)}.`;
       return `You are on the list at ${npc.campName}. ${this.g.npcs.bailFor(id)} spades squares it, then you can walk back in. Nobody out here is going to shoot you over it, so long as you don't start anything.`;
     }

@@ -23,6 +23,12 @@ export const ITEMS = {
   block_wood: { name: 'Planks', type: 'block', mat: M.BLOCK_WOOD, value: 1, weight: .01, stack: true, bundle: 20, desc: 'Place to barricade a doorway. Weak.' },
   block_conc: { name: 'Cinder Blocks', type: 'block', mat: M.BLOCK_CONC, value: 1, weight: .02, stack: true, bundle: 20, desc: 'Solid. Takes real work to chew through.' },
   block_steel: { name: 'Steel Plates', type: 'block', mat: M.BLOCK_STEEL, value: 3, weight: .03, stack: true, bundle: 10, desc: 'The zombies will get bored first.' },
+  block_brick: { name: 'Bricks', type: 'block', mat: M.BRICK_R, value: 1, weight: .02, stack: true, bundle: 20, desc: 'Pulled out of a wall somewhere else. Better than planks, short of cinder block.' },
+  block_log: { name: 'Logs', type: 'block', mat: M.LOG, value: 2, weight: .03, stack: true, bundle: 10, desc: 'Whole timber. Heavy, and it takes a long time to chew through.' },
+  block_sandbag: { name: 'Sandbags', type: 'block', mat: M.SANDBAG, value: 1, weight: .03, stack: true, bundle: 20, desc: 'Stack them chest high and keep your head down.' },
+  block_tin: { name: 'Sheet Metal', type: 'block', mat: M.ROOF_TIN, value: 1, weight: .02, stack: true, bundle: 20, desc: 'Corrugated roofing. Quick to put up, loud when something hits it.' },
+  block_stone: { name: 'Stone', type: 'block', mat: M.GRANITE, value: 2, weight: .04, stack: true, bundle: 10, desc: 'Dressed stone off an old building. It will outlast you.' },
+  block_glass: { name: 'Glass Panes', type: 'block', mat: M.GLASS_T, value: 2, weight: .02, stack: true, bundle: 10, desc: 'For a window you can see out of. Stops nothing.' },
   // Ammunition
   ammo_pistol: { name: 'Pistol Rounds', type: 'ammo', value: 1, weight: .02, stack: true, bundle: 24, desc: 'Fits the 9mm, .357 and MP5.' },
   ammo_shell: { name: '12ga Shells', type: 'ammo', value: 3, weight: .04, stack: true, bundle: 8, desc: 'Double-aught.' },
@@ -57,7 +63,26 @@ export const ITEMS = {
   metrocard: { name: 'Albion Transit Pass', type: 'junk', value: 1, weight: .01, stack: true, desc: 'Insufficient fare.' },
 };
 
-export const WEAPON_ORDER = ['crowbar', 'axe', 'sledge', 'pistol', 'revolver', 'smg', 'shotgun', 'rifle', 'deer', 'hunting', 'lmg', 'rocket', 'grenade', 'dynamite', 'block_wood', 'block_conc', 'block_steel'];
+// Building: the three materials, and the things you can put up from them in one go. A piece is laid out from where you aim, the way you
+// face: u to your right, v up, w away from you. It costs a block for every cell of it that is not already filled. `view` is which side
+// its icon shows it from.
+export const BLOCKS = ['block_wood', 'block_log', 'block_brick', 'block_conc', 'block_stone', 'block_sandbag', 'block_tin', 'block_steel', 'block_glass'];
+const span = (a, b) => { const o = []; for (let k = a; k <= b; k++) o.push(k); return o; };
+const cellsOf = (fn) => { const o = []; for (const u of span(-3, 3)) for (const v of span(0, 4)) for (const w of span(0, 5)) if (fn(u, v, w)) o.push([u, v, w]); return o; };
+export const BUILD_PIECES = [
+  { id: 'wall', name: 'Wall', view: 'front', cells: cellsOf((u, v, w) => w === 0 && Math.abs(u) <= 2 && v <= 2) },
+  { id: 'door', name: 'Doorway', view: 'front', cells: cellsOf((u, v, w) => w === 0 && Math.abs(u) <= 2 && v <= 2 && !(u === 0 && v <= 1)) },
+  { id: 'window', name: 'Window', view: 'front', cells: cellsOf((u, v, w) => w === 0 && Math.abs(u) <= 2 && v <= 2 && !(u === 0 && v === 1)) },
+  { id: 'low', name: 'Barricade', view: 'front', cells: cellsOf((u, v, w) => w === 0 && Math.abs(u) <= 2 && v <= 1) },
+  { id: 'pillar', name: 'Pillar', view: 'front', cells: cellsOf((u, v, w) => w === 0 && u === 0 && v <= 3) },
+  { id: 'floor', name: 'Floor', view: 'top', cells: cellsOf((u, v, w) => v === 0 && Math.abs(u) <= 2 && w <= 4) },
+  { id: 'stairs', name: 'Stairs', view: 'side', cells: cellsOf((u, v, w) => Math.abs(u) <= 1 && w <= 3 && v <= w) },
+  // Six across, so the way in can be two wide in the middle of the front.
+  { id: 'shed', name: 'Shed', view: 'front', cells: cellsOf((u, v, w) => u >= -2 && u <= 3 && w <= 4 && (v === 3 || (v <= 2 && (u === -2 || u === 3 || w === 0 || w === 4) && !(w === 0 && (u === 0 || u === 1) && v <= 1)))) },
+];
+for (const p of BUILD_PIECES) p.cost = p.cells.length;
+
+export const WEAPON_ORDER = ['crowbar', 'axe', 'sledge', 'pistol', 'revolver', 'smg', 'shotgun', 'rifle', 'deer', 'hunting', 'lmg', 'rocket', 'grenade', 'dynamite', 'block_wood', 'block_conc', 'block_steel', 'block_brick', 'block_log', 'block_sandbag', 'block_tin', 'block_stone', 'block_glass'];
 
 const pick = (table) => {
   let total = 0;
@@ -124,7 +149,7 @@ export const VENDOR_STOCK = {
   medic: [['sleeping_pills', .9, 2, 5], ['bandage', 1, 6, 14], ['medkit', 1, 2, 6], ['antibiotic', 1, 2, 6], ['stim', .8, 1, 4], ['water', 1, 4, 8], ['beans', .7, 2, 6]],
   food: [['beans', 1, 8, 24], ['water', 1, 8, 24], ['whiskey', .7, 2, 6], ['smokes', .6, 2, 8], ['bandage', .4, 2, 5]],
   bar: [['whiskey', 1, 6, 16], ['water', 1, 6, 14], ['smokes', .9, 4, 12], ['beans', .6, 3, 8]],
-  builder: [['flashlight', .5, 1, 2], ['block_wood', 1, 240, 540], ['block_conc', 1, 180, 420], ['block_steel', 1, 60, 180], ['sledge', .7, 1, 1], ['axe', .7, 1, 1], ['crowbar', 1, 1, 2], ['dynamite', .5, 1, 3]],
+  builder: [['flashlight', .5, 1, 2], ['block_wood', 1, 240, 540], ['block_brick', 1, 180, 420], ['block_log', .8, 60, 160], ['block_sandbag', .9, 80, 200], ['block_tin', .9, 80, 200], ['block_stone', .7, 40, 120], ['block_glass', .6, 20, 60], ['block_conc', 1, 180, 420], ['block_steel', 1, 60, 180], ['sledge', .7, 1, 1], ['axe', .7, 1, 1], ['crowbar', 1, 1, 2], ['dynamite', .5, 1, 3]],
   mechanic: [['bike_keys', 1, 1, 1], ['flashlight', .8, 1, 2], ['scrap', .7, 4, 12], ['parts', .7, 2, 6], ['crowbar', .7, 1, 1], ['sledge', .4, 1, 1]],
   junk: [['flashlight', .7, 1, 2], ['block_wood', 1, 120, 300], ['block_conc', 1, 90, 240], ['block_steel', .8, 24, 72], ['sledge', .6, 1, 1], ['axe', .6, 1, 1], ['dynamite', .5, 1, 3], ['scrap', .7, 4, 12], ['parts', .5, 2, 6], ['backpack', .4, 1, 1]],
 };
@@ -161,6 +186,7 @@ export const KITS = {
   veteran: { name: 'Easy', desc: 'Full kit from the start.' },
   regular: { name: 'Medium', desc: 'Basic gear from your faction.' },
   drifter: { name: 'Hard', desc: 'A crowbar and nothing else.' },
+  creative: { name: 'Creative', desc: 'Every weapon, plenty of ammo, and building blocks that never run out.' },
   survival: { name: 'Survival', desc: 'Carver Yard, basic gear. No natural healing, and you need to eat. One life.' },
 };
 export const SURVIVAL_TIERS = ['Poor', 'Middling'];
@@ -190,6 +216,13 @@ export function startingGear(kit, campKey) {
   }
   if (kit === 'regular') { const c = CAMP_START[campKey]; return { items: c.items, scrip: c.scrip, standing: 10 }; }
   if (kit === 'drifter') return { items: [['crowbar', 1], ['bandage', 2], ['water', 1]], scrip: 25, standing: 0 };
+  // Everything in the armoury, and enough to shoot with. The building materials do not need handing over: in Creative they never run out.
+  if (kit === 'creative') return {
+    items: [['crowbar', 1], ['axe', 1], ['sledge', 1], ['pistol', 1], ['revolver', 1], ['smg', 1], ['shotgun', 1], ['rifle', 1], ['deer', 1], ['hunting', 1], ['lmg', 1], ['rocket', 1],
+      ['ammo_pistol', 400], ['ammo_shell', 160], ['ammo_rifle', 800], ['ammo_rocket', 12], ['grenade', 12], ['dynamite', 8], ['tactical', 1], ['backpack', 1], ['flashlight', 1],
+      ['medkit', 6], ['bandage', 10], ['antibiotic', 4], ['stim', 3], ['water', 4], ['beans', 4]],
+    scrip: 2000, standing: 0,
+  };
   return {
     items: [['axe', 1], ['pistol', 1], ['rifle', 1], ['shotgun', 1], ['ammo_pistol', 90], ['ammo_rifle', 180], ['ammo_shell', 32], ['grenade', 4], ['dynamite', 2], ['riot', 1], ['backpack', 1], ['medkit', 3], ['bandage', 6], ['antibiotic', 2], ['stim', 1], ['water', 3], ['beans', 3], ['block_wood', 144], ['block_conc', 72], ['block_steel', 18]],
     scrip: 300, standing: 0,

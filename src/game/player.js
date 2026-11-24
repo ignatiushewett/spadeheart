@@ -1,7 +1,7 @@
 // First-person player: movement, voxel collision, weapons, inventory and vitals.
 import { WATER_Y, WX, WZ } from '../shared/constants.js';
 import { M, FLAGS, F_GLASS, isLoot, isBed } from '../shared/materials.js';
-import { ITEMS, WEAPON_ORDER, startingGear } from './items.js';
+import { ITEMS, WEAPON_ORDER, BLOCKS, BUILD_PIECES, startingGear } from './items.js';
 import { clamp, damp } from '../engine/math.js';
 import { SKIN_TONE_COUNT } from './viewmodel.js';
 
@@ -81,6 +81,7 @@ export class Player {
     this.highlight = null;
     this.placeColor = 0;
     this.discovered = {};
+    this.invPos = {};
     this.campRep = {};
     this.grief = {};
     this.wanted = {};
@@ -173,22 +174,51 @@ export class Player {
     return w;
   }
 
-  // B cycles through whatever building materials you have.
-  selectBlocks() {
-    const kinds = ['block_wood', 'block_conc', 'block_steel'].filter((id) => this.count(id));
-    if (!kinds.length) { this.g.ui.toast('No building materials'); return; }
-    const i = kinds.indexOf(this.weapon);
-    this.selectWeapon(kinds[(i + 1) % kinds.length]);
+  // In Creative the building materials never run out.
+  freeBuild() { return this.loadout === 'creative'; }
+
+  // Whether you have any of something to hold: the sandbox always has every building material.
+  has(id) { return this.count(id) > 0 || (ITEMS[id]?.type === 'block' && this.freeBuild()); }
+
+  // Building is one item: whichever material you have picked, held as a single block or as a piece to put up whole.
+  blockPick() {
+    if (ITEMS[this.weapon]?.type === 'block' && this.has(this.weapon)) return this.weapon;
+    if (this.lastBlock && this.has(this.lastBlock)) return this.lastBlock;
+    return BLOCKS.find((id) => this.has(id)) || null;
   }
 
-  carryCap() { return 70 + (this.count('backpack') ? ITEMS.backpack.carry : 0); }
+  buildPiece() { return this.piece ? BUILD_PIECES.find((p) => p.id === this.piece) || null : null; }
 
+  // B gets the building out, or with it already out, changes the material, the same as a tap of right-click.
+  selectBlocks() {
+    if (ITEMS[this.weapon]?.type === 'block') { this.cycleMaterial(); return; }
+    const b = this.blockPick();
+    if (!b) { this.g.ui.toast('No building materials'); return; }
+    this.selectWeapon(b);
+  }
+
+  cycleMaterial() {
+    const kinds = BLOCKS.filter((id) => this.has(id));
+    if (!kinds.length) { this.g.ui.toast('No building materials'); return; }
+    const i = kinds.indexOf(this.weapon);
+    const next = kinds[(i + 1) % kinds.length];
+    if (next === this.weapon) { this.g.ui.toast(`Only ${ITEMS[next].name} to build with`); return; }
+    this.selectWeapon(next);
+  }
+
+  carryCap() { return (this.loadout === 'creative' ? 400 : 70) + (this.count('backpack') ? ITEMS.backpack.carry : 0); }
+
+  // Everything you can hold, in order, with the building always last.
   weapons() {
-    return WEAPON_ORDER.filter((id) => this.count(id) > 0);
+    const out = WEAPON_ORDER.filter((id) => ITEMS[id].type !== 'block' && this.count(id) > 0);
+    const b = this.blockPick();
+    if (b) out.push(b);
+    return out;
   }
 
   selectWeapon(id) {
-    if (this.weapon === id || !this.count(id)) return;
+    if (this.weapon === id || !this.has(id)) return;
+    if (ITEMS[id].type === 'block') this.lastBlock = id;
     this.weapon = id;
     this.swapT = .3;
     this.reloadT = 0;
@@ -210,7 +240,7 @@ export class Player {
     if (!list.length) { this.weapon = null; return; }
     const i = list.indexOf(this.weapon);
     this.selectWeapon(list[(i + dir + list.length) % list.length]);
-    if (!this.count(this.weapon)) this.weapon = list[0];
+    if (!this.has(this.weapon)) this.weapon = list[0];
   }
 
   useItem(id) {
@@ -648,7 +678,16 @@ export class Player {
         else if (this.cook > 0) this.throwItem(it, id);
       }
     } else if (it.type === 'block') {
-      if (this.swapT <= 0 && this.fireCd <= 0 && (rmb || lmb)) this.placeBlock(it, id);
+      // Right-click: a tap changes the material, held it brings up everything you can build.
+      if (rPressed) { this.rmbT = 0; this.rmbMenu = false; }
+      if (rmb && this.rmbT != null) {
+        this.rmbT += dt;
+        if (this.rmbT > .3 && !this.rmbMenu) { this.rmbMenu = true; this.g.openBuildMenu(); }
+      } else if (this.rmbT != null) {
+        if (!this.rmbMenu) this.cycleMaterial();
+        this.rmbT = null; this.rmbMenu = false;
+      }
+      if (this.swapT <= 0 && this.fireCd <= 0 && lmb) this.placeBlock(it, id, pressed);
     }
     // The melee tools and fists double as block cutters on RMB; placing uses the block kit.
     if (it.type === 'melee' && rPressed) this.selectBlocks();
@@ -955,47 +994,87 @@ export class Player {
     this.g.audio.simple('swing');
   }
 
-  // Where a block would go if you placed one now: its edges traced out in a thin glowing line, white where it can go and red where it
-  // cannot (where you are standing). Nothing when you are not holding blocks or not pointing at anything in reach.
-  blockPreview() {
+  // What placing would do right now: the cells it would fill, what it costs, and whether it can. A single block, or a whole piece laid out
+  // from the cell you are pointing at, square to the way you face.
+  buildPlan() {
     const g = this.g, it = ITEMS[this.weapon];
-    if (!this.alive || !it || it.type !== 'block' || g.ui.modal || (g.bikes && g.bikes.ride)) return 0;
+    if (!this.alive || !it || it.type !== 'block' || g.ui.modal || (g.bikes && g.bikes.ride)) return null;
     const w = g.world, o = this.eyePos(), f = this.forward();
     const hit = w.raycast(o[0], o[1], o[2], f[0], f[1], f[2], 9);
-    if (!hit) return 0;
+    if (!hit) return null;
     const x = hit.x + hit.nx, y = hit.y + hit.ny, z = hit.z + hit.nz;
-    if (w.get(x, y, z)) return 0;
-    const inside = x + 1 > this.x - R && x < this.x + R && z + 1 > this.z - R && z < this.z + R && y + 1 > this.y && y < this.y + this.height;
-    const out = this.pvCubes || (this.pvCubes = new Float32Array(12 * 11 * 9));
-    const [cr, cg, cb] = inside ? [1.6, .25, .2] : [1.25, 1.25, 1.15];
-    let n = 0;
-    const edge = (ax, ay, az, dx, dy, dz) => {
-      for (let k = 0; k <= 10; k++) {
-        const t = k / 10, q = n++ * 9;
-        out[q] = x + ax + dx * t; out[q + 1] = y + ay + dy * t; out[q + 2] = z + az + dz * t;
-        out[q + 3] = .1; out[q + 4] = cr; out[q + 5] = cg; out[q + 6] = cb; out[q + 7] = 0; out[q + 8] = .45;
+    if (w.get(x, y, z)) return null;
+    const piece = this.buildPiece();
+    let cells;
+    if (!piece) cells = [[x, y, z]];
+    else {
+      const ax = Math.abs(f[0]) > Math.abs(f[2]), fx = ax ? Math.sign(f[0]) : 0, fz = ax ? 0 : Math.sign(f[2]) || 1, rx = -fz, rz = fx;
+      cells = [];
+      for (const [u, v, d] of piece.cells) {
+        const cx = x + u * rx + d * fx, cy = y + v, cz = z + u * rz + d * fz;
+        if (!w.get(cx, cy, cz)) cells.push([cx, cy, cz]);
       }
-    };
-    for (const a of [0, 1]) for (const b of [0, 1]) { edge(0, a, b, 1, 0, 0); edge(a, 0, b, 0, 1, 0); edge(a, b, 0, 0, 0, 1); }
+    }
+    const have = this.freeBuild() ? Infinity : this.count(this.weapon), cost = cells.length;
+    let why = null;
+    if (!cost) why = 'Nothing to build there';
+    else if (cells.some(([cx, cy, cz]) => this.cellTaken(cx, cy, cz))) why = 'Someone is in the way';
+    else if (have < cost) why = `Needs ${cost} ${it.name}, you have ${have}`;
+    return { cells, cost, why, piece };
+  }
+
+  // Nobody gets built into: not you, not anyone else, living or dead on their feet.
+  cellTaken(x, y, z) {
+    const over = (px, py, pz, r, h) => x + 1 > px - r && x < px + r && z + 1 > pz - r && z < pz + r && y + 1 > py && y < py + h;
+    if (over(this.x, this.y, this.z, R, this.height)) return true;
+    const g = this.g;
+    for (const n of g.npcs.list) if (!n.dead && Math.abs(n.x - x - .5) < 2 && Math.abs(n.z - z - .5) < 2 && over(n.x, n.y, n.z, .45, 1.95)) return true;
+    for (const n of g.npcs.followers || []) if (!n.dead && over(n.x, n.y, n.z, .45, 1.95)) return true;
+    for (const d of (g.dogs && g.dogs.list) || []) if (!d.dead && over(d.x, d.y, d.z, .45, 1)) return true;
+    let hit = false;
+    const H = g.horde;
+    H.forRadius(x + .5, z + .5, 1.2, (j) => { if (over(H.px[j], H.py[j], H.pz[j], .45, 1.95)) hit = true; });
+    return hit;
+  }
+
+  // Where it would go, traced out in thin glowing lines: white where it can go, red where it cannot (in someone's way, or not enough
+  // of the material for all of it).
+  blockPreview() {
+    const plan = this.buildPlan();
+    if (!plan || !plan.cells.length) return 0;
+    const per = 10, need = plan.cells.length * 12 * (per + 1) * 9;
+    if (!this.pvCubes || this.pvCubes.length < need) this.pvCubes = new Float32Array(need + 4096);
+    const out = this.pvCubes, [cr, cg, cb] = plan.why ? [1.6, .25, .2] : [1.25, 1.25, 1.15];
+    let n = 0;
+    for (const [x, y, z] of plan.cells) {
+      const edge = (ax, ay, az, dx, dy, dz) => {
+        for (let k = 0; k <= per; k++) {
+          const t = k / per, q = n++ * 9;
+          out[q] = x + ax + dx * t; out[q + 1] = y + ay + dy * t; out[q + 2] = z + az + dz * t;
+          out[q + 3] = .1; out[q + 4] = cr; out[q + 5] = cg; out[q + 6] = cb; out[q + 7] = 0; out[q + 8] = .45;
+        }
+      };
+      for (const a of [0, 1]) for (const b of [0, 1]) { edge(0, a, b, 1, 0, 0); edge(a, 0, b, 0, 1, 0); edge(a, b, 0, 0, 0, 1); }
+    }
     return n;
   }
 
-  placeBlock(it, id) {
+  placeBlock(it, id, pressed) {
     const g = this.g, w = g.world;
-    const o = this.eyePos(), f = this.forward();
-    const hit = w.raycast(o[0], o[1], o[2], f[0], f[1], f[2], 9);
-    if (!hit) return;
-    const x = hit.x + hit.nx, y = hit.y + hit.ny, z = hit.z + hit.nz;
-    if (w.get(x, y, z)) return;
-    // Refuse a block inside the player's own box.
-    if (x + 1 > this.x - R && x < this.x + R && z + 1 > this.z - R && z < this.z + R && y + 1 > this.y && y < this.y + this.height) return;
-    if (w.set(x, y, z, it.mat)) {
-      this.remove(id, 1);
-      this.fireCd = .2;
-      g.audio.simple('place', x, y, z);
-      g.horde.nearDirty = true;
-      g.stats.placed++;
-    }
+    const plan = this.buildPlan();
+    if (!plan) return;
+    // A piece goes up once per click; a block at a time can be held down.
+    if (plan.piece && !pressed) return;
+    if (plan.why) { if (pressed) g.ui.toast(plan.why); return; }
+    let placed = 0;
+    for (const [x, y, z] of plan.cells) if (w.set(x, y, z, it.mat)) placed++;
+    if (!placed) return;
+    if (!this.freeBuild()) this.remove(id, placed);
+    this.fireCd = plan.piece ? .45 : .2;
+    const [x, y, z] = plan.cells[0], m = id === 'block_steel' ? 'steel' : id === 'block_conc' ? 'conc' : 'wood';
+    g.audio.simple(`${plan.piece ? 'build' : 'place'}_${m}`, x, y, z);
+    g.horde.nearDirty = true;
+    g.stats.placed += placed;
   }
 
   updateProjectiles(dt) {
@@ -1119,7 +1198,7 @@ export class Player {
     return {
       x: this.x, y: this.y, z: this.z, yaw: this.yaw, pitch: this.pitch, health: this.health, infection: this.infection, stamina: this.stamina, hunger: this.hunger, rest: this.rest, sedated: this.sedated, home: this.home, torchItem: true,
       scrip: this.scrip, inventory: this.inventory, mags: this.mags, weapon: this.weapon, armor: this.armor, rep: this.rep,
-      loadout: this.loadout, charName: this.charName, skin: this.skin, bornDay: this.bornDay, kills: this.kills, headshots: this.headshots, voxelsBroken: this.voxelsBroken, discovered: this.discovered, campRep: this.campRep, grief: this.grief, wanted: this.wanted, bail: this.bail || {}, bailExtra: this.bailExtra || {}, bailLock: this.bailLock || {}, dlg: this.dlg, perks: this.perks || {}, pendingKit: this.pendingKit || null,
+      loadout: this.loadout, charName: this.charName, skin: this.skin, bornDay: this.bornDay, kills: this.kills, headshots: this.headshots, voxelsBroken: this.voxelsBroken, discovered: this.discovered, campRep: this.campRep, grief: this.grief, wanted: this.wanted, bail: this.bail || {}, bailExtra: this.bailExtra || {}, bailLock: this.bailLock || {}, campKills: this.campKills || {}, invPos: this.invPos || {}, dlg: this.dlg, perks: this.perks || {}, pendingKit: this.pendingKit || null,
     };
   }
 
@@ -1128,6 +1207,7 @@ export class Player {
     this.bail = s.bail || {};
     this.bailExtra = s.bailExtra || {};
     this.bailLock = s.bailLock || {};
+    this.invPos = s.invPos || {};
     if (typeof this.rest !== 'number') this.rest = 100;
     this.alive = true;
     // From before the flashlight was something you carried.

@@ -585,6 +585,17 @@ export class Audio2 {
         break;
       }
       case 'place': this.tone(d(.3, .06), .08, 'square', 140, 90, .4); break;
+      // Building, by what it is made of: a plank knocked home, a block set down on mortar, a steel plate clanged into place.
+      case 'place_wood': { const o = d(.55, .06); this.noiseBurst(o, .06, 'bandpass', 900 + rand() * 300, 420, 2.2, .9); this.tone(o, .09, 'triangle', 230 + rand() * 40, 120, .5); break; }
+      case 'place_conc': { const o = d(.6, .06); this.noiseBurst(o, .12, 'lowpass', 520, 140, 1.2, 1); this.tone(o, .14, 'sine', 120, 52, .7); this.noiseBurst(o, .08, 'highpass', 2400, 1600, 1, .18, .01); break; }
+      case 'place_steel': { const o = d(.5, .08); this.tone(o, .32, 'triangle', 640 + rand() * 80, 560, .32); this.tone(o, .22, 'square', 1260, 1100, .06); this.noiseBurst(o, .05, 'bandpass', 2600, 1400, 2, .6); break; }
+      // A whole piece going up: a run of hammer blows, or blocks set one after another, and a last one to finish it.
+      case 'build_wood': case 'build_conc': case 'build_steel': {
+        const one = kind.replace('build_', 'place_'), n = 4 + Math.floor(rand() * 3);
+        for (let k = 0; k < n; k++) later(k * (95 + rand() * 60), () => this.simple(one, x, y, z));
+        later(n * 120 + 80, () => this.simple(one, x, y, z));
+        break;
+      }
       case 'beep': this.tone(d(.3, .12), .08, 'square', 1250, 1250, .24); break;
       case 'gate': { const o = d(.4, .3); this.noiseBurst(o, .7, 'lowpass', 340, 120, 2, .7, .08); this.tone(o, .5, 'sawtooth', 64, 52, .18); break; }
       case 'splash': this.noiseBurst(d(.4, .15), .5, 'lowpass', 1800, 300, .6, .7, .02); break;

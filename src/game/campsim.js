@@ -216,7 +216,9 @@ export class CampSim {
       if (s.postBroken) { s.fullT = 0; s.slowT = 0; continue; }
       // The full siren: three holes or a real crowd inside. However briefly that is true, it always gets through at least one
       // whole rise and fall, and a crowd hovering around the line does not keep flipping it on and off.
-      if (s.breaches.length >= 3 || s.inside >= 150) s.fullT = 12;
+      // A killer loose inside the wall puts the full siren on too, for a minute and a half.
+      if (s.huntT > 0) s.huntT -= dt;
+      if (s.breaches.length >= 3 || s.inside >= 150 || s.huntT > 0) s.fullT = 12;
       else if (s.fullT > 0) s.fullT -= dt;
       // The slow one gets to finish its wail too.
       if (s.breaches.length || s.inside >= 30 || s.evac) s.slowT = 7;
@@ -821,7 +823,7 @@ export class CampSim {
     const R = H.settings.radius;
     if (H.siegeCount[c.id] >= SIEGE_BODIES * (s.fatal || s.evac || s.collapseT > 0 ? 1.5 : 1)) return;
     // They do not all arrive at once. It builds.
-    let budget = Math.min(s.waveT > 40 ? 12 : 3 + Math.floor(s.waveT * .2), Math.ceil(s.pool));
+    let budget = Math.min(s.evac || s.collapseT > 0 ? 20 : s.waveT > 40 ? 12 : 3 + Math.floor(s.waveT * .2), Math.ceil(s.pool));
     s.waveT = (s.waveT || 0) + g.frameDt;
     const hx = (c.x1 - c.x0) / 2, hz = (c.z1 - c.z0) / 2;
     const start = budget;
@@ -829,11 +831,13 @@ export class CampSim {
       // Out from the wall itself, whatever the camp's shape: a ring around a long camp lands too far off.
       const a = s.dir + Math.floor(rand() * (s.arms || 1)) * (Math.PI * 2 / (s.arms || 1)) + (rand() - .5) * 1.4, ux = Math.sin(a), uz = -Math.cos(a);
       // Well out from the wall, so they are seen coming up the streets rather than appearing at it.
-      const d = Math.min(hx / (Math.abs(ux) + .001), hz / (Math.abs(uz) + .001)) + 95 + rand() * 90;
+      // Once the wall is coming down they are already at it: close in, so the crowd is inside while there is still anyone to catch.
+      const near = s.evac || s.collapseT > 0;
+      const d = Math.min(hx / (Math.abs(ux) + .001), hz / (Math.abs(uz) + .001)) + (near ? 35 + rand() * 45 : 95 + rand() * 90);
       const x = Math.floor(c.cx + ux * d), z = Math.floor(c.cz + uz * d);
       if (x < 2 || z < 2 || x >= WX - 2 || z >= WZ - 2) continue;
       const dp = Math.hypot(x - P.x, z - P.z);
-      if (dp > R || dp < 60) continue;
+      if (dp > R || dp < (near ? 40 : 60)) continue;
       if (!W.walk[(x >> 1) + (z >> 1) * W.walkW] || H.campAt(x, z, 12)) continue;
       // And never where you are looking and could see it happen: in front of you with nothing in the way, it waits for another spot.
       const fx = Math.sin(P.yaw), fz = -Math.cos(P.yaw), ahead = ((x - P.x) * fx + (z - P.z) * fz) / (dp || 1);
@@ -1059,8 +1063,8 @@ export class CampSim {
     s.quiet = 0;
     s.arms = 4;
     s.waveT = Math.max(s.waveT || 0, 41);
-    // Everything that was still on its way arrives now.
-    s.pool = Math.max(s.pool, Math.round(240 * this.g.horde.settings.horde));
+    // Everything that was still on its way arrives now, and a big place draws a big crowd: as many again as there are people inside.
+    s.pool = Math.max(s.pool, Math.round(Math.max(240, (s.folk + s.guards) * .9) * this.g.horde.settings.horde));
     this.radio(c, 'The wall! The whole wall is coming down!', c.name, true, true);
   }
 

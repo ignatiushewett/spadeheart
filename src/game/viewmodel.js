@@ -120,6 +120,12 @@ export const MODELS = {
   block_wood: [[0, 0, 0, .2, .2, .2, 0x8a6c42]],
   block_conc: [[0, 0, 0, .2, .2, .2, 0x83837d]],
   block_steel: [[0, 0, 0, .2, .2, .2, 0x525a62]],
+  block_brick: [[0, 0, 0, .2, .2, .2, 0x8a4a3a]],
+  block_log: [[0, 0, 0, .2, .2, .2, 0x5f452c]],
+  block_sandbag: [[0, 0, 0, .2, .2, .2, 0x9a8a62]],
+  block_tin: [[0, 0, 0, .2, .2, .2, 0x8a8f90]],
+  block_stone: [[0, 0, 0, .2, .2, .2, 0x777880]],
+  block_glass: [[0, 0, 0, .2, .2, .2, 0x5f9c9c]],
 };
 
 // pos: where it rests. rot: x tips the top away from you, z leans it toward the middle of the screen.
@@ -147,6 +153,12 @@ const POSES = {
   block_wood: { pos: [.2, -.22, -.46], rot: [.15, .4, 0] },
   block_conc: { pos: [.2, -.22, -.46], rot: [.15, .4, 0] },
   block_steel: { pos: [.2, -.22, -.46], rot: [.15, .4, 0] },
+  block_brick: { pos: [.2, -.22, -.46], rot: [.15, .4, 0] },
+  block_log: { pos: [.2, -.22, -.46], rot: [.15, .4, 0] },
+  block_sandbag: { pos: [.2, -.22, -.46], rot: [.15, .4, 0] },
+  block_tin: { pos: [.2, -.22, -.46], rot: [.15, .4, 0] },
+  block_stone: { pos: [.2, -.22, -.46], rot: [.15, .4, 0] },
+  block_glass: { pos: [.2, -.22, -.46], rot: [.15, .4, 0] },
 };
 
 // The mouth of each barrel, in the model's own space: the flash comes out of it.
@@ -284,6 +296,12 @@ function buildHands(tone) {
     block_wood: bothHands('block_wood', .07, 0, 0, .07, .2, .12),
     block_conc: bothHands('block_conc', .07, 0, 0, .07, .2, .12),
     block_steel: bothHands('block_steel', .07, 0, 0, .07, .2, .12),
+    block_brick: bothHands('block_brick', .07, 0, 0, .07, .2, .12),
+    block_log: bothHands('block_log', .07, 0, 0, .07, .2, .12),
+    block_sandbag: bothHands('block_sandbag', .07, 0, 0, .07, .2, .12),
+    block_tin: bothHands('block_tin', .07, 0, 0, .07, .2, .12),
+    block_stone: bothHands('block_stone', .07, 0, 0, .07, .2, .12),
+    block_glass: bothHands('block_glass', .07, 0, 0, .07, .2, .12),
   };
 }
 

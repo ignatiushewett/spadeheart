@@ -40,6 +40,7 @@ import { makePersona } from './dialogue.js';
 const rand = Math.random;
 // What people in a camp say when it is going wrong.
 const PANIC_LINES = ["Oh God, they're in, they're in!", 'Where do we go? Where do we go?!', 'Get the kids inside!', 'Is the wall holding? Somebody tell me!', "Don't just stand there, move!", 'I can hear them. I can hear them!', 'Bar the doors! Bar the doors!', 'Has anyone seen my brother?', 'We should have left when we could.', 'Keep your head down and keep moving.', 'They said it would hold. They said!', 'Get away from the wall!', 'Run! Just run!', 'Somebody help me with this!', "Oh shit, oh shit, they're inside!", 'Fuck! Get back, get back!', 'Goddamn it, where are the guards?!', 'Shit, shut the doors!'];
+const SHOOTER_LINES = ['Shooter! Get down!', 'Get inside, get inside!', 'Who is shooting?!', 'Run! Just run!', 'Where are they? Where are they?!', 'Stay away from the windows!', 'Somebody stop them!'];
 const PANIC_KIDS = ['Mom? Mom!', 'I want to go home!', 'Are they coming in?', "I'm scared."];
 const pickOf = (a) => a[Math.floor(rand() * a.length)];
 const pickName = () => randomName();
@@ -115,7 +116,7 @@ const WATCH_SIGHT = 85;   // how far out the watch on a wall picks targets: what
 // Said round a fire, to whoever else is there.
 const WARM_LINES = ['Nights are getting colder.', 'Do not let it go out, whatever you do.', 'Feels like the first warm thing in a week.', 'Remember takeout? I would kill for takeout.',
   'Pass me that log.', 'Hands are finally working again.', 'Who is on the wall tonight?', 'You smell that? Somebody is burning a tyre again.', 'My dad used to do this every summer. Upstate.'];
-const POSE = { warm: 0, sit: 5, class: 5, sleep: 7, work: 6, farm: 6, talk: 4, teach: 4, shop: 0, browse: 0, stand: 0, mourn: 0, patrol: 0, play: 4 };
+const POSE = { cower: 5, warm: 0, sit: 5, class: 5, sleep: 7, work: 6, farm: 6, talk: 4, teach: 4, shop: 0, browse: 0, stand: 0, mourn: 0, patrol: 0, play: 4 };
 
 const wardrobeRow = (kinds) => {
   const [start, n] = WARDROBE[pickOf(kinds)];
@@ -167,6 +168,8 @@ const SERMON = ['The Lord did not promise us an easy road. He promised to walk i
   'They took the city. They did not take the valley, and they did not take this house.', 'You are tired. I know you are tired. Rest here a while, and then we go back to the wall.',
   'Weeping may endure for a night. I know, church. It has been a long night.', 'Say it with me now. We feed who comes. We bury who falls. We keep the light on.',
   'Do not ask me why. I have asked Him. I am still waiting on the answer, same as you.', 'Leon Calloway sang in that choir for thirty years. Somebody sing for him tonight.'];
+// Kill this many of a settlement's people inside its wall within this many seconds of play, and you are barred from it for good.
+const SPREE_KILLS = 3, SPREE_WINDOW = 300;
 const RAIDER_BREAK = ['Forget this!', "I'm out!", 'Not worth it!', 'Go, go, go!'];
 const RAID_CREW = ['gunman', 'shotgun', 'rusher', 'gunman', 'scav', 'gunner', 'gunman', 'bomber', 'rusher', 'marksman', 'scav', 'shotgun'];
 const RAID_BARKS = ['Stores first! Then we go!', 'Grab what you can carry!', 'Keep them off me!', "Don't stop, don't stop!", 'Who has eyes on the stores?', 'Two minutes, then we are gone!'];
@@ -752,6 +755,18 @@ export class NPCs {
     const milling = n.task && n.task.kind === 'market' && n.task.loose && rand() < .7;
     if (n.task && n.task.poi) { if (n.task.poi.by === n) n.task.poi.by = null; }
     n.stuckT = 0; n.stuckN = 0; n.lastX = n.x; n.lastZ = n.z;
+    // A killer loose in the place: everyone who lives here gets indoors, onto a bed or a seat out of the way, and stays down there until
+    // the siren stops.
+    if (n.kind === 'resident' && this.hunting(c.id)) {
+      // A bed, a seat in the bar or the hall, any seat or bench, a workbench or a desk; and failing all of that, down where they stand.
+      const spot = (n.bed && (!n.bed.by || n.bed.by === n) ? n.bed : this.freePoi(c, 'sleep', n))
+        || (c.bar && c.bar.pois.find((q) => !q.by && q.kind === 'sit')) || (c.hallPois || []).find((q) => !q.by && q.kind === 'sit')
+        || this.freePoi(c, 'sit', n) || this.freePoi(c, 'work', n) || this.freePoi(c, 'class', n);
+      n.task = { poi: spot || { x: n.x, z: n.z, kind: 'cower' }, kind: 'cower', loose: !spot, t: 40 + rand() * 30, hide: true };
+      if (spot) spot.by = n;
+      n.path = null; n.pathI = 0; n.arrived = !spot;
+      return;
+    }
     let kind = milling ? 'market' : this.scheduleKind(n);
     const tod = this.g.tod;
     const idler = n.browser;
@@ -913,10 +928,12 @@ export class NPCs {
     // When the siren goes, or they are through the wall, nobody in the camp sits still: they hurry, they cut whatever they were doing
     // short and go somewhere else, they wake up, and they say what everyone is thinking.
     const panic = this.campPanic(c);
+    // In a manhunt, whatever they were doing, they drop it and go for cover: not all in the same instant, but within a second or two.
+    if (!t.hide && this.hunting(c.id) && rand() < dt * 1.5) { this.startTask(n, c); return; }
     if (panic > 0) {
       if (t.kind === 'sleep' && panic >= .9 && n.arrived) { this.startTask(n, c); return; }
       if (n.arrived && !t.panicked && t.kind !== 'sleep' && t.kind !== 'work') { t.panicked = true; t.t = Math.min(t.t, 1.5 + rand() * (8 - panic * 5)); }
-      if (dp < 45 && rand() < dt * .05 * panic) this.bark(n, pickOf(n.kid ? PANIC_KIDS : PANIC_LINES), 34);
+      if (dp < 45 && rand() < dt * (this.hunting(c.id) ? .14 : .05) * panic) this.bark(n, pickOf(n.kid ? PANIC_KIDS : this.hunting(c.id) ? SHOOTER_LINES : PANIC_LINES), 34);
     }
     if (n.arrived) {
       if (t.loose && this.crowd && dp < 80 && ((n.tick + this.frameN) & 3) === 0) {
@@ -1006,7 +1023,8 @@ export class NPCs {
       }
     }
     if (n.bumpT > 0) n.bumpT -= dt;
-    const speed = n.speed * (t.kind === 'play' || n.alarmed ? 1.6 : 1) * (1 + panic * .65) * (n.bumpT > 0 ? .55 : 1);
+    // With a killer loose in the place they run, flat out, wherever they are going.
+    const speed = n.speed * (t.kind === 'play' || n.alarmed ? 1.6 : 1) * (1 + panic * .65) * (this.hunting(c.id) ? 1.6 : 1) * (n.bumpT > 0 ? .55 : 1);
     // Spend this frame's whole stride along the path, however many points it passes, so the pace never hitches.
     let left = speed * dt, hx = 0, hz = 0;
     n.phase += left * 2.1;
@@ -1510,7 +1528,7 @@ export class NPCs {
     const g = this.g, P = g.player, w = g.world;
     if (!P.alive) return;
     for (const c of g.layout.camps) {
-      if (!this.owesBail(c.id) || g.campSim.state[c.id].status !== 'holding') continue;
+      if (!this.owesBail(c.id) || this.banned(c.id) || g.campSim.state[c.id].status !== 'holding') continue;
       const wall = Math.max(c.x0 - P.x, P.x - c.x1, c.z0 - P.z, P.z - c.z1);
       if (wall < 0 || wall > PATROL_REACH) continue;
       // One of theirs already about: the nearest crew is sent over.
@@ -2755,11 +2773,18 @@ export class NPCs {
     const within = g.horde.campAt(P.x, P.z) ? g.horde.inCamp(P.x, P.z) : null;
     const angry = this.angry || (this.angry = []);
     this.watchTrespass(within, dt);
-    for (const c of g.layout.camps) angry[c.id] = !!within && within.id === c.id && (this.hostileCamp(c.id) || this.trespassing === c.id);
+    // A camp only minds you inside its wall, unless you have killed there: then its guards fire on you anywhere they can see you from
+    // the wall and the gate.
+    for (const c of g.layout.camps) {
+      const off = Math.max(c.x0 - P.x, P.x - c.x1, c.z0 - P.z, P.z - c.z1);
+      angry[c.id] = (!!within && within.id === c.id && (this.hostileCamp(c.id) || this.trespassing === c.id)) || (this.banned(c.id) && off < 70);
+    }
     const inId = within ? within.id : -1;
     if (inId !== this.lastWithin) {
       this.lastWithin = inId;
-      if (inId >= 0 && angry[inId] && this.hostileCamp(inId)) g.ui.banner('You are not welcome here', `They will shoot. Bail is ${this.bailFor(inId)} spades, at their Town Hall or to a patrol outside.`);
+      if (inId >= 0 && this.banned(inId)) g.campSim.state[inId].huntT = Math.max(g.campSim.state[inId].huntT || 0, 60);
+      if (inId >= 0 && angry[inId] && this.hostileCamp(inId)) this.campSays(inId, this.banned(inId) ? pickOf(['Eyes on the killer, inside the wall. Guards, open fire.', 'They are back. All guards, take them down.'])
+        : pickOf(['Contact inside the wall. It is the one who shot our people. Guards, on them.', 'We can see you. Guards, they are inside.']));
     }
     // Who is standing where, near you: people walking through a camp have to get round each other.
     // How fast you are actually going, from where you were last frame: what your companions match their pace to.
@@ -2862,6 +2887,34 @@ export class NPCs {
   hillY(n) {
     const t = this.g.world.terrainTop(n.x, n.z);
     if (t > STREET_Y) { if (n.y < t || n.onHill) { n.y = t; n.onHill = true; } } else if (n.onHill) { n.y = STREET_Y; n.onHill = false; }
+    if (this.holes && this.holes.length && !n.knock) this.overHole(n);
+  }
+
+  // A blast leaves a hole. Plenty of what people do puts them back on the street every step; anyone standing where the street has gone
+  // keeps their own height instead, falls to whatever is left under them, and climbs back out a step at a time.
+  noteHole(x, z, r) {
+    const now = this.g.time, list = this.holes || (this.holes = []);
+    for (let i = list.length - 1; i >= 0; i--) if (now - list[i].t > 600) list.splice(i, 1);
+    list.push({ x, z, r2: r * r, t: now });
+    if (list.length > 40) list.shift();
+  }
+
+  overHole(n) {
+    if (!this.holes.some((h) => (n.x - h.x) ** 2 + (n.z - h.z) ** 2 < h.r2)) { n.fy = undefined; return; }
+    const w = this.g.world, dt = this.g.frameDt || .016;
+    let y = n.fy !== undefined ? n.fy : n.y;
+    const gy = w.groundBelow(n.x, y + 1.2, n.z, 48);
+    if (gy < y - .05) {
+      n.fvy = Math.max(-40, (n.fvy || 0) - 28 * dt);
+      y = Math.max(gy, y + n.fvy * dt);
+      if (y <= gy) n.fvy = 0;
+    } else {
+      // Up out of it a step at a time; anything they would otherwise be stood inside, they are on top of.
+      y = gy - y <= 1.1 ? Math.min(gy, y + dt * 6) : gy;
+      n.fvy = 0;
+    }
+    n.y = y;
+    n.fy = y < STREET_Y - .05 || y > STREET_Y + .05 ? y : undefined;
   }
 
   updateChatter(dt) {
@@ -3526,10 +3579,12 @@ export class NPCs {
           const watch = st.npcs.find((n) => n.kind === 'sentry');
           if (owes) {
             g.ui.floatSay(watch, pickOf(['Not you. Not till you pay what you owe.', 'Settle your bail with a patrol, then we talk.', "Gate's shut to you. You know why."]), 3);
-            g.ui.toast(`${c.name} will not open to you until your bail is paid: ${this.bailFor(c.id).toLocaleString('en-US')} spades, to one of its patrols.`);
+            if (this.banned(c.id)) g.ui.floatSay(watch, pickOf(['Not you. Not ever.', 'Walk away before we put you down.', "You know what you did. That gate is never opening for you."]), 3);
+            else g.ui.toast(`${c.name} will not open to you until your bail is paid: ${this.bailFor(c.id).toLocaleString('en-US')} spades, to one of its patrols.`);
           } else {
             g.ui.floatSay(watch, pickOf(['Citizens only.', "Not without papers. Talk to one of the patrols.", "Gate stays shut. You know the rules.", "You got papers? Then keep walking."]), 3);
-            g.ui.toast(`${c.name} only opens to citizens. Its patrols sell papers: ${this.citizenFee(c.id).toLocaleString('en-US')} spades.`);
+            const said = this.citSaid || (this.citSaid = {});
+            if (g.time - (said[c.id] ?? -1e9) > 120) { said[c.id] = g.time; g.ui.banner('Citizens only', `${c.name} only opens to citizens. Its patrols sell papers: ${this.citizenFee(c.id).toLocaleString('en-US')} spades.`); }
           }
         }
         if (gate.admitT > 0) gate.admitT -= dt;
@@ -3820,10 +3875,31 @@ export class NPCs {
   // Everyone off the wall shoots for themselves, one target at a time.
   selfDefence(n, dp, hostile) {
     const g = this.g, H = g.horde, W = g.world, P = g.player;
-    if (hostile && P.alive && dp < 40 && n.armed && this.clearShot(n, P.x, P.y + 1.6, P.z)) {
+    // With the siren going for you, the people defending the place are shooting to kill: further, more often on target, and harder.
+    const hunting = n.camp >= 0 && this.hunting(n.camp), hunt = hunting && (n.kind === 'guard' || n.kind === 'sentry');
+    // Everyone else is getting to cover first; but anyone with a gun who sees you close by on the way, or from where they are hiding,
+    // takes a shot or two at you. Not often, not far, and not well.
+    if (hunting && !hunt) {
+      if (!(hostile && P.alive && n.armed && dp < 26 && this.clearShot(n, P.x, P.y + 1.6, P.z))) return false;
       if (!this.squareUp(n, P.x, P.z)) { n.cd = Math.min(n.cd, .1); return false; }
       this.fire(n, P.x, P.y + 1.6, P.z, n.gun, true);
-      if (rand() < .22) P.damage(7, n.x, n.z, 'shot');
+      if (rand() < .16) P.damage(6, n.x, n.z, 'shot');
+      n.cd = Math.max(n.cd, 1.4 + rand() * 1.6);
+      return true;
+    }
+    if (hostile && P.alive && dp < (hunt ? 60 : 40) && n.armed && this.clearShot(n, P.x, P.y + 1.6, P.z)) {
+      if (!this.squareUp(n, P.x, P.z)) { n.cd = Math.min(n.cd, .1); return false; }
+      this.fire(n, P.x, P.y + 1.6, P.z, n.gun, true);
+      if (rand() < (hunt ? .4 : .22)) P.damage(hunt ? 14 : 7, n.x, n.z, 'shot');
+      return true;
+    }
+    // Out of sight in a manhunt, now and then they put rounds where you were anyway, to keep your head down. Those go into whatever is in
+    // the way, and take pieces out of it.
+    if (hunt && hostile && P.alive && n.armed && n.gun && n.gun.sound && dp < 100 && rand() < .45) {
+      const tx = P.x + (rand() - .5) * 3, ty = P.y + .6 + rand() * 1.6, tz = P.z + (rand() - .5) * 3;
+      if (!this.squareUp(n, tx, tz)) { n.cd = Math.min(n.cd, .1); return false; }
+      this.fire(n, tx, ty, tz, n.gun, true, true);
+      n.cd = Math.max(n.cd, .35 + rand() * .5);
       return true;
     }
     // Raiders would rather shoot a patrol than a corpse, and it is mutual.
@@ -3987,6 +4063,8 @@ export class NPCs {
         this.selfDefence(n, dp, hostile);
       }
     }
+    // A manhunt: the watch on the ground leaves its posts and comes for you through the lanes. The guns on the wall stay up there.
+    if (n.camp >= 0 && (n.kind === 'sentry' || (n.kind === 'guard' && !n.beat && n.y < STREET_Y + 2)) && this.hunting(n.camp) && this.huntStep(n, dt, dp)) return;
     // Out in the streets too: a patrol, someone walking with you, anyone on the road. Caught in a crowd, nobody stands still in it.
     if (!n.flee && !n.beat && ((campS && (n.kind === 'guard' || n.kind === 'sentry' || n.kind === 'vendor' || n.kind === 'clerk' || n.kind === 'named' || n.kind === 'boss' || n.kind === 'resident'))
       || (!campS && (n.kind === 'roamer' || n.kind === 'follower' || n.kind === 'wanderer'))) && this.giveGround(n, dt)) return;
@@ -4405,7 +4483,7 @@ export class NPCs {
     return !hit || hit.dist >= d - .3;
   }
 
-  fire(n, x, y, z, gun, audio) {
+  fire(n, x, y, z, gun, audio, rough = false) {
     const g = this.g;
     const dist = Math.hypot(n.x - g.player.x, n.z - g.player.z);
     n.yaw = Math.atan2(x - n.x, z - n.z);
@@ -4427,7 +4505,7 @@ export class NPCs {
       const hit = g.world.raycast(mx, my, mz, dx / d, dy / d, dz / d, d, true);
       if (hit && hit.dist < d - .3) { x = mx + dx / d * hit.dist; y = my + dy / d * hit.dist; z = mz + dz / d * hit.dist; struck = hit; }
     }
-    if (gun.sound && dist < 160) this.roundLands(n, mx, my, mz, x, y, z, struck);
+    if (gun.sound && dist < 160) this.roundLands(n, mx, my, mz, x, y, z, struck, rough);
     if (gun.sound) {
       // Out of the end of the barrel as it is drawn this frame, and the gun kept up for a few seconds after.
       const M = MUZZLE[n.weaponId];
@@ -4448,14 +4526,21 @@ export class NPCs {
   // Where a round goes after it leaves the gun: into the wall that stopped it, or, missing now and then, on into whatever is behind what
   // it was aimed at. It chips at what it hits like yours would: windows, buildings, cars, the road. Never a camp's own wall or gate, and
   // nothing inside a camp: they are not going to shoot their own place apart.
-  roundLands(n, mx, my, mz, x, y, z, struck) {
+  roundLands(n, mx, my, mz, x, y, z, struck, rough = false) {
     const g = this.g, W = g.world, dx = x - mx, dy = y - my, dz = z - mz, d = Math.hypot(dx, dy, dz) || 1, ux = dx / d, uy = dy / d, uz = dz / d;
-    // Glass on the way breaks, about half the time.
-    const pane = W.raycast(mx, my, mz, ux, uy, uz, d + .3, false);
-    if (pane && pane.dist < d + .2 && isGlassId(pane.id) && rand() < .5 && !g.horde.inCamp(pane.x + .5, pane.z + .5, 4)) g.breakGlass(pane.x, pane.y, pane.z);
+    // Every pane of glass on the way goes, the way yours do: a round does not slip through a window and leave it whole.
+    for (let t = 0, k = 0; k < 6; k++) {
+      const pane = W.raycast(mx + ux * t, my + uy * t, mz + uz * t, ux, uy, uz, d + .3 - t, false);
+      if (!pane || !isGlassId(pane.id)) break;
+      g.breakGlass(pane.x, pane.y, pane.z);
+      t += pane.dist + .05;
+      if (t >= d + .2) break;
+    }
     let hit = struck;
     if (!hit && rand() < .28) hit = W.raycast(x, y, z, ux + (rand() - .5) * .06, uy + (rand() - .5) * .06, uz + (rand() - .5) * .06, 30, true);
-    if (!hit || g.horde.inCamp(hit.x + .5, hit.z + .5, 4)) return;
+    // A manhunt's covering fire is the exception: that goes into the buildings inside, though still never the wall or the gate.
+    if (!hit) return;
+    if (g.horde.inCamp(hit.x + .5, hit.z + .5, 4) && !(rough && g.horde.inCamp(hit.x + .5, hit.z + .5, -5))) return;
     // A rifle round chews a real piece out of brick and plaster, not a scratch.
     const broke = W.hit(hit.x, hit.y, hit.z, 3);
     if (Math.hypot(hit.x - g.player.x, hit.z - g.player.z) < 70) g.particles.debris(hit.x, hit.y, hit.z, hit.id, broke ? 5 : 2, 2);
@@ -4577,8 +4662,18 @@ export class NPCs {
   // Shooting on sight. Something done outside their wall gets the gate shut on you, but nobody opens fire over it.
   hostileCamp(id) {
     const P = this.g.player, b = P.bail && P.bail[id];
+    if (b === 'banned') return true;
     if (b === 'out') return false;
     return b === 'in' || P.rep <= -30 || this.g.dialogue.standing(id) < -30;
+  }
+
+  // Killed their people inside their own wall, more than once: there is no paying for that. Never again.
+  banned(id) { const P = this.g.player; return !!(P.bail && P.bail[id] === 'banned'); }
+
+  // A settlement says what it has to say about you over its radio, from whoever speaks for it.
+  campSays(id, text) {
+    const g = this.g, c = g.layout.camps[id];
+    if (c) g.campSim.radio(c, text, c.name, true, true);
   }
 
   // Do you owe them? Then the gate is shut to you until it is paid, whether or not they are shooting.
@@ -4627,9 +4722,8 @@ export class NPCs {
     this.trespassT += dt;
     if (this.trespassT > 7 && this.trespassing !== id) {
       this.trespassing = id;
-      P.rep -= 4;
       g.dialogue.addStanding(id, -20);
-      g.ui.banner('Trespasser', `${within.name} is shooting at you. Word of this will get around.`);
+      g.ui.banner('Trespasser', `${within.name} is shooting at you.`);
       g.saveGame();
     }
   }
@@ -4733,6 +4827,27 @@ export class NPCs {
       return;
     }
     const S = n.camp >= 0 ? g.campSim.state[n.camp] : null;
+    // Already at war with you: they are trying to kill you, and every round counts. None of the forgiving below applies, siren or not.
+    const home0 = n.camp >= 0 ? n.camp : n.factionId ? n.factionId - 1 : -1;
+    if ((n.camp >= 0 && this.hostileCamp(n.camp)) || (n.camp < 0 && n.kind === 'roamer' && (P.wanted[-1] > 0 || (home0 >= 0 && this.hostileCamp(home0))))) {
+      n.hp -= dmg * BODY_HIT * Math.max(n.bodyHp || 0, n.hp);
+      if (n.hp <= 0) {
+        n.headless = behead;
+        this.kill(n, true);
+        // The settlement keeps a count while it hunts you, and now and then says it out loud; and while you are barred, every one of
+        // them puts the siren on again.
+        if (n.camp >= 0) this.spreeCall(n.camp);
+        if (n.camp >= 0 && this.banned(n.camp)) g.campSim.state[n.camp].huntT = Math.max(g.campSim.state[n.camp].huntT || 0, 90);
+        // Still counting: enough of them dead inside their own wall and it is for good.
+        if (n.camp >= 0 && !this.banned(n.camp) && g.horde.inCamp(n.x, n.z, 0)) {
+          const now = g.stats.playSecs || 0, k = P.campKills || (P.campKills = {});
+          k[n.camp] = (k[n.camp] || []).filter((t) => now - t < SPREE_WINDOW);
+          k[n.camp].push(now);
+          if (k[n.camp].length >= SPREE_KILLS) this.banPlayer(n.camp);
+        }
+      }
+      return;
+    }
     // On high alert, with the siren going or the dead inside, a round in the wrong place is not anybody's business: it is ignored.
     if (n.camp >= 0 && this.campPanic(g.layout.camps[n.camp]) >= .6) {
       if (g.time - (n.ffSaid ?? -99) > 6) { n.ffSaid = g.time; g.ui.floatSay(n, pickOf(['Watch your fire!', 'Other way!', 'Careful!']), 1.4); }
@@ -4765,15 +4880,26 @@ export class NPCs {
     const deliberate = n.hits > (outside ? 3 : 2);
     if (n.hp <= 0) {
       if (!fighting || deliberate) {
-        P.rep -= 10;
-        if (n.camp >= 0) g.dialogue.addStanding(n.camp, -18);
-        g.ui.toast(`You killed ${n.name}. People saw it.`, 'bad');
+        // What you did to a settlement's people is that settlement's business. Only killing someone who belongs nowhere gets around.
+        const own = n.camp >= 0 ? n.camp : n.factionId ? n.factionId - 1 : -1;
+        if (own >= 0) g.dialogue.addStanding(own, -18);
+        else P.rep -= 10;
+        if (n.camp >= 0) this.campSays(n.camp, pickOf([`Shots inside the wall. ${n.name} is down. Somebody saw who did it.`, `${n.name} has been shot. We know who it was.`, `Man down by the ${pickOf(['market', 'square', 'lanes'])}. ${n.name}. The shooter is still inside.`]));
+        else g.ui.toast(`You killed ${n.name}. People saw it.`, 'bad');
       }
       n.headless = behead;
       this.kill(n, true);
       // One of theirs dead at your hand, while you already owe them: the bail goes up by a good part again, and for four minutes or
       // so nobody of theirs will take your money. Their patrols come for you instead.
       const home = n.camp >= 0 ? n.camp : n.factionId ? n.factionId - 1 : -1;
+      // Three of theirs dead at your hand inside their own wall in a few minutes, and it is not a misunderstanding any more: the siren
+      // goes, and you are barred from the place for good.
+      if (home >= 0 && !outside && !this.banned(home)) {
+        const now = g.stats.playSecs || 0, k = P.campKills || (P.campKills = {});
+        k[home] = (k[home] || []).filter((t) => now - t < SPREE_WINDOW);
+        k[home].push(now);
+        if (k[home].length >= SPREE_KILLS) { this.banPlayer(home); return; }
+      }
       if (home >= 0 && this.owesBail(home) && (!fighting || deliberate)) {
         this.bailOffence(home, n.kid ? 1 : .35, 240);
         if (n.kind === 'roamer') P.wanted[-1] = Math.max(P.wanted[-1] || 0, 150);
@@ -4802,26 +4928,89 @@ export class NPCs {
       this.bailOffence(home, weight * .02, 0);
       return;
     }
-    if (before < 2.5 && now >= 2.5 && now < 5) g.ui.toast('People are reaching for their guns. Put yours down.', 'bad');
+    if (before < 2.5 && now >= 2.5 && now < 5) { if (key >= 0) this.campSays(key, pickOf(['Whoever is shooting in there, put it down. Now.', 'Hold your fire inside the wall. Last warning.', 'We can see you. Lower the weapon.'])); else g.ui.toast('People are reaching for their guns. Put yours down.', 'bad'); }
     if (now < 5) return;
     const name = home >= 0 ? g.layout.camps[home].name : 'The patrol';
     P.grief[key] = 0;
     if (outside && home >= 0) {
       // Done outside the wall: nobody is shooting back, but the gate is shut to you until you pay up.
       P.bail[home] = 'out';
-      P.rep -= 4;
-      g.ui.banner('You are on their list', `${name} has shut its gate to you until you pay your bail: ${this.bailFor(home)} spades, at their Town Hall or to one of their patrols.`);
+      g.dialogue.addStanding(home, -8);
+      this.campSays(home, pickOf(['Gate crews, eyes up. Somebody out there has been shooting our people. Keep the gate shut to them.', 'Patrols, watch the roads. Someone out there just shot at our people.']));
+      g.ui.banner('Wanted', `${name} has shut its gate to you. Bail is ${this.bailFor(home)} spades, at its Town Hall or to one of its patrols.`);
       g.saveGame();
       return;
     }
-    P.rep -= 12;
+    if (home < 0) P.rep -= 12;
     if (key < 0) P.wanted[-1] = 90;
     if (home >= 0) { P.campRep[home] = Math.min(P.campRep[home] || 0, 0) - 20; P.bail[home] = 'in'; }
-    g.ui.banner('They have turned on you', home >= 0 ? `${name} will shoot you inside its wall until you pay your bail: ${this.bailFor(home)} spades.` : `${name} is shooting back.`);
+    if (home >= 0) {
+      this.campSays(home, pickOf(['All guards, the shooter is still inside the wall. Find them.', 'We have a shooter inside. Guards, on them. Everyone else, get down.', 'Shooter in the lanes. Guards, take them.']));
+      g.ui.banner('Wanted', `${name} will shoot you inside its wall. Bail is ${this.bailFor(home)} spades, at its Town Hall or to one of its patrols.`);
+    } else g.ui.toast(`${name} is shooting back.`, 'bad');
     if (P.rep <= -30 && !this.warned) {
       this.warned = true;
-      g.ui.banner('Marked', 'Every settlement will shoot you inside its wall. Patrols will still take your bail.');
+      const near = g.horde.inCamp(P.x, P.z, 400) || g.layout.camps[P.home >= 0 ? P.home : 0];
+      if (near) this.campSays(near.id, 'All stations, heads up. There is someone out there shooting up settlements. If they come to your gate, you know what to do.');
+      g.ui.banner('Wanted everywhere', 'Every settlement will shoot you inside its wall. Their patrols will still take your bail.');
     }
+    g.saveGame();
+  }
+
+  // A running count of the dead while a settlement hunts you: every five, though never more than once in twenty seconds.
+  spreeCall(id) {
+    const g = this.g, c = g.layout.camps[id], k = this.spreeDead || (this.spreeDead = {});
+    const s = k[id] || (k[id] = { n: 0, said: 0, at: -1e9 });
+    s.n++;
+    if (s.n - s.said < 5 || g.time - s.at < 20) return;
+    s.said = s.n - (s.n % 5); s.at = g.time;
+    // No counting out loud: just how it sounds, getting worse, the longer it goes on.
+    const n = s.n, tier = n >= 20 ? 3 : n >= 15 ? 2 : n >= 10 ? 1 : 0;
+    this.campSays(id, pickOf([
+      ['We have more people down. They are still inside.', 'More of ours on the ground. Somebody find them.', 'They have hit us again. Guards, where are you?', 'Still shooting. Everyone off the lanes.'],
+      ['This is bad. Get the families off the streets, now.', 'They are going through us. Close in on them, all of you.', 'Too many down. Where is the watch?', 'Doors shut, lights off. Nobody goes outside.'],
+      ['We cannot stop them. Get people out the back, anyone who can move.', 'It is a massacre in here. Every gun you have, now!', 'Someone answer me. Is anybody still out there?', 'We are losing people faster than we can count.'],
+      ['God help us. Stay where you are. Do not come out.', 'There is nobody left on the lanes. Just stay down.', 'Whoever is still listening, hide. Just hide.', 'I can hear them out there still. Keep quiet. Keep down.'],
+    ][tier]));
+  }
+
+  // A settlement with its siren going for you: hunting you, not just holding its posts.
+  hunting(id) { const S = this.g.campSim.state[id]; return this.banned(id) && S.status === 'holding' && S.huntT > 0 && this.g.player.alive; }
+
+  // Running at you through the lanes, the way they would walk anywhere in the place, until close enough to stand and shoot. Where you
+  // are outside the wall, they come to the nearest inside it.
+  huntStep(n, dt, dp) {
+    const g = this.g, P = g.player, c = g.layout.camps[n.camp], H = n.hunt || (n.hunt = { t: 0 });
+    if (dp < 9) { n.yaw = Math.atan2(P.x - n.x, P.z - n.z); n.state = n.aim > 0 ? 3 : 0; return true; }
+    // Each of them works out a fresh way to you every second or so, ahead of everyone else's errands: the hunt does not wait its turn.
+    if ((H.t -= dt) <= 0 || !H.path) {
+      H.t = 1.2 + rand() * .6;
+      const tx = Math.max(c.x0 + 3, Math.min(c.x1 - 3, P.x)), tz = Math.max(c.z0 + 3, Math.min(c.z1 - 3, P.z));
+      H.path = this.findPath(c, n.x, n.z, tx, tz);
+      H.i = H.path && H.path.length > 2 ? 2 : 0;
+      if (!H.path) return false;
+    }
+    if (H.i >= H.path.length) { n.state = n.aim > 0 ? 3 : 0; return true; }
+    const tx = H.path[H.i], tz = H.path[H.i + 1], dx = tx - n.x, dz = tz - n.z, d = Math.hypot(dx, dz), step = 3.6 * dt;
+    if (d <= step) { n.x = tx; n.z = tz; H.i += 2; } else { n.x += dx / d * step; n.z += dz / d * step; }
+    if (!(n.aim > 0) && d > .01) n.yaw = Math.atan2(dx, dz);
+    n.phase += step * 2.1;
+    n.state = n.aim > 0 ? 3 : .7;
+    n.y = STREET_Y;
+    return true;
+  }
+
+  // Barred for good: the siren goes and stays on a good while, and the settlement says so.
+  banPlayer(id) {
+    const g = this.g, P = g.player, c = g.layout.camps[id], s = g.campSim.state[id];
+    P.bail[id] = 'banned';
+    if (P.bailExtra) delete P.bailExtra[id];
+    if (P.bailLock) delete P.bailLock[id];
+    P.campRep[id] = Math.min(P.campRep[id] || 0, 0) - 40;
+    P.grief[id] = 0;
+    if (s) s.huntT = 90;
+    this.campSays(id, pickOf(['Siren! We have a killer inside the wall. All guards, find them.', `Everyone inside! There is a shooter loose in ${c.name}. Guards, take them down.`]));
+    g.ui.banner('Wanted for murder', `${c.name} will never take you back. Its guards will shoot on sight.`);
     g.saveGame();
   }
 
@@ -4908,6 +5097,8 @@ export class NPCs {
   campPanic(c) {
     const sim = this.g.campSim, S = sim.state[c.id];
     if (S.status !== 'holding') return 0;
+    // A killer loose inside the wall: as bad as it gets, whichever siren you happen to be hearing.
+    if (this.hunting(c.id)) return 1;
     let p = 0;
     if (sim.alarm === c) p = sim.alarmLevel >= 1 ? 1 : .6;
     if (S.breaches.length) p = Math.max(p, .5 + Math.min(.4, S.breaches.length * .15));
