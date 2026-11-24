@@ -2282,8 +2282,8 @@ export class UI {
     const P = g.player;
     const tx = (px) => c.width / 2 + (px - v.x) * s, tz = (pz) => c.height / 2 + (pz - v.z) * s;
     this.mapLights('bm-lights', c.width, c.height, (q) => { q.translate(c.width / 2 - v.x * s, c.height / 2 - v.z * s); q.scale(s, s); });
-    // The chunk grid: every chunk close in, every second, fourth and so on further out, so the lines never crowd.
-    {
+    // The chunk grid: off. The map reads better as the land alone. (Kept here, switched off, in case it is wanted back.)
+    if (false) {
       let step = CS;
       while (step * s < 9) step *= 2;
       // Out over the country past the edges as well, so the squares carry on across all of it.
@@ -2405,12 +2405,14 @@ export class UI {
     }
     for (const f of g.npcs.followers) if (!f.dead) companionArrow(x, tx(f.x), tz(f.z), Math.atan2(Math.sin(f.ys), -Math.cos(f.ys)), .85);
     const ax = tx(P.x), az = tz(P.z);
-    x.save();
-    x.translate(ax, az);
-    x.rotate(P.yaw);
-    x.fillStyle = '#fff';
-    x.beginPath(); x.moveTo(0, -11); x.lineTo(7, 8); x.lineTo(0, 4); x.lineTo(-7, 8); x.closePath(); x.fill();
-    x.restore();
+    if (!this.mapPhoto) {
+      x.save();
+      x.translate(ax, az);
+      x.rotate(P.yaw);
+      x.fillStyle = '#fff';
+      x.beginPath(); x.moveTo(0, -11); x.lineTo(7, 8); x.lineTo(0, 4); x.lineTo(-7, 8); x.closePath(); x.fill();
+      x.restore();
+    }
     // The whole round, so you can see where it goes: done, and still to do.
     for (const j of g.jobs.active) {
       if (j.type !== 'patrol' || j.status !== 'active') continue;

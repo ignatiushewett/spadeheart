@@ -367,8 +367,15 @@ class Game {
       // Relief: lit from the north-west, a little lighter the higher it is, and a contour every twelve blocks of height.
       let shade = 1;
       if (!top && g !== G.WATER) {
-        const t = L.terr[i], slope = ((T(wx + 4, wz) - T(wx - 4, wz)) + (T(wx, wz + 4) - T(wx, wz - 4))) * .07;
-        shade *= 1 + Math.max(-.6, Math.min(.5, slope));
+        // Hill shading, lit from the north-west: the slope taken close in for the detail and further out for the shape of the land, so a
+        // whole ridge reads as one, not just its steep bits.
+        const t = L.terr[i];
+        const gx = (T(wx + 4, wz) - T(wx - 4, wz)) * .075 + (T(wx + 26, wz) - T(wx - 26, wz)) * .03;
+        const gz = (T(wx, wz + 4) - T(wx, wz - 4)) * .075 + (T(wx, wz + 26) - T(wx, wz - 26)) * .03;
+        const lam = (.6 * gx + .45 * gz + .65) / Math.sqrt(1 + gx * gx + gz * gz) / .65;
+        shade *= Math.max(.5, Math.min(1.45, .3 + .7 * lam));
+        // Higher ground a touch lighter, the low ground a touch darker, so the hills stand up off the valleys.
+        if (g === G.PARK || g === G.ROCK) shade *= .93 + Math.min(.14, Math.max(0, t) / 420);
         const lift = g === G.PARK ? 0 : Math.max(0, Math.min(60, t)) * .2;
         rgb = [rgb[0] + lift, rgb[1] + lift * .9, rgb[2] + lift * .7];
         if (t > 3 && (g === G.PARK || g === G.ROCK || g === G.FIELD) && (Math.floor(t / 16) !== Math.floor(T(wx + 2, wz) / 16) || Math.floor(t / 16) !== Math.floor(T(wx, wz + 2) / 16))) shade *= .87;
