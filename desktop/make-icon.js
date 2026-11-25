@@ -1,35 +1,34 @@
-// Draws the game's icon (the same pixel spade as the web page's favicon, read out of index.html) into icon.png and icon.ico for the
-// desktop window, on a dark rounded square so it shows up on a light taskbar as well as a dark one. Run with: node make-icon.js
+// Draws the game's icon (the spade from the title, the same as the web page's favicon) into icon.png and icon.ico for the desktop
+// window, on a dark rounded square so it shows up on a light taskbar as well as a dark one. Run with: node make-icon.js
 const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
 
-const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
-const icon = html.match(/<link rel="icon"[^>]*href='([^']*)'/)[1];
-const svg = decodeURIComponent(icon.replace(/^data:image\/svg\+xml,/, ''));
-const [, vw, vh] = svg.match(/viewBox="0 0 (\d+) (\d+)"/).map(Number);
-const layers = [...svg.matchAll(/<path fill="#([0-9a-f]{6})" d="([^"]*)"/g)].map(([, col, d]) => ({
-  rgb: [0, 2, 4].map((k) => parseInt(col.slice(k, k + 2), 16)),
-  rects: [...d.matchAll(/M(\d+) (\d+)h(\d+)v(\d+)/g)].map((m) => m.slice(1).map(Number)),
-}));
+// The spade, as in the title: a 10 by 12 outline.
+const SPADE = [[5, 0], [10, 5.4], [10, 8.2], [8.4, 9.6], [5.9, 8.6], [6.9, 12], [3.1, 12], [4.1, 8.6], [1.6, 9.6], [0, 8.2], [0, 5.4]];
+const inside = (x, y) => {
+  let c = false;
+  for (let i = 0, j = SPADE.length - 1; i < SPADE.length; j = i++) {
+    const [xi, yi] = SPADE[i], [xj, yj] = SPADE[j];
+    if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) c = !c;
+  }
+  return c;
+};
 
 function draw(N) {
   const px = Buffer.alloc(N * N * 4);
-  // The spade as big as the tile allows: a thin margin, and scaled to whatever the size is (so at 16 and 24 pixels, where Windows draws
-  // it in the title bar, it is still all there rather than nothing).
-  const pad = N <= 32 ? 1 : Math.round(N * .07), s = (N - pad * 2) / Math.max(vw, vh);
-  const ox = (N - s * vw) / 2, oy = (N - s * vh) / 2, r = N * .16;
-  const grid = new Array(vw * vh).fill(null);
-  for (const { rgb, rects } of layers) for (const [x0, y0, w, h] of rects) for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) grid[x + y * vw] = rgb;
+  // The spade as big as the tile allows, with a margin, smoothed at its edges (sampled 4 by 4 a pixel).
+  const pad = N * .16, s = (N - pad * 2) / 12, ox = (N - s * 10) / 2, oy = (N - s * 12) / 2, r = N * .16;
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
     const k = (x + y * N) * 4;
     // The rounded square behind it, so it shows on a light taskbar as well as a dark one.
     const dx = Math.max(0, Math.abs(x + .5 - N / 2) - (N / 2 - r)), dy = Math.max(0, Math.abs(y + .5 - N / 2) - (N / 2 - r));
     const a = Math.max(0, Math.min(1, r - Math.hypot(dx, dy) + .5));
-    px[k] = 22; px[k + 1] = 21; px[k + 2] = 19; px[k + 3] = Math.round(a * 255);
-    const u = Math.floor((x + .5 - ox) / s), v = Math.floor((y + .5 - oy) / s);
-    const c = u >= 0 && v >= 0 && u < vw && v < vh ? grid[u + v * vw] : null;
-    if (c) { px[k] = c[0]; px[k + 1] = c[1]; px[k + 2] = c[2]; px[k + 3] = 255; }
+    let cover = 0;
+    for (let sy = 0; sy < 4; sy++) for (let sx = 0; sx < 4; sx++) if (inside((x + (sx + .5) / 4 - ox) / s, (y + (sy + .5) / 4 - oy) / s)) cover++;
+    const t = cover / 16;
+    px[k] = Math.round(22 + (233 - 22) * t); px[k + 1] = Math.round(21 + (228 - 21) * t); px[k + 2] = Math.round(19 + (216 - 19) * t);
+    px[k + 3] = Math.round(Math.max(a, t) * 255);
   }
   return png(N, px);
 }
