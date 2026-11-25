@@ -2,7 +2,7 @@
 // planCamp turns a definition into plain data; stampCamp turns that data into voxels chunk by chunk.
 // Everything placed reserves its footprint first, so no two pieces of a camp can overlap.
 import { STREET_Y, WX, WZ, G } from './constants.js';
-import { M, CLOTH_OF, FLAGS, F_CLOTH, F_LEAF } from './materials.js';
+import { M, CLOTH_OF, FLAG_OF, FLAGS, F_CLOTH, F_LEAF } from './materials.js';
 import { h2, makeRng } from './rng.js';
 
 // A real bed, a block off the floor: headboard, pillows, the sheet turned down, then the blanket, and maybe a spare folded at the foot.
@@ -1145,7 +1145,7 @@ export function flagCells(p) {
   const out = [], pole = p.x0, z = p.z0, h = p.h;
   for (let b = z - 1; b <= z + 1; b++) for (let a = pole - 1; a <= pole + 1; a++) out.push([a, YB, b, M.CONCRETE]);
   for (let y = YB + 1; y <= YB + h; y++) out.push([pole, y, z, M.ALUM]);
-  for (let y = YB + h - 6; y <= YB + h - 1; y++) for (let k = 1; k <= 9; k++) { const col = y >= YB + h - 3 ? p.c2 : p.c1; out.push([pole + k, y, z, CLOTH_OF[col] || col]); }
+  for (let y = YB + h - 6; y <= YB + h - 1; y++) for (let k = 1; k <= 9; k++) { const col = y >= YB + h - 3 ? p.c2 : p.c1; out.push([pole + k, y, z, FLAG_OF[col] || CLOTH_OF[col] || col]); }
   return out;
 }
 
@@ -1775,6 +1775,8 @@ function stampPart(p, c, box, put, car, letterAt) {
       box(x0, YB - 3, z0, x1, YB, z1, M.STONE);
       box(x0 + 1, YB - 2, z0 + 1, x1 - 1, YB, z1 - 1, 0);
       box(x0 + 1, YB - 2, z0 + 1, x1 - 1, YB - 2, z1 - 1, M.CAR_GLASS);
+      // A stone step in one corner of the shaft, so anyone who falls in can climb back out.
+      put(x0 + 1, YB - 1, z0 + 1, M.STONE);
       for (const [a, b] of [[x0, z0], [x1, z0], [x0, z1], [x1, z1]]) box(a, YB, b, a, YB + 3, b, M.WOOD_D);
       box(x0, YB + 4, z0, x1, YB + 4, z1, M.PLANK);
       break;

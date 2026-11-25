@@ -2,6 +2,7 @@
 // ambient beds are rendered once into buffers, a few variations of each, and then played back
 // through distance filters and a street-canyon reverb.
 import { MenuMusic, LAMENT_SCORE } from './menumusic.js';
+import { StationMusic } from './stationmusic.js';
 
 const rand = Math.random;
 const TAU = Math.PI * 2;
@@ -62,6 +63,9 @@ export class Audio2 {
     this.musicLevel.connect(comp);
     this.music = new MenuMusic(ctx, this.musicLevel);
     this.lament = new MenuMusic(ctx, this.musicLevel, LAMENT_SCORE);
+    // The civilian stations' music: on your radio it is music, under the volume for music; out of a speaker in the world it is a sound
+    // in the world like any other, muffled with the rest when you pause.
+    this.station = new StationMusic(ctx, this.musicLevel, this.master);
     // The interface, and the voice of whoever you are talking to, go round the muffle too: a menu being up is exactly when they need
     // to be heard, not when they should sound like they are through a wall.
     this.uiLevel = ctx.createGain();
@@ -584,9 +588,9 @@ export class Audio2 {
         g.gain.setValueAtTime(.45, t + body);
         g.gain.linearRampToValueAtTime(.16, t + body + (len - body) * .45);
         g.gain.exponentialRampToValueAtTime(.0001, t + len);
-        for (let k = 0; k < 5; k++) later(rand() * body * 1000, () => this.noiseBurst(d(1.4, 0), .012 + rand() * .022, 'highpass', 2500 + rand() * 4000, 2000, 1, .8));
-        for (let k = 0; k < 2; k++) later((body + rand() * (len - body) * .6) * 1000, () => this.noiseBurst(d(.8, 0), .012 + rand() * .02, 'highpass', 2500 + rand() * 3000, 2000, 1, .5));
-        src.connect(hp); hp.connect(lp); lp.connect(g); g.connect(d(1.4, 0));
+        for (let k = 0; k < 5; k++) later(rand() * body * 1000, () => this.noiseBurst(d(.8, 0), .012 + rand() * .022, 'highpass', 2500 + rand() * 4000, 2000, 1, .8));
+        for (let k = 0; k < 2; k++) later((body + rand() * (len - body) * .6) * 1000, () => this.noiseBurst(d(.5, 0), .012 + rand() * .02, 'highpass', 2500 + rand() * 3000, 2000, 1, .5));
+        src.connect(hp); hp.connect(lp); lp.connect(g); g.connect(d(.8, 0));
         src.start(t, rand());
         src.stop(t + len + .02);
         break;
@@ -882,6 +886,11 @@ export class Audio2 {
 
   // camp is whichever camp's siren you can hear, or null. The horns carry the distance, so this only says which siren is going.
   // Leaving the game cuts it straight off; a siren winding down on its own takes its time.
+  // How loud the stations' music is on your radio, and out of the nearest speaker in the world (and from which side).
+  setStation(radio, world, pan) {
+    if (this.station) this.station.set(radio, world, pan);
+  }
+
   setAlarm(camp, level = 1, cut = false) {
     if (!this.ctx || !this.alarmGain) return;
     const evac = !!camp && level === 2;

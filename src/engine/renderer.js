@@ -693,6 +693,7 @@ export class Renderer {
     // Leaves and cloth sway on a clock of their own too: a little quicker than real time, and quicker still in a downpour.
     this.swayT = ((this.swayT || 0) + gdt * (1.15 + (this.rain || 0) * .75 + Math.min(.4, Math.hypot(this.windX || 0, this.windZ || 0) * .08))) % 6283.18;
     if (p.u.uSwayT) gl.uniform1f(p.u.uSwayT, this.swayT);
+    if (p.u.uFlagPoles && this.flagPoles) { gl.uniform3fv(p.u.uFlagPoles, this.flagPoles); gl.uniform1i(p.u.uFlagN, this.flagPoles.length / 3); }
     if (p.u.uGrassWave) gl.uniform1f(p.u.uGrassWave, this.grassWave ? 1 : 0);
     gl.uniform1i(p.u.uGlassPass, 0);
     this.bindRainMap(p); this.bindBlood(p);

@@ -269,6 +269,8 @@ layout(location=1) in uvec4 aInfo;
 uniform vec3 uOrigin;
 uniform sampler2D uPalette;
 uniform float uSway;
+uniform vec3 uFlagPoles[24];   // each settlement flag's pole (x, z), for waving the flag out from it
+uniform int uFlagN;
 uniform float uSwayT;   // the sway's own clock, which runs faster the harder the weather
 uniform float uGrassT;
 uniform float uGrassWave;   // 1 with grass moving in the wind (a setting), 0 for it standing still
@@ -297,6 +299,17 @@ void main(){
     float t=uSwayT,k=min(uSway,1.6)*((aInfo.w&4u)!=0u?.45:1.);
     float r=sin(t*2.1+p.x*.33+p.y*.22+p.z*.29)*.6+sin(t*3.1+p.z*.41-p.x*.19)*.4;
     p.x+=r*.05*k; p.z+=cos(t*1.9+p.z*.31+p.y*.24)*.05*k; p.y+=r*.022*k;
+  }
+  // A flag: still at the pole, and a wave running out along it to the free end, which flaps hardest, dips a little, and is pulled in
+  // a little as it swings. Each flag runs out along x from its pole, so how far along it a corner is says how much it moves.
+  if((flags&64)!=0&&uSway>0.){
+    float d=-1.;
+    for(int i=0;i<24;i++){ if(i>=uFlagN) break; vec3 q=uFlagPoles[i]; if(abs(p.z-q.y-.5)<1.6&&p.x>q.x+.5&&p.x<q.x+11.5) d=p.x-q.x-1.; }
+    if(d>=0.){
+      float t=uSwayT,k=min(uSway,1.8),a=pow(clamp(d/9.,0.,1.),1.15);
+      float w=sin(t*4.4-d*.78+p.y*.1)*.72+sin(t*7.1-d*1.4+p.y*.2)*.28;
+      p.z+=w*a*.78*k; p.y-=a*a*.22; p.x-=a*abs(w)*.22*k;
+    }
   }
   // Grass in the wind: the top edge of each grass block lifted up to a fifth of a block and let down again, in long waves running
   // across the ground on the diagonal. Only what is drawn moves; nothing anyone stands on or bumps into does.

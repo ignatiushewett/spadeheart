@@ -121,5 +121,18 @@ for (const [k, hex] of [['GLASS_B', 0x6c94b8], ['GLASS_T', 0x5f9c9c], ['GLASS_K'
   CRACKED[M[`${k}_X`]] = M[`${k}_X`];
   PANE[M[`${k}_X`]] = M[k];
 }
+// A flag's cloth: the same colours again, marked so the drawing can wave it out from its pole like a flag, not ripple it like a tarp.
+// Added last, so every material before it keeps its number.
+export const F_FLAG = 64;
+export const FLAG_OF = new Uint8Array(256);
+for (const k of ['PAINT_Y', 'PAINT_K', 'BARN_R', 'CONT_G', 'RUST', 'STAINED', 'CONT_O', 'PLANK', 'PAINT_C', 'CONT_B', 'CONT_R', 'WOOD', 'ALUM', 'AWN_R', 'AWN_G', 'AWN_B', 'TENT_W']) {
+  const src = M[k], id = next++;
+  M[`FLAG_${k}`] = id; NAMES[id] = `flag_${k.toLowerCase()}`;
+  for (let c = 0; c < 3; c++) PALETTE[id * 4 + c] = PALETTE[src * 4 + c];
+  PALETTE[id * 4 + 3] = FLAGS[src] | F_CLOTH | F_FLAG;
+  HP[id] = HP[src];
+  FLAGS[id] = FLAGS[src] | F_CLOTH;
+  FLAG_OF[src] = id;
+}
 export const isLoot = (id) => (FLAGS[id] & F_LOOT) !== 0;
 export const isBed = (id) => id === M.BEDROLL || id === M.MATTRESS || id === M.PILLOW || id === M.BLANKET_G || id === M.BLANKET_R || id === M.BLANKET_B || id === M.BLANKET_C;

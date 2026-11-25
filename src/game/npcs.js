@@ -1141,6 +1141,7 @@ export class NPCs {
     if (n.order === 'camp' && this.campStep(n, dt, dp)) return;
     if (n.order === 'call' && this.callStep(n, dt, dp)) return;
     const camp = this.companionCamp(n, dp);
+    if (camp && this.clinicStep(n, camp, dt, dp)) return;
     if (camp) {
       if (n.visit !== camp.id) { this.leaveVisit(n); n.visit = camp.id; }
       // Behind a wall they get their breath back, and patched up.
@@ -1156,20 +1157,21 @@ export class NPCs {
   crewOrder(n, order) {
     const g = this.g, P = g.player, first = n.name.split(' ')[0];
     if (order === 'follow') {
+      // With you again: they come to where you are now, by your position, and fall in once they get there.
       n.order = null; n.atCamp = false;
-      this.crewSend(`${first}, with me. Over.`, () => this.crewReply(n, pickOf(['Copy, on my way. Out.', 'Coming to you. Out.', 'Right with you. Out.'])));
-      if (Math.hypot(n.x - P.x, n.z - P.z) > 60) { n.order = 'call'; n.callX = P.x; n.callZ = P.z; n.callETA = null; }
+      this.crewSend(`${first}, with me. Sending my position, ${Math.round(P.x)}, ${Math.round(P.z)}. Over.`, () => this.crewReply(n, this.crewPick(['Got your position. On my way. Out.', 'Coming to you. Out.', 'Copy that. Right with you. Out.'])));
+      if (Math.hypot(n.x - P.x, n.z - P.z) > 20) { n.order = 'call'; n.callX = P.x; n.callZ = P.z; n.callETA = null; }
     } else if (order === 'hold') {
       n.order = 'hold';
-      this.crewSend(`${first}, stand down for a while. Over.`, () => this.crewReply(n, pickOf(['Copy, standing down. Out.', 'Taking a breather. Call if you need me. Out.', 'Roger that. I will be here. Out.'])));
+      this.crewSend(`${first}, stand down for a while. Over.`, () => this.crewReply(n, this.crewPick(['Copy, standing down. Out.', 'Taking a breather. Call if you need me. Out.', 'Roger that. I will be here. Out.'])));
     } else if (order === 'camp') {
       const c = this.crewHomeCamp(n);
       if (!c) { this.crewReply(n, 'Back where? There is nowhere left to go. Over.'); return; }
       n.order = 'camp'; n.orderCamp = c.id; n.atCamp = false; n.campETA = null;
-      this.crewSend(`${first}, head back to ${c.name.replace(/\.$/, '')}. I will find you there. Over.`, () => this.crewReply(n, pickOf([`Copy, heading for ${c.name.replace(/\.$/, '')}. Out.`, `Roger. See you at ${c.name.replace(/\.$/, '')}. Out.`, `Back to ${c.name.replace(/\.$/, '')}. Watch yourself. Out.`])));
+      this.crewSend(`${first}, head back to ${c.name.replace(/\.$/, '')}. I will find you there. Over.`, () => this.crewReply(n, this.crewPick([`Copy, heading for ${c.name.replace(/\.$/, '')}. Out.`, `Roger. See you at ${c.name.replace(/\.$/, '')}. Out.`, `Back to ${c.name.replace(/\.$/, '')}. Watch yourself. Out.`])));
     } else if (order === 'call') {
       n.order = 'call'; n.callX = P.x; n.callZ = P.z; n.callETA = null; n.atCamp = false;
-      this.crewSend(`${first}, I need you. Sending my position, ${Math.round(P.x)}, ${Math.round(P.z)}. Over.`, () => this.crewReply(n, pickOf(['Got your position. Moving. Out.', 'Copy that, on my way. Out.', 'Hold tight, coming to you. Out.'])));
+      this.crewSend(`${first}, I need you. Sending my position, ${Math.round(P.x)}, ${Math.round(P.z)}. Over.`, () => this.crewReply(n, this.crewPick(['Got your position. Moving. Out.', 'Copy that, on my way. Out.', 'Hold tight, coming to you. Out.'])));
     }
   }
 
@@ -1193,18 +1195,18 @@ export class NPCs {
     const hurt = P.health < 40, swarmed = crowd > 12;
     // The answer, and why.
     let no = null;
-    if (this.banned(c.id)) no = pickOf(['Not a chance. You know what you did here. Out.', 'Nobody on this channel is coming for you. Out.']);
+    if (this.banned(c.id)) no = this.crewPick(['Not a chance. You know what you did here. Out.', 'Nobody on this channel is coming for you. Out.']);
     else if (this.owesBail(c.id)) no = `Settle your bail with us first: ${this.bailFor(c.id).toLocaleString('en-US')} spades. Then we talk. Out.`;
     else if (P.wanted[-1] > 0 || g.layout.camps.some((o) => this.hunting(o.id))) no = 'Every patrol out there has your description. We are not putting ours next to you. Out.';
-    else if (S.drawing || S.breaches.length || S.locked || (S.op && (S.op.mag || 1) >= 3)) no = pickOf(['Negative. We have our own trouble at the wall. Every gun is spoken for. Out.', 'Not now. We are holding the wall ourselves. Out.']);
+    else if (S.drawing || S.breaches.length || S.locked || (S.op && (S.op.mag || 1) >= 3)) no = this.crewPick(['Negative. We have our own trouble at the wall. Every gun is spoken for. Out.', 'Not now. We are holding the wall ourselves. Out.']);
     else if (wall < 8) no = 'You are standing at our wall. Come inside. Out.';
     else if (wall > 800) no = 'Too far out. Nobody of ours can get to you in time. Sorry. Out.';
-    else if (stand < 10) no = pickOf(['We do not know you well enough to send people out for you. Out.', 'Our patrols are for our own. Do some work for us first. Out.']);
+    else if (stand < 10) no = this.crewPick(['We do not know you well enough to send people out for you. Out.', 'Our patrols are for our own. Do some work for us first. Out.']);
     else if ((S.guards || 0) < 12) no = 'We are short on guards as it is. Cannot spare anyone. Out.';
     else {
       // Known, a fair chance; Trusted, likely; Family, almost always. Less the further out, more if you are in a bad way.
       const odds = Math.min(.95, .35 + stand / 90 - wall / 2000 + (hurt ? .15 : 0) + (swarmed ? .1 : 0));
-      if (rand() > odds) no = pickOf(['Cannot spare anyone right now. Try again later. Out.', 'Negative, everyone is on shift. Out.', 'Not this time. Watch yourself out there. Out.']);
+      if (rand() > odds) no = this.crewPick(['Cannot spare anyone right now. Try again later. Out.', 'Negative, everyone is on shift. Out.', 'Not this time. Watch yourself out there. Out.']);
     }
     const count = no ? 0 : Math.max(1, Math.min(3, 1 + Math.floor(stand / 30) + (hurt || swarmed ? 1 : 0)));
     // How long they would take: about a walk from the wall to you.
@@ -1244,9 +1246,9 @@ export class NPCs {
       const alive = q.members.filter((m) => !m.dead && this.list.includes(m));
       if (!alive.length) { h.squad = null; continue; }
       const P = g.player, near = Math.min(...alive.map((m) => Math.hypot(m.x - P.x, m.z - P.z)));
-      if (!q.here && near < 22) { q.here = true; sim.radio(c, pickOf(['Patrol is with you. Point us at it. Out.', 'We see you. Moving up on your position. Out.']), `${alive[0].name || 'Patrol lead'}, Patrol`); }
+      if (!q.here && near < 22) { q.here = true; sim.radio(c, this.crewPick(['Patrol is with you. Point us at it. Out.', 'We see you. Moving up on your position. Out.']), `${alive[0].name || 'Patrol lead'}, Patrol`); }
       if (q.seekT <= 0 || !P.alive) {
-        sim.radio(c, pickOf([`Patrol heading back to ${c.name.replace(/\.$/, '')}. Stay safe out there. Out.`, `That is our time up. Back to ${c.name.replace(/\.$/, '')}. Out.`]), `${alive[0].name || 'Patrol lead'}, Patrol`);
+        sim.radio(c, this.crewPick([`Patrol heading back to ${c.name.replace(/\.$/, '')}. Stay safe out there. Out.`, `That is our time up. Back to ${c.name.replace(/\.$/, '')}. Out.`]), `${alive[0].name || 'Patrol lead'}, Patrol`);
         q.help = false; h.squad = null;
       }
     }
@@ -1278,32 +1280,76 @@ export class NPCs {
     if (!n.atCamp) {
       const inside = n.x > c.x0 + 2 && n.x < c.x1 - 2 && n.z > c.z0 + 2 && n.z < c.z1 - 2;
       if (inside) n.atCamp = true;
-      else if (dp > 60) {
-        if (n.campETA == null) n.campETA = g.time + Math.hypot(c.cx - n.x, c.cz - n.z) / 3.2;
-        if (g.time >= n.campETA) { const s = c.spots.plaza || { x: c.cx, z: c.cz }; n.x = s.x + (rand() - .5) * 6; n.z = s.z + (rand() - .5) * 6; n.y = STREET_Y; n.atCamp = true; }
-        return true;
-      } else { this.trek(n, c.cx, c.cz, 3.2, dt, dp); n.state = .7; n.phase += 3.2 * dt * 2.1; this.settleY(n, dt); return true; }
+      else {
+        // They walk it. A long way off and out of your sight, they are there once they would have been, without walking every step.
+        if (dp > 60) {
+          if (n.campETA == null) n.campETA = g.time + Math.hypot(c.cx - n.x, c.cz - n.z) / 3.2;
+          if (g.time >= n.campETA && !this.inSight(n, dp)) { const s = c.spots.plaza || { x: c.cx, z: c.cz }; n.x = s.x + (rand() - .5) * 6; n.z = s.z + (rand() - .5) * 6; n.y = STREET_Y; n.atCamp = true; return true; }
+        }
+        this.trek(n, c.cx, c.cz, 3.2, dt, dp); n.state = .7; n.phase += 3.2 * dt * 2.1; this.settleY(n, dt); return true;
+      }
     }
     // There, and you are too: they go about the place like anyone else with you. Otherwise they keep to themselves.
+    if (this.clinicStep(n, c, dt, dp)) return true;
     const here = this.companionCamp(n, dp);
     if (here) { if (n.visit !== here.id) { this.leaveVisit(n); n.visit = here.id; } if (n.hp < n.maxHp) n.hp = Math.min(n.maxHp, n.hp + CREW_HEAL * dt); this.updateResident(n, dt, dp); return true; }
     this.holdStep(n, dt);
     return true;
   }
 
+  // Several of them with the same thing to say: whoever is first says it, the rest say "me too", and never all at once.
+  crewChorus(n, key, first, also) {
+    const g = this.g, ch = this.chorus || (this.chorus = {}), last = ch[key] || { t: -1e9, at: 0 };
+    const joining = g.time - last.t < 25, at = Math.max(Date.now() + 800 + rand() * 3000, joining ? last.at + 2500 + rand() * 2000 : 0);
+    ch[key] = { t: g.time, at };
+    const text = this.crewPick(joining ? also : first);
+    setTimeout(() => { if (g.state === 'play' && !n.dead) this.crewSay(n, text); }, at - Date.now());
+  }
+
+  // Hurt and in a settlement with a clinic: they go and get patched up there, and say so; and again when they are done.
+  clinicStep(n, c, dt, dp) {
+    if (!c || !c.clinic || !c.clinic.sit.length || this.g.campSim.state[c.id].status !== 'holding') return false;
+    if (!n.toClinic) {
+      if (n.hp >= n.maxHp * .4) return false;
+      n.toClinic = true;
+      this.crewChorus(n, 'clinic', ['Heading to the clinic to get patched up. Out.', 'Going to see the doc. Out.', 'Getting this looked at in the clinic. Out.'], ['Me too. Save me a seat. Out.', 'Same. Right behind you. Out.', 'Make that two of us. Out.']);
+    }
+    if (n.hp >= n.maxHp * .95) { n.toClinic = false; this.crewChorus(n, 'patched', ['All patched up. Out.', 'Good as new. Out.', 'Doc says I will live. Out.'], ['Me too. Out.', 'Same here. Out.']); return false; }
+    if (n.visit !== undefined) this.leaveVisit(n);
+    // A spot of their own just outside the benches, so two of them do not stand in one place.
+    const k = Math.max(0, this.followers.indexOf(n)), q = c.clinic.sit[k % c.clinic.sit.length], a = k * 2.1;
+    const tx = q.x + Math.cos(a) * 1.6, tz = q.z + Math.sin(a) * 1.6, d = Math.hypot(tx - n.x, tz - n.z);
+    // Patched up a little on the way already (someone is waiting for them), and there in the end even if the streets are against them.
+    if (d > 1.2) {
+      n.hp = Math.min(n.maxHp, n.hp + CREW_HEAL * 1.5 * dt);
+      n.clinicT = (n.clinicT || 0) + dt;
+      if (n.clinicT > 30 && !this.inSight(n, dp)) { n.x = tx; n.z = tz; n.y = STREET_Y; n.clinicT = 0; }
+      else { this.trek(n, tx, tz, 2.8, dt, dp); n.state = .7; n.phase += 2.8 * dt * 2.1; }
+    }
+    else { n.hp = Math.min(n.maxHp, n.hp + CREW_HEAL * 4 * dt); n.state = 0; n.yaw = Math.atan2(q.x - n.x, q.z - n.z); }
+    this.settleY(n, dt);
+    return true;
+  }
+
+  // Whether you could see them from where you stand.
+  inSight(n, dp) {
+    const P = this.g.player;
+    return dp < 220 && this.g.world.los(P.x, P.y + 2.4, P.z, n.x, n.y + 2, n.z);
+  }
+
   // Coming to where you said. Out of sight, they get there when they would have; in sight, they walk it.
   callStep(n, dt, dp) {
     const g = this.g, P = g.player, d = Math.hypot(n.callX - n.x, n.callZ - n.z);
-    if (d < 6) { n.order = null; this.crewSay(n, pickOf(['At your position. Out.', 'Made it. Out.', 'With you. Out.'])); return false; }
-    if (dp > 60) {
+    if (d < 6) { n.order = null; this.crewSay(n, this.crewPick(['At your position. Out.', 'Made it. Out.', 'With you. Out.'])); return false; }
+    if (dp > 60 && !this.inSight(n, dp)) {
       if (n.callETA == null) n.callETA = g.time + d / 3.4;
-      if (g.time < n.callETA) return true;
+      if (g.time < n.callETA) { if (this.walkOutOfCamp(n, dt, dp)) return true; this.trek(n, n.callX, n.callZ, 3.4, dt, dp); n.state = .7; n.phase += 3.4 * dt * 2.1; this.settleY(n, dt); return true; }
       // Arrived: by you, if you are still there; otherwise where you said, and they come on from there.
       const nearYou = Math.hypot(P.x - n.callX, P.z - n.callZ) < 60, a = rand() * 6.28;
       const bx = nearYou ? P.x : n.callX, bz = nearYou ? P.z : n.callZ;
       n.x = bx + Math.cos(a) * 6; n.z = bz + Math.sin(a) * 6; n.y = g.world.groundBelow(n.x, P.y + 1.2, n.z, 48); n.vy = 0;
       n.order = null; n.callETA = null;
-      this.crewSay(n, pickOf(['At your position. Out.', 'Made it. Out.', 'With you. Out.']));
+      this.crewSay(n, this.crewPick(['At your position. Out.', 'Made it. Out.', 'With you. Out.']));
       return false;
     }
     if (this.walkOutOfCamp(n, dt, dp)) return true;
@@ -1318,7 +1364,7 @@ export class NPCs {
       if (n.dead) continue;
       const first = n.name.split(' ')[0];
       if (n.hp < n.maxHp * .3) {
-        if (!n.lowSaid) { n.lowSaid = true; this.crewSay(n, pickOf(['I am hit bad. Need patching up. Over.', 'Took a bad one. Could use a medkit. Over.', 'Bleeding here. Not good. Over.', `${first} here. I am hurt. Badly.`])); }
+        if (!n.lowSaid) { n.lowSaid = true; this.crewChorus(n, 'hurt', ['I am hit bad. Need patching up. Over.', 'Took a bad one. Could use a medkit. Over.', 'Bleeding here. Not good. Over.', `${first} here. I am hurt. Badly. Over.`], ['Me too. I am hit as well. Over.', 'Same here. Took one too. Over.', 'Not just them. I am bleeding too. Over.']); }
       } else if (n.hp > n.maxHp * .6) n.lowSaid = false;
       // Settled somewhere in a settlement you are not right next to them in: now and then, where to find them.
       if (n.visit !== undefined && n.task && n.arrived && g.time - (n.inviteAt ?? -1e9) > 360 && Math.hypot(n.x - P.x, n.z - P.z) > 18) {
@@ -1326,8 +1372,8 @@ export class NPCs {
         const atBar = c && c.bar && c.bar.pois.includes(poi), atHall = c && c.hallPois && c.hallPois.includes(poi);
         if ((atBar || atHall) && rand() < dt * .02) {
           n.inviteAt = g.time;
-          this.crewSay(n, atBar ? pickOf(['At the bar if you want a drink. Over.', 'Got a seat at the bar. Join me? Over.', 'Bar is quiet. Come sit. Out.'])
-            : c.spots.pulpit && this.inService() ? pickOf(['Sitting in on the service. Come by if you want. Out.', 'In the church. Reverend is going strong today. Out.']) : pickOf(['In the hall, resting my feet. Out.', 'Taking a seat in the hall a while. Out.']));
+          this.crewSay(n, atBar ? this.crewPick(['At the bar if you want a drink. Over.', 'Got a seat at the bar. Join me? Over.', 'Bar is quiet. Come sit. Out.'])
+            : c.spots.pulpit && this.inService() ? this.crewPick(['Sitting in on the service. Come by if you want. Out.', 'In the church. Reverend is going strong today. Out.']) : this.crewPick(['In the hall, resting my feet. Out.', 'Taking a seat in the hall a while. Out.']));
         }
       }
     }
@@ -1361,7 +1407,7 @@ export class NPCs {
     const near = (q) => !q.by && COMPANION_DOES.has(q.kind) && Math.hypot(q.x - P.x, q.z - P.z) < COMPANION_ROAM * .7;
     let pool = c.bar && rand() < COMPANION_BAR ? c.bar.pois.filter((q) => near(q) && q.kind !== 'browse') : [];
     if (!pool.length) pool = c.pois.filter(near);
-    let poi = pool.length && rand() < .85 ? pickOf(pool) : null;
+    let poi = pool.length && rand() < .85 ? this.crewPick(pool) : null;
     const loose = !poi;
     if (loose) { const a = rand() * 6.283, r = 3 + rand() * 9; poi = { x: P.x + Math.cos(a) * r, z: P.z + Math.sin(a) * r, kind: 'stand' }; }
     else poi.by = n;
@@ -1563,7 +1609,25 @@ export class NPCs {
   crewRepAdd(d) { const P = this.g.player; P.crewRep = Math.max(-40, Math.min(100, (P.crewRep || 0) + d)); }
 
   // On the crew's own channel: you, or one of them.
-  crewSay(n, text) { this.g.ui.crewRadio(n ? n.name : null, text); }
+  crewSay(n, text) {
+    // The group signs off with "Out"; "Over" is yours.
+    if (n) {
+      text = text.replace(/\s*Over\.$/, '');
+      (this.crewRecent || (this.crewRecent = [])).push({ text, t: this.g.time });
+      if (this.crewRecent.length > 30) this.crewRecent.shift();
+    }
+    this.g.ui.crewRadio(n ? n.name : null, text);
+  }
+
+  // One of these, but not one anybody in the group has said in the last few minutes.
+  crewPick(list) {
+    const g = this.g, recent = (this.crewRecent || []).filter((r) => g.time - r.t < 300).map((r) => r.text);
+    const fresh = list.filter((t) => !recent.includes(String(t).replace(/\s*Over\.$/, '')));
+    const pick = pickOf(fresh.length ? fresh : list);
+    // Held for a moment even before it is said, so two answers picked together do not match.
+    if (typeof pick === 'string') (this.crewRecent || (this.crewRecent = [])).push({ text: pick.replace(/\s*Over\.$/, ''), t: g.time });
+    return pick;
+  }
 
   // Something you say to the group that nothing was pressed for: typed out by the radio calls first, then sent.
   crewType(text, done) { this.g.ui.crewType(text, done); }
@@ -1583,7 +1647,7 @@ export class NPCs {
     const g = this.g, P = g.player, live = this.followers.filter((f) => !f.dead);
     if (!live.length || g.time < (this.checkInUntil || 0)) return;
     this.checkInUntil = g.time + 60;
-    this.crewSend(pickOf(['All units, check in. Over.', 'Group, check in. Over.', 'Radio check. Everyone sound off. Over.']), () => this.checkInAnswers(live));
+    this.crewSend(this.crewPick(['All units, check in. Over.', 'Group, check in. Over.', 'Radio check. Everyone sound off. Over.']), () => this.checkInAnswers(live));
   }
 
   checkInAnswers(live) {
@@ -1593,17 +1657,17 @@ export class NPCs {
     const first = (f) => f.name.split(' ')[0], night = g.tod < .22 || g.tod > .88;
     const status = (f) => {
       const c = g.layout.camps[f.orderCamp], d = Math.hypot(f.x - P.x, f.z - P.z);
-      if (f.hp < f.maxHp * .35) return pickOf(['Hurting, but upright. Could use a medkit. Over.', `${first(f)} here. Took a knock. I will live. Over.`, 'Not great. Bleeding a bit. Over.']);
-      if (f.order === 'hold') return pickOf(['Off duty, feet up. All quiet here. Over.', 'Still standing down. Nothing to report. Over.', 'Resting. Shout when you need me. Over.']);
-      if (f.order === 'camp' && c) return f.atCamp ? pickOf([`At ${c.name.replace(/\.$/, '')}. Quiet here. Over.`, `Safe at ${c.name.replace(/\.$/, '')}. Got a hot meal, even. Over.`]) : pickOf([`Still on the road to ${c.name.replace(/\.$/, '')}. Over.`, `Halfway to ${c.name.replace(/\.$/, '')}. Nothing following me. Over.`]);
-      if (f.order === 'call') return pickOf(['Still coming to you. Hold on. Over.', 'On my way to your position. Over.']);
-      if (d > 60) return pickOf(['Fell behind a bit. Catching up. Over.', 'Lost sight of you. Coming. Over.']);
-      return pickOf(['Right behind you. Over.', 'All good. Eyes on the street. Over.', 'Fine. Bored, but fine. Over.', `${f.weapon && f.ammo === 0 ? 'Out of rounds, for what it is worth.' : 'Ammo is holding.'} Over.`, night ? 'Cold, but fine. Over.' : 'Good here. Over.']);
+      if (f.hp < f.maxHp * .35) return this.crewPick(['Hurting, but upright. Could use a medkit. Over.', `${first(f)} here. Took a knock. I will live. Over.`, 'Not great. Bleeding a bit. Over.']);
+      if (f.order === 'hold') return this.crewPick(['Off duty, feet up. All quiet here. Over.', 'Still standing down. Nothing to report. Over.', 'Resting. Shout when you need me. Over.']);
+      if (f.order === 'camp' && c) return f.atCamp ? this.crewPick([`At ${c.name.replace(/\.$/, '')}. Quiet here. Over.`, `Safe at ${c.name.replace(/\.$/, '')}. Got a hot meal, even. Over.`]) : this.crewPick([`Still on the road to ${c.name.replace(/\.$/, '')}. Over.`, `Halfway to ${c.name.replace(/\.$/, '')}. Nothing following me. Over.`]);
+      if (f.order === 'call') return this.crewPick(['Still coming to you. Hold on. Over.', 'On my way to your position. Over.']);
+      if (d > 60) return this.crewPick(['Fell behind a bit. Catching up. Over.', 'Lost sight of you. Coming. Over.']);
+      return this.crewPick(['Right behind you. Over.', 'All good. Eyes on the street. Over.', 'Fine. Bored, but fine. Over.', `${f.weapon && f.ammo === 0 ? 'Out of rounds, for what it is worth.' : 'Ammo is holding.'} Over.`, night ? 'Cold, but fine. Over.' : 'Good here. Over.']);
     };
     // What another one has to say back.
     const chime = (a, b) => a.hp < a.maxHp * .35
-      ? [pickOf([`Hang in there, ${first(a)}. Out.`, `I have got a bandage if you need it, ${first(a)}. Out.`]), null]
-      : pickOf([
+      ? [this.crewPick([`Hang in there, ${first(a)}. Out.`, `I have got a bandage if you need it, ${first(a)}. Out.`]), null]
+      : this.crewPick([
         [`${first(a)} snores, for the record. Over.`, 'I do not. Out.'],
         [`${first(a)}, you still owe me for the last round. Over.`, 'Put it on my tab. Out.'],
         ['Quiet day. Too quiet. Over.', `Do not jinx it, ${first(b)}. Out.`],
@@ -1619,7 +1683,7 @@ export class NPCs {
       t += 3000 + rand() * 3000;
       const others = live.filter((o) => o !== f);
       if (others.length && rand() < .45) {
-        const b = pickOf(others);
+        const b = this.crewPick(others);
         let [say, back] = chime(f, b);
         for (let k = 0; k < 6 && used.has((back || say).slice(0, 14)); k++) [say, back] = chime(f, b);
         if (used.has((back || say).slice(0, 14))) continue;
@@ -1661,7 +1725,7 @@ export class NPCs {
       this.g.campSim.state[n.camp].folk = Math.max(0, this.g.campSim.state[n.camp].folk - 1);
     }
     this.followers.push(n);
-    this.crewReply(n, pickOf(['On this frequency now. Glad to be along. Out.', 'Radio check. Right behind you. Out.', "Reading you. Let's see where this goes. Out."]));
+    this.crewReply(n, this.crewPick(['On this frequency now. Glad to be along. Out.', 'Radio check. Right behind you. Out.', "Reading you. Let's see where this goes. Out."]));
     return true;
   }
 
@@ -1715,7 +1779,7 @@ export class NPCs {
     if (what === 'armour') n.variant = wardrobeRow([CREW_ARMOUR[id].wear]);
     else { n.setWeapon(id); n.gunFrom = this.crewShop(n).camp.name; }
     const first = n.name.split(' ')[0];
-    this.crewSend(what === 'armour' ? `${first}, got you a ${CREW_ARMOUR[id].name.toLowerCase()}. Over.` : `${first}, the ${CREW_GUN_NAMES[id]} is yours. Over.`, () => this.crewReply(n, pickOf(['Appreciate it. Out.', 'That will help. Out.', 'Now we are talking. Out.', 'Owe you one. Out.', theirs ? `Put ${theirs} of mine in. Fair. Out.` : 'On you, then. Thanks. Out.'])));
+    this.crewSend(what === 'armour' ? `${first}, got you a ${CREW_ARMOUR[id].name.toLowerCase()}. Over.` : `${first}, the ${CREW_GUN_NAMES[id]} is yours. Over.`, () => this.crewReply(n, this.crewPick(['Appreciate it. Out.', 'That will help. Out.', 'Now we are talking. Out.', 'Owe you one. Out.', theirs ? `Put ${theirs} of mine in. Fair. Out.` : 'On you, then. Thanks. Out.'])));
     return true;
   }
 
@@ -5587,6 +5651,7 @@ export class Jobs {
   accept(job) {
     job.status = 'active';
     this.active.push(job);
+    this.took(job);
     const o = this.offers[job.campId];
     if (o) o.splice(o.indexOf(job), 1);
     this.g.ui.toast(`Commission accepted: ${job.title}`);
@@ -5594,6 +5659,17 @@ export class Jobs {
   }
 
   // Changing your mind costs you a little with whoever asked, and nothing else. A personal favour can be picked up again.
+  // You tell the group what you have taken on, and a line of what it is.
+  took(job) {
+    const g = this.g, N = g.npcs, crew = N.followers.filter((f) => !f.dead);
+    if (!job || !crew.length) return;
+    const c = job.campId >= 0 ? g.layout.camps[job.campId] : null, name = c ? c.name.replace(/\.$/, '') : '';
+    const first = String(job.desc || '').split(/(?<=\.)\s/)[0];
+    const brief = first && first.length <= 120 ? ` ${first}` : '';
+    N.crewType(`Took on ${job.title}${c && !job.title.includes(c.name) ? ` for ${name}` : ''}.${brief} Over.`,
+      () => N.crewReply(pickOf(crew), N.crewPick(['Copy. Lead the way. Out.', 'Roger. We are with you. Out.', 'Sounds like work. Out.', 'Copy that. Out.'])));
+  }
+
   abandon(job) {
     const g = this.g, P = g.player;
     const i = this.active.indexOf(job);
@@ -5614,6 +5690,8 @@ export class Jobs {
       P.rep = Math.max(-100, P.rep - (contract ? 3 : 2));
     }
     g.ui.toast(`Abandoned: ${job.title}`);
+    const crew = g.npcs.followers.filter((f) => !f.dead);
+    if (crew.length) g.npcs.crewType(`Dropping ${job.title}. We are done with that one. Over.`, () => g.npcs.crewReply(pickOf(crew), g.npcs.crewPick(['Copy. Out.', 'Fair enough. Out.', 'Their loss. Out.', 'Understood. Moving on. Out.'])));
     // Walking out on a contract breaks it. You still get the same bonus for your kills as anyone who helps.
     if (job.type === 'defend') {
       const s = g.campSim.state[job.campId], c = g.layout.camps[job.campId];
@@ -5691,6 +5769,7 @@ export class Jobs {
     if (spec.type === 'kill') { job.need = spec.need || 30; job.got = 0; }
     if (spec.type === 'hold') { job.time = 40; job.held = 0; }
     this.active.push(job);
+    this.took(job);
     this.g.ui.toast(`New objective: ${job.title}`, 'good');
     this.refreshCrowds();
   }
@@ -5898,7 +5977,8 @@ export class Jobs {
       return names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
     };
     const who = near[0] || crew[0], title = (j.title || 'the job').replace(/^Commission: /, '');
-    const answer = cut ? `Took the group's cut, ${cut.toLocaleString('en-US')} spades.${tip ? ` Client tipped ${near.length === 1 ? 'me' : 'us'} ${tip}${near.length === 1 ? '' : ' each'} for coming along.` : ''} Out.`
+    const each = Math.floor(cut / crew.length);
+    const answer = cut ? `Got the group's cut. ${crew.length === 1 ? `That is ${cut.toLocaleString('en-US')} spades for me.` : `${cut.toLocaleString('en-US')} spades between ${crew.length === 2 ? 'the two' : `all ${crew.length}`} of us, ${each.toLocaleString('en-US')} each.`}${tip ? ` Client tipped ${near.length === 1 ? 'me' : 'us'} ${tip}${near.length === 1 ? '' : ' each'} for coming along.` : ''} Out.`
       : `Client tipped ${near.length === 1 ? 'me' : 'us'} ${tip}${near.length === 1 ? '' : ' each'} for coming along. Out.`;
     // You tell them it has been paid, and what is theirs; one of them answers.
     const say = cut ? `Paid for ${title}. Group's cut is ${cut.toLocaleString('en-US')} spades${crew.length > 1 ? `, split ${crew.length} ways` : ''}. Over.`
@@ -5969,6 +6049,7 @@ export class Jobs {
       status: 'active', x: posts[0].x, z: posts[0].z, y: STREET_Y, posts, next: 0, k, told: now < k + OP_PAY.patrolStart ? undefined : k, walked: false, waiting: now < k + OP_PAY.patrolStart, streak: 0, earned: 0,
     };
     this.active.push(j);
+    this.took(j);
     g.ui.toast(`Signed: ${j.title}`, 'good');
     g.audio.simple('crate');
     g.saveGame();
@@ -5985,6 +6066,7 @@ export class Jobs {
       status: 'active', unmarked: true, x: c.cx, z: c.cz, y: STREET_Y, k: Math.floor(g.campSim.now() - OP_PAY.nightStart) + 1, shiftKills: 0, streak: 0, earned: 0, quota,
     };
     this.active.push(j);
+    this.took(j);
     g.ui.toast(`Signed: ${j.title}`, 'good');
     g.audio.simple('crate');
     g.saveGame();

@@ -931,6 +931,53 @@ class Game {
   // Right-click held with the building out: everything you can build, to pick from.
   openBuildMenu() { if (!this.ui.modal && this.player.alive && !(this.bikes && this.bikes.ride)) this.openModal(() => this.ui.openBuild()); }
 
+  // Where a settlement's speakers are: the bar's, loudest; one at the mechanic's; one on the benches round the big fire; and a few out
+  // in the corners where people live, among the beds. Worked out once.
+  speakersFor(c) {
+    const out = [], far = (x, z) => out.every((q) => Math.hypot(q.x - x, q.z - z) > 14);
+    const add = (x, z, k, bar = false) => { if (x !== undefined && far(x, z)) out.push({ x, z, k, bar }); };
+    if (c.bar && c.bar.keep) add(c.bar.keep.x, c.bar.keep.z, 1.3, true);
+    const mech = (c.vendors || []).find((q) => q.role === 'mechanic');
+    if (mech) add(mech.x, mech.z, .55);
+    const fire = (c.fires || []).find((f) => f.big), seats = c.pois.filter((q) => q.seat && q.kind === 'sit');
+    if (fire && seats.length) { const s = seats.reduce((a, q) => (Math.hypot(q.x - fire.x, q.z - fire.z) < Math.hypot(a.x - fire.x, a.z - fire.z) ? q : a)); add(s.x, s.z, .45); }
+    // Among the beds in the middle of each quarter of the place, not out by the wall.
+    const beds = c.pois.filter((q) => q.kind === 'sleep'), mx = (c.x0 + c.x1) / 2, mz = (c.z0 + c.z1) / 2;
+    for (const [cx, cz] of [[(c.x0 + mx) / 2, (c.z0 + mz) / 2], [(c.x1 + mx) / 2, (c.z0 + mz) / 2], [(c.x0 + mx) / 2, (c.z1 + mz) / 2], [(c.x1 + mx) / 2, (c.z1 + mz) / 2]]) {
+      if (!beds.length) break;
+      const b = beds.reduce((a, q) => (Math.hypot(q.x - cx, q.z - cz) < Math.hypot(a.x - cx, a.z - cz) ? q : a));
+      add(b.x, b.z, .38);
+    }
+    if (!out.length) add(c.cx, c.cz, .38);
+    return out;
+  }
+
+  // The civilian stations' music. A few speakers in each settlement play it, quietly: one in the bar, and one or two about the place.
+  // Heard like anything else out there, louder the closer you are and from the side it is on, and off while the siren is going.
+  // Your own radio plays it too, if you have it on.
+  stationMusic(siren) {
+    const P = this.player, sim = this.campSim, a = this.audio;
+    let best = 0, pan = 0;
+    // Nobody plays music with the sirens going: not the speakers, not your radio.
+    for (const c of siren ? [] : this.layout.camps) {
+      if (Math.abs(c.cx - P.x) > 220 || Math.abs(c.cz - P.z) > 220) continue;
+      const s = sim.state[c.id];
+      if (s.status !== 'holding' || s.evac || siren === c) continue;
+      if (!c.speakers) c.speakers = this.speakersFor(c);
+      // Out in the streets they go off late at night, and come back on at five in the morning. The bar plays on.
+      const late = this.tod > 23 / 24 || this.tod < 5 / 24;
+      for (const sp of c.speakers) {
+        if (late && !sp.bar) continue;
+        const q = a.spatial(sp.x, STREET_Y + 3, sp.z, 8), g = q.gain * sp.k;
+        if (g > best) { best = g; pan = q.pan; }
+      }
+    }
+    const tuned = this.ui.radioMusic, c = tuned >= 0 ? this.layout.camps[tuned] : null;
+    const on = !!c && !siren && sim.state[c.id].status === 'holding' && P.alive && (!this.ui.modal || LIVE_MODALS.has(this.ui.modal));
+    if (c && sim.state[c.id].status !== 'holding') this.ui.radioMusic = -1;
+    a.setStation(on ? .6 : 0, best < .004 ? 0 : best, pan);
+  }
+
   // A modal opens over the game: the view racks out of focus, and unless it is one of LIVE_MODALS the sim stops.
   openModal(fn) {
     this.modalOpenWhilePlaying = true;
@@ -2794,6 +2841,8 @@ class Game {
     else if (this.state === 'play' && !paused) this.updatePlay(dt);
     else if (this.state === 'play') this.world.update(this.player.x, this.player.z);
     r.setTimeOfDay(this.tod);
+    // Where the settlement flags' poles are, so they can be waved out from them.
+    if (!r.flagPoles && this.layout) r.flagPoles = new Float32Array(this.layout.camps.flatMap((c) => c.parts.filter((q) => q.t === 'flag').map((q) => [q.x0, q.z0, 0])).slice(0, 24).flat());
     r.grain = this.settings.grain ?? .3;
     r.grassWave = !!this.settings.grassWave;
     r.swayK = this.settings.sway ?? 1;
@@ -3090,6 +3139,7 @@ class Game {
     this.audio.setListener(P.x, P.y, P.z, P.yaw);
     const siren = this.campSim.alarm;
     this.audio.setAlarm(siren && !this.settings.muteSiren ? siren : null, this.campSim.alarmLevel);
+    this.stationMusic(siren);
     this.audio.tick(dt, this.audioState(sampleMoan, night));
 
     const wasSwim = this.wasSwim;
