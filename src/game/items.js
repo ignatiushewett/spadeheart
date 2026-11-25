@@ -70,15 +70,16 @@ export const BLOCKS = ['block_wood', 'block_log', 'block_brick', 'block_conc', '
 const span = (a, b) => { const o = []; for (let k = a; k <= b; k++) o.push(k); return o; };
 const cellsOf = (fn) => { const o = []; for (const u of span(-3, 3)) for (const v of span(0, 4)) for (const w of span(0, 5)) if (fn(u, v, w)) o.push([u, v, w]); return o; };
 export const BUILD_PIECES = [
-  { id: 'wall', name: 'Wall', view: 'front', cells: cellsOf((u, v, w) => w === 0 && Math.abs(u) <= 2 && v <= 2) },
-  { id: 'door', name: 'Doorway', view: 'front', cells: cellsOf((u, v, w) => w === 0 && Math.abs(u) <= 2 && v <= 2 && !(u === 0 && v <= 1)) },
-  { id: 'window', name: 'Window', view: 'front', cells: cellsOf((u, v, w) => w === 0 && Math.abs(u) <= 2 && v <= 2 && !(u === 0 && v === 1)) },
+  // Sized to you: you stand nearly three blocks tall, so a wall is four, a doorway three high, and a window is at your eyes.
+  { id: 'wall', name: 'Wall', view: 'front', cells: cellsOf((u, v, w) => w === 0 && Math.abs(u) <= 2 && v <= 3) },
+  { id: 'door', name: 'Doorway', view: 'front', cells: cellsOf((u, v, w) => w === 0 && Math.abs(u) <= 2 && v <= 3 && !(u === 0 && v <= 2)) },
+  { id: 'window', name: 'Window', view: 'front', cells: cellsOf((u, v, w) => w === 0 && Math.abs(u) <= 2 && v <= 3 && !(Math.abs(u) <= 1 && v === 2)) },
   { id: 'low', name: 'Barricade', view: 'front', cells: cellsOf((u, v, w) => w === 0 && Math.abs(u) <= 2 && v <= 1) },
-  { id: 'pillar', name: 'Pillar', view: 'front', cells: cellsOf((u, v, w) => w === 0 && u === 0 && v <= 3) },
+  { id: 'pillar', name: 'Pillar', view: 'front', cells: cellsOf((u, v, w) => w === 0 && u === 0 && v <= 4) },
   { id: 'floor', name: 'Floor', view: 'top', cells: cellsOf((u, v, w) => v === 0 && Math.abs(u) <= 2 && w <= 4) },
   { id: 'stairs', name: 'Stairs', view: 'side', cells: cellsOf((u, v, w) => Math.abs(u) <= 1 && w <= 3 && v <= w) },
   // Six across, so the way in can be two wide in the middle of the front.
-  { id: 'shed', name: 'Shed', view: 'front', cells: cellsOf((u, v, w) => u >= -2 && u <= 3 && w <= 4 && (v === 3 || (v <= 2 && (u === -2 || u === 3 || w === 0 || w === 4) && !(w === 0 && (u === 0 || u === 1) && v <= 1)))) },
+  { id: 'shed', name: 'Shed', view: 'front', cells: cellsOf((u, v, w) => u >= -2 && u <= 3 && w <= 4 && (v === 4 || (v <= 3 && (u === -2 || u === 3 || w === 0 || w === 4) && !(w === 0 && (u === 0 || u === 1) && v <= 2)))) },
 ];
 for (const p of BUILD_PIECES) p.cost = p.cells.length;
 
@@ -261,7 +262,7 @@ export const SURVIVOR_NAMES = [
   'Dalia', 'Damian', 'Dana', 'Dante', 'Dao', 'Darius', 'Dariusz', 'Delia', 'Dembe', 'Desmond', 'Devi', 'Diego', 'Dimitri', 'Dolores', 'Dominic', 'Dorothy', 'Duc', 'Dwayne', 'Ebony', 'Edith', 'Efua', 'Elias', 'Elif', 'Elena', 'Emeka', 'Emil', 'Esther', 'Ezra',
   'Farah', 'Felix', 'Femi', 'Fern', 'Fiona', 'Flora', 'Frankie', 'Gabe', 'Gemma', 'Gideon', 'Gloria', 'Goran', 'Grace', 'Greta', 'Gus', 'Hana', 'Hank', 'Hassan', 'Hattie', 'Helen', 'Henrik', 'Hiro', 'Holly', 'Hugo', 'Hyun',
   'Ibrahim', 'Ida', 'Ilya', 'Imani', 'Inez', 'Ines', 'Irene', 'Isaac', 'Ivan', 'Ivy', 'Jada', 'Jamal', 'Janusz', 'Jasper', 'Javier', 'Jia', 'Jimmy', 'Joaquin', 'Joelle', 'Jonah', 'Josie', 'Juan', 'June', 'Junior',
-  'Kai', 'Kamal', 'Kareem', 'Katya', 'Kavya', 'Keisha', 'Kelvin', 'Kenji', 'Khalid', 'Kofi', 'Kwame', 'Lamar', 'Lara', 'Lars', 'Leila', 'Leroy', 'Lian', 'Liam', 'Lily', 'Lin', 'Lionel', 'Lorenzo', 'Lou', 'Lucia', 'Luther', 'Lydia',
+  'Kieran', 'Kamal', 'Kareem', 'Katya', 'Kavya', 'Keisha', 'Kelvin', 'Kenji', 'Khalid', 'Kofi', 'Kwame', 'Lamar', 'Lara', 'Lars', 'Leila', 'Leroy', 'Lian', 'Liam', 'Lily', 'Lin', 'Lionel', 'Lorenzo', 'Lou', 'Lucia', 'Luther', 'Lydia',
   'Mabel', 'Mads', 'Magda', 'Malik', 'Manny', 'Mara', 'Marisol', 'Marta', 'Mateo', 'Maya', 'Mehmet', 'Mila', 'Milo', 'Minh', 'Miriam', 'Moses', 'Musa', 'Nabil', 'Nasir', 'Nate', 'Neela', 'Nell', 'Nico', 'Nikolai', 'Nina', 'Nkechi', 'Nora',
   'Obi', 'Odessa', 'Olga', 'Olu', 'Omar', 'Oona', 'Orlando', 'Oscar', 'Pablo', 'Paolo', 'Paz', 'Pearl', 'Pedro', 'Petra', 'Pilar', 'Quentin', 'Quincy', 'Rafael', 'Rahul', 'Ramona', 'Rashid', 'Raquel', 'Reuben', 'Rhea', 'Rocco', 'Roman', 'Ruth',
   'Sabina', 'Sadie', 'Salim', 'Salma', 'Santiago', 'Sasha', 'Seamus', 'Selma', 'Sergei', 'Shanice', 'Silas', 'Simone', 'Sione', 'Sofia', 'Solomon', 'Soo', 'Stella', 'Sunil', 'Svetlana', 'Tai', 'Talia', 'Tamika', 'Tariq', 'Teddy', 'Tess', 'Thabo', 'Thea', 'Theo', 'Tobias', 'Trina', 'Tunde',

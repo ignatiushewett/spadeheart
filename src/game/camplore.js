@@ -11,7 +11,7 @@ export const LORE = {
     jobIntro: 'Odalys keeps the board. Pays on time, every time.',
     cast: [
       {
-        id: 'reyes', name: 'Odalys Reyes', role: 'leader', title: 'Administrator of the Refuge', weapon: 'pistol', wardrobe: 'civ',
+        id: 'reyes', name: 'Odalys Reyes', role: 'leader', title: 'Administrator of the Refuge', weapon: 'pistol', wardrobe: 'L_reyes',
         greet: {
           first: 'New face. Good. New faces buy things. I am Odalys, and before you ask, nobody elected me. I ran dispatch for the MTA for nineteen years, and when the trains stopped I was the only person who still knew where everybody was.',
           again: ['Back again. Market is open, wall is up, and I have a list.', 'You still have all your fingers. That makes you an asset.', 'Talk fast. I have two caravans and a bad generator.'],
@@ -78,7 +78,7 @@ export const LORE = {
     jobIntro: 'The Harbormaster posts work when there is tide to spare.',
     cast: [
       {
-        id: 'wen', name: 'Captain Wen Liu', role: 'leader', title: 'Harbormaster', weapon: 'shotgun', wardrobe: 'scrap',
+        id: 'wen', name: 'Captain Wen Liu', role: 'leader', title: 'Harbormaster', weapon: 'shotgun', wardrobe: 'L_wen',
         greet: {
           first: 'Wen Liu. Twenty-two years on the Severn Bay ferry, and I never once sank it. The boat behind you ran out of fuel in the third week with four hundred people on board. We walked them up the gangway and built a wall around the gangway.',
           again: ['Tide is turning. What do you need?', 'Any boats where you came from? No. Nobody ever has boats.'],
@@ -124,7 +124,7 @@ export const LORE = {
     jobIntro: 'The Assembly votes on work each morning. It takes a long time.',
     cast: [
       {
-        id: 'okafor', name: 'Prof. Adaeze Okafor', role: 'leader', title: 'Facilitator of the Assembly', weapon: 'crossbow', wardrobe: 'civ',
+        id: 'okafor', name: 'Prof. Adaeze Okafor', role: 'leader', title: 'Facilitator of the Assembly', weapon: 'crossbow', wardrobe: 'L_okafor',
         greet: {
           first: 'Please do not call me the leader. The Assembly would have to discuss it for an hour. I taught political theory two blocks from here. I am now testing whether any of it was true.',
           again: ['The Assembly meets at sundown. You are welcome to observe.', 'Good timing. We have just lost a vote on latrines, and I would enjoy a distraction.'],
@@ -170,7 +170,7 @@ export const LORE = {
     jobIntro: 'Sergeant Whitaker hands out tasking at 0700. Be on time.',
     cast: [
       {
-        id: 'whitaker', name: 'SSgt. Cole Whitaker', role: 'leader', title: 'Commanding', weapon: 'rifle', wardrobe: 'mil',
+        id: 'whitaker', name: 'SSgt. Cole Whitaker', role: 'leader', title: 'Commanding', weapon: 'rifle', wardrobe: 'L_whitaker',
         greet: {
           first: 'Stand easy. Whitaker, 69th Infantry, what is left of it. Our orders on day nine were to fall back across the state line and blow the crossings behind us. There were eleven thousand civilians on this side. We got on the radio and said we could not read them. We are still having that radio trouble.',
           again: ['Report.', 'Make it quick, I have a perimeter to walk.', 'You are out of uniform, but I will let it go.'],
@@ -221,7 +221,7 @@ export const LORE = {
     jobIntro: 'Judge Halloran posts community service on the hall door. She means it literally.',
     cast: [
       {
-        id: 'halloran', name: 'Judge Miriam Halloran', role: 'leader', title: 'The Judge', weapon: 'pistol', wardrobe: 'civ',
+        id: 'halloran', name: 'Judge Miriam Halloran', role: 'leader', title: 'The Judge', weapon: 'pistol', wardrobe: 'L_halloran',
         greet: {
           first: 'Miriam Halloran. Ballarat Superior Court, Albion County, retired against my will. You will find we have tomatoes and rules here, and you will find that the first depends on the second. Welcome to Providence. Do try not to be sentenced.',
           again: ['Good to see you. Wipe your boots.', 'You are in my way, dear, but only slightly.'],
@@ -272,7 +272,7 @@ export const LORE = {
     jobIntro: 'Mother Rat does not give orders. She mentions things that need doing, and looks at you.',
     cast: [
       {
-        id: 'rat', name: 'Mother Rat', role: 'leader', title: 'Nobody\'s Boss', weapon: 'bat', wardrobe: 'scrap',
+        id: 'rat', name: 'Mother Rat', role: 'leader', title: 'Nobody\'s Boss', weapon: 'bat', wardrobe: 'L_rat',
         greet: {
           first: 'Oh, look. Another one who walked past the sign and thinks I am in charge. I am not. Nobody is. I have been squatting on Cannery Row since 1988, I fought the cops on this very dock in the strike, and I have been waiting for the end of the world my entire adult life. Frankly, it has been a little disappointing.',
           again: ['You again. Grab a paintbrush or get out of the way.', 'Did someone tell you I was in charge? Who was it, I will hit them.'],
@@ -319,7 +319,7 @@ export const LORE = {
     jobIntro: 'Dr. Brandt needs supplies. She always needs supplies.',
     cast: [
       {
-        id: 'brandt', name: 'Dr. Imani Brandt', role: 'leader', title: 'Chief of Medicine', weapon: 'pistol', wardrobe: 'med',
+        id: 'brandt', name: 'Dr. Imani Brandt', role: 'leader', title: 'Chief of Medicine', weapon: 'pistol', wardrobe: 'L_brandt',
         greet: {
           first: 'Dr. Brandt, Albion General, emergency medicine. Hold out both your arms. Thank you. Turn. Thank you. Welcome to Triage. Sorry, I do that to everyone, and I will do it again next time.',
           again: ['Arms, please. Good. What can I do for you?', 'I have twelve minutes, so choose carefully.'],
@@ -366,7 +366,7 @@ export const LORE = {
     jobIntro: 'Coach Calloway knows every family between the mill and the Esperance road. When she blows the whistle, you move.',
     cast: [
       {
-        id: 'loretta', name: 'Odessa Calloway', role: 'leader', title: 'Block Captain', weapon: 'shotgun', wardrobe: 'civ',
+        id: 'loretta', name: 'Odessa Calloway', role: 'leader', title: 'Block Captain', weapon: 'shotgun', wardrobe: 'L_loretta',
         greet: {
           first: 'Hold it. Hands where I can see them, then come closer. Odessa Calloway. Thirty years teaching gym at Carver Mill School, twenty-two summers running the girls\' bracket at the county courts. Everybody in this valley either played for me or has a kid who did, which is the only reason any of them listen. You are new. New sits on the bench until I see what you do. Do not take it personal. Everybody starts on the bench.',
           again: ['Still on your feet. Good. Stay that way.', 'What do you need? Make it quick, I have a wall rotation to fix.', 'Drink some water. I am serious. Half the people who go down out there go down tired.', 'You again. Fine. Talk.'],
@@ -423,7 +423,7 @@ export const LORE = {
     jobIntro: 'Father Rourke keeps the work list in the back of the parish ledger. Here is what is left on it.',
     cast: [
       {
-        id: 'finch', name: 'Declan Rourke', role: 'leader', title: 'Pastor of St. Brigid\'s', weapon: 'machete', wardrobe: 'civ',
+        id: 'finch', name: 'Declan Rourke', role: 'leader', title: 'Pastor of St. Brigid\'s', weapon: 'machete', wardrobe: 'L_finch',
         greet: {
           first: 'You came in off the west side, then. Most do not. Father Declan Rourke. I have had this parish twenty-two years: christenings, funerals, bingo on a Thursday. When it started, the whole street came to the church, because that is what this street has always done in a bad winter. So now I run a fortress. God has a sense of humour.',
           again: ['What news from outside the walls?', 'You find us in good order. We have just patched the roof on the bell tower.'],

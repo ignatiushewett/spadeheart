@@ -20,7 +20,7 @@ const GUNS = {
 };
 
 // Interface sounds: heard as they are whatever else is going on (see uiOut).
-const UI_SOUNDS = new Set(['ui', 'uiOver', 'coin', 'bonk', 'beep', 'pickup', 'crate', 'static']);
+const UI_SOUNDS = new Set(['ui', 'uiOver', 'coin', 'bonk', 'beep', 'pickup', 'crate', 'static', 'sent']);
 
 export class Audio2 {
   constructor() {
@@ -570,26 +570,26 @@ export class Audio2 {
       case 'pickup': { const o = d(.18, .05); this.tone(o, .09, 'triangle', 620, 840, .5); later(60, () => this.tone(d(.18, .05), .1, 'triangle', 920, 1160, .4)); break; }
       case 'coin': { const o = d(1, .06); this.tone(o, .14, 'square', 1500, 1400, .3); later(70, () => this.tone(d(1, .06), .22, 'square', 2000, 1900, .3)); break; }
       case 'static': {
-        // Old-television snow: a hard, bright wash of hiss that cuts in, judders a little slower than it did, crackles, and then trails
+        // Old-television snow: a soft wash of hiss that cuts in, wavers, crackles quietly, and then trails
         // off over most of a second rather than stopping dead.
         const ctx = this.ctx, t = ctx.currentTime, body = .3 + rand() * .05, len = body + .45 + rand() * .08;
         const src = ctx.createBufferSource();
         src.buffer = this.noiseBuf; src.loop = true;
         src.playbackRate.value = .85;
         const hp = ctx.createBiquadFilter(), lp = ctx.createBiquadFilter(), g = ctx.createGain();
-        hp.type = 'highpass'; hp.frequency.value = 1100; hp.Q.value = .7;
-        lp.type = 'lowpass'; lp.frequency.value = 12500; lp.Q.value = .5;
+        hp.type = 'highpass'; hp.frequency.value = 650; hp.Q.value = .5;
+        lp.type = 'lowpass'; lp.frequency.value = 7000; lp.Q.value = .4;
         // As it trails off it dulls, the way a set going quiet does.
-        lp.frequency.setValueAtTime(12500, t + body);
-        lp.frequency.exponentialRampToValueAtTime(5200, t + len);
+        lp.frequency.setValueAtTime(7000, t + body);
+        lp.frequency.exponentialRampToValueAtTime(3200, t + len);
         g.gain.setValueAtTime(.0001, t);
         g.gain.linearRampToValueAtTime(.5, t + .01);
-        for (let k = .03; k < body - .04; k += .03) g.gain.setValueAtTime(.3 + rand() * .3, t + k);
+        for (let k = .03; k < body - .04; k += .035) g.gain.linearRampToValueAtTime(.34 + rand() * .16, t + k);
         g.gain.setValueAtTime(.45, t + body);
         g.gain.linearRampToValueAtTime(.16, t + body + (len - body) * .45);
         g.gain.exponentialRampToValueAtTime(.0001, t + len);
-        for (let k = 0; k < 5; k++) later(rand() * body * 1000, () => this.noiseBurst(d(.8, 0), .012 + rand() * .022, 'highpass', 2500 + rand() * 4000, 2000, 1, .8));
-        for (let k = 0; k < 2; k++) later((body + rand() * (len - body) * .6) * 1000, () => this.noiseBurst(d(.5, 0), .012 + rand() * .02, 'highpass', 2500 + rand() * 3000, 2000, 1, .5));
+        for (let k = 0; k < 5; k++) later(rand() * body * 1000, () => this.noiseBurst(d(.6, 0), .012 + rand() * .02, 'bandpass', 2200 + rand() * 1800, 1800, 1.2, .6));
+        for (let k = 0; k < 2; k++) later((body + rand() * (len - body) * .6) * 1000, () => this.noiseBurst(d(.4, 0), .012 + rand() * .02, 'bandpass', 2000 + rand() * 1500, 1600, 1.2, .4));
         src.connect(hp); hp.connect(lp); lp.connect(g); g.connect(d(.8, 0));
         src.start(t, rand());
         src.stop(t + len + .02);
@@ -627,6 +627,8 @@ export class Audio2 {
         break;
       }
       case 'beep': this.tone(d(.3, .12), .08, 'square', 1250, 1250, .24); break;
+      // Your own call going out: the same little radio chirp as one coming in, but two short notes stepping down.
+      case 'sent': { const o = d(.42, 0); this.tone(o, .05, 'square', 1250, 1250, .2); later(60, () => this.tone(d(.42, 0), .06, 'square', 940, 940, .18)); break; }
       case 'gate': { const o = d(.4, .3); this.noiseBurst(o, .7, 'lowpass', 340, 120, 2, .7, .08); this.tone(o, .5, 'sawtooth', 64, 52, .18); break; }
       case 'splash': this.noiseBurst(d(.4, .15), .5, 'lowpass', 1800, 300, .6, .7, .02); break;
     }

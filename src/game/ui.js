@@ -1289,7 +1289,7 @@ export class UI {
         companionArrow(x, cx + dx * cY - dz * sY, cx + dx * sY + dz * cY, Math.atan2(fx * cY - fz * sY, -(fx * sY + fz * cY)), .8);
       }
     }
-    x.fillStyle = '#c8453a';
+    x.fillStyle = '#e8b04a';
     x.beginPath(); x.moveTo(cx, cx - 11); x.lineTo(cx + 7, cx + 8); x.lineTo(cx, cx + 4); x.lineTo(cx - 7, cx + 8); x.closePath(); x.fill();
     const na = -P.yaw;
     x.fillStyle = '#e9e4d8';
@@ -1406,6 +1406,7 @@ export class UI {
     const where = (f) => {
       if (f.order === 'hold') return 'Off duty';
       if (f.order === 'call') return 'On the way';
+      if (f.order === 'gate') return 'Waiting for you to head out';
       if (f.order === 'camp') { const c = g.layout.camps[f.orderCamp]; return c ? (f.atCamp ? `At ${c.name}` : `Going to ${c.name}`) : 'Away'; }
       const d = Math.hypot(f.x - P.x, f.z - P.z);
       return d > 60 ? `${fmt(d)} m away` : 'With you';
@@ -1415,8 +1416,8 @@ export class UI {
     for (const f of crew) {
       const hp = Math.max(0, Math.min(1, f.hp / f.maxHp)), tier = crewArmourTier(f);
       const b = document.createElement('button');
-      b.className = `crew-card${f === n ? ' sel' : ''}`;
-      b.innerHTML = `${figureSvg(hp, tier > 0)}<span class="nm">${f.name}</span><small>${CREW_GUN_NAMES[f.weaponName] || 'Unarmed'}</small><small>${where(f)}</small><div class="hpbar${hp < .35 ? ' low' : ''}"><i style="width:${(hp * 100).toFixed(1)}%"></i></div>`;
+      b.className = `crew-card${f === n ? ' sel' : ''}${f.order && f.order !== 'call' && f.order !== 'gate' ? ' away' : ''}`;
+      b.innerHTML = `${figureSvg(hp, tier > 0)}<span class="nm">${f.name}</span><small class="bond">${f.bond || 'Member'}</small><small>${CREW_GUN_NAMES[f.weaponName] || 'Unarmed'}</small><small>${where(f)}</small><div class="hpbar${hp < .35 ? ' low' : ''}"><i style="width:${(hp * 100).toFixed(1)}%"></i></div>`;
       b.addEventListener('click', () => { this.crewSel = f; g.audio.simple('ui'); this.renderCrew(); });
       cards.appendChild(b);
     }
@@ -1425,23 +1426,35 @@ export class UI {
     const box = $('crew-detail');
     if (!n) { box.innerHTML = ''; this.renderRadio(); return; }
     const first = n.name.split(' ')[0], fac = this.crewFaction(n), tier = crewArmourTier(n), days = g.day - (n.joined ?? g.day);
-    let html = `<div class="dt">${n.name}</div><div class="fac">${fac.col ? `<i style="background:rgb(${fac.col.map((v) => Math.round(v * 255)).join(',')})"></i>` : ''}${fac.name}</div>`;
+    // The person: name and who they are to you on the left, whether they are with you on the right; then their numbers in a strip.
+    const withMe = !n.order || n.order === 'call' || n.order === 'gate';
+    const facDot = fac.col ? `<i style="background:rgb(${fac.col.map((v) => Math.round(v * 255)).join(',')})"></i>` : '';
+    let html = `<div class="cd-head"><div><div class="dt">${n.name}</div><div class="fac"><span class="bond">${n.bond || 'Member'}</span>${facDot}${fac.name}</div></div>`;
+    html += `<button class="cd-switch${withMe ? ' on' : ''}" data-order="${withMe ? 'camp' : 'follow'}"><span>Stay with me</span><i></i></button></div>`;
     html += `<div class="cd-stats"><span><b>${Math.ceil(Math.max(0, n.hp))}</b>Health</span><span><b>${fmt(n.kills || 0)}</b>Kills</span><span><b>${SP} ${fmt(n.purse || 0)}</b>Their spades</span><span><b>${days < 1 ? 0 : days}</b>Days</span></div>`;
-    const order = !n.order || n.order === 'call' ? 'follow' : n.order;
-    html += `<div class="cd-orders">${[['follow', 'With me'], ['hold', 'Stand down'], ['camp', 'Back to camp']].map(([k, l]) => `<button data-order="${k}" class="${order === k ? 'on' : ''}">${l}</button>`).join('')}</div>`;
+    // Their kit, two short lists side by side: what it is, and what it costs, or that they have it.
     const why = N.crewShop(n).why;
-    const tile = (what, id, name, cost, owned) => {
+    const row = (what, id, name, cost, owned) => {
       const { yours } = N.crewSplit(n, cost);
-      return `<button class="kit-tile${owned ? ' owned' : ''}" data-what="${what}" data-id="${id}"${owned || why || P.scrip < yours ? ' disabled' : ''}><span>${name}</span><b>${owned ? 'Equipped' : `${SP} ${fmt(cost)}`}</b></button>`;
+      return `<button class="kit-row${owned ? ' owned' : ''}" data-what="${what}" data-id="${id}"${owned || why || P.scrip < yours ? ' disabled' : ''}><span>${name}</span><b>${owned ? 'Equipped' : `${SP} ${fmt(cost)}`}</b></button>`;
     };
-    html += '<div class="list-title">Armour</div><div class="kit-grid">';
-    html += CREW_ARMOUR.map((a, t) => (t === 0 ? '' : tile('armour', t, a.name, a.cost, t <= tier))).join('');
-    html += '</div><div class="list-title">Weapon</div><div class="kit-grid">';
-    html += Object.keys(CREW_GUNS).sort((x, y) => CREW_GUNS[x] - CREW_GUNS[y]).map((w) => tile('gun', w, CREW_GUN_NAMES[w], CREW_GUNS[w], w === n.weaponName)).join('');
-    html += `</div><div class="shop-why">${why || (n.purse ? `${first} puts in ${SP} ${fmt(n.purse)}.` : '')}</div>`;
+    html += '<div class="cd-kit"><div><div class="list-title">Armour</div>';
+    html += CREW_ARMOUR.map((q, t) => (t === 0 ? '' : row('armour', t, q.name, q.cost, t <= tier))).join('');
+    html += '</div><div><div class="list-title">Weapon</div>';
+    html += Object.keys(CREW_GUNS).sort((x, y) => CREW_GUNS[x] - CREW_GUNS[y]).map((w) => row('gun', w, CREW_GUN_NAMES[w], CREW_GUNS[w], w === n.weaponName)).join('');
+    html += `</div></div><div class="shop-why">${why || (n.purse ? `${first} puts in ${SP} ${fmt(n.purse)}.` : '')}</div>`;
+    html += '<button class="cd-dismiss" data-dismiss>Dismiss from group</button>';
     box.innerHTML = html;
     box.querySelectorAll('[data-order]').forEach((b) => b.addEventListener('click', () => { this.radioChan = 'crew'; N.crewOrder(n, b.dataset.order); this.renderCrew(); this.renderRadio(); }));
-    box.querySelectorAll('.kit-tile').forEach((b) => b.addEventListener('click', () => {
+    // Letting someone go for good: the first press asks, the second means it.
+    const dis = box.querySelector('[data-dismiss]');
+    dis.addEventListener('click', () => {
+      if (!dis.dataset.sure) { dis.dataset.sure = '1'; dis.textContent = `Really let ${first} go?`; return; }
+      this.radioChan = 'crew';
+      N.crewLetGo(n);
+      this.renderCrew();
+    });
+    box.querySelectorAll('.kit-row').forEach((b) => b.addEventListener('click', () => {
       const what = b.dataset.what, id = what === 'armour' ? +b.dataset.id : b.dataset.id;
       if (!N.crewBuy(n, what, id)) return;
       g.audio.simple('coin');
@@ -1642,7 +1655,6 @@ export class UI {
     for (let y = 0; y < rows; y++) for (let x = 0; x < COLS; x++) cells += `<i class="dz-cell" style="left:${x * STEP}px;top:${y * STEP}px;width:${CELL}px;height:${CELL}px"></i>`;
     grid.innerHTML = cells;
     box.appendChild(grid);
-    if (!ids.length) grid.insertAdjacentHTML('beforeend', '<div class="empty">Nothing here.</div>');
     const drop = document.createElement('div');
     drop.className = 'dz-drop';
     grid.appendChild(drop);
@@ -1970,7 +1982,7 @@ export class UI {
 
     const topics = g.dialogue.topics(n);
     const isWork = (t) => t.job || t.pay;
-    const isDeed = (t) => t.recruit || t.hire || t.dismiss || t.food || t.give || t.scrip || t.rest;
+    const isDeed = (t) => t.recruit || t.hire || t.dismiss || t.home || t.food || t.give || t.scrip || t.rest;
     // What they are for comes first, one key away. Chatting is what is left after that.
     const root = this.actionsFor(n, topics.filter(isDeed), topics.some(isWork));
     root.push({ label: 'There is something I wanted to ask you.', fn: () => this.talkMenu() });
@@ -2097,12 +2109,12 @@ export class UI {
   topicChoice(n, t, after) {
     const g = this.g, P = g.player;
     const seen = n.part && P.dlg.flags[`seen_${n.part.id}_${t.id}`];
-    return { label: t.ask, cls: t.recruit || t.hire || t.food || t.dismiss ? 'quest' : seen ? 'seen' : (t.job || t.pay ? 'quest' : ''), fn: () => {
+    return { label: t.ask, cls: t.recruit || t.hire || t.food || t.dismiss || t.home ? 'quest' : seen ? 'seen' : (t.job || t.pay ? 'quest' : ''), fn: () => {
       const r = g.dialogue.choose(n, t);
       this.say(r.text);
       // Said yes to coming along, or agreed to head home: that is the conversation over. One key and you are on your way.
-      if (((t.recruit || t.hire) && n.kind === 'follower') || t.dismiss) {
-        this.setChoices([{ label: t.dismiss ? 'Take care.' : 'Let\'s go.', cls: 'primary', fn: () => g.resume() }], null);
+      if (((t.recruit || t.hire) && n.kind === 'follower') || t.dismiss || t.home) {
+        this.setChoices([{ label: t.dismiss || t.home ? 'Take care.' : 'Let\'s go.', cls: 'primary', fn: () => g.resume() }], null);
         return;
       }
       if (r.then) this.talkMenu(r.then); else after();
@@ -2111,7 +2123,7 @@ export class UI {
 
   talkMenu(thread) {
     const g = this.g, n = this.dlgNpc;
-    const isDeed = (t) => t.recruit || t.hire || t.dismiss || t.food || t.give || t.scrip || t.rest;
+    const isDeed = (t) => t.recruit || t.hire || t.dismiss || t.home || t.food || t.give || t.scrip || t.rest;
     const topics = g.dialogue.topics(n, thread).filter((t) => thread || !(t.job || t.pay || isDeed(t)));
     const list = topics.map((t) => this.topicChoice(n, t, () => this.talkMenu()));
     if (!thread) {
@@ -2329,7 +2341,7 @@ export class UI {
   // commission taken), it is typed down with the radio calls. send() puts it on the log; then() runs once it has gone, so an answer
   // comes after it and not before.
   typeOut({ chan, text, menu, send, then }) {
-    const g = this.g, go = (noise) => { send(); if (noise) g.audio.simple('static'); if (then) then(); };
+    const g = this.g, go = (noise) => { send(); if (noise) g.audio.simple('sent'); if (then) then(); };
     if (g.campSim.passing) { go(false); return; }
     if (menu) {
       // One at a time: a second order waits for the first to go out.
@@ -2337,7 +2349,28 @@ export class UI {
       if (!this.typing) this.nextTyped();
       return;
     }
-    if (!this.notifies(chan)) { go(false); return; }
+    // Said without pressing anything: in turn, one after another, never two typed at once. When several go out together (three jobs
+    // taken in a row), only the last is answered, once.
+    (this.autoQueue || (this.autoQueue = [])).push({ chan, text, send, then });
+    if (!this.autoBusy) this.nextAuto();
+  }
+
+  nextAuto() {
+    const g = this.g, q = this.autoQueue || [];
+    const item = q[0];
+    if (!item) { this.autoBusy = false; return; }
+    this.autoBusy = true;
+    // Said while you are still talking to someone (a job taken, a payment): it waits until you have walked away from them.
+    if (this.modal === 'dialog' || this.modal === 'trade') { setTimeout(() => this.nextAuto(), 300); return; }
+    q.shift();
+    const { chan, text, send, then } = item;
+    const go = (noise) => {
+      send();
+      if (noise) g.audio.simple('sent');
+      if (then && !q.length) then();
+      setTimeout(() => this.nextAuto(), noise ? 700 : 0);
+    };
+    if (g.campSim.passing || !this.notifies(chan)) { go(false); return; }
     const box = $('toasts'), d = document.createElement('div');
     d.className = 'radio mine typing';
     const b = document.createElement('b'), shown = document.createElement('span'), rest = document.createElement('span');
@@ -2416,6 +2449,22 @@ export class UI {
     const tint = voiceTint(who || station);
     b.style.color = tint;
     d.style.borderLeftColor = tint;
+    // A settlement's operations channel gets a small star before the name, so its calls stand apart from the chatter.
+    if (station && station !== 'Private Frequency' && !station.endsWith('Civilian Radio')) {
+      const i = document.createElement('i');
+      i.className = 'ops-mark';
+      i.innerHTML = '<svg viewBox="0 0 10 10" aria-hidden="true"><path d="M5 .3l1.4 3.1 3.4.3-2.6 2.2.8 3.3L5 7.5 2 9.2l.8-3.3L.2 3.7l3.4-.3z" fill="currentColor"/></svg>';
+      i.style.color = tint;
+      d.appendChild(i);
+    }
+    // Someone in your group: a small figure, so their calls stand apart from the settlements'.
+    if (station === 'Private Frequency') {
+      const i = document.createElement('i');
+      i.className = 'ops-mark';
+      i.innerHTML = '<svg viewBox="0 0 10 10" aria-hidden="true"><circle cx="5" cy="2.6" r="2.3" fill="currentColor"/><path d="M.8 10c0-3 1.9-4.6 4.2-4.6S9.2 7 9.2 10z" fill="currentColor"/></svg>';
+      i.style.color = tint;
+      d.appendChild(i);
+    }
     d.appendChild(b);
     d.appendChild(document.createTextNode(text));
     box.appendChild(d);

@@ -1,3 +1,4 @@
+import { GRASS_N } from './grassmap.js';
 // Forward HDR renderer with cascaded sun shadows and an OpenSpades-style cinematic post chain:
 // SSAO, motion blur, depth of field, bloom, god rays, lens flare, ACES grading, grain and FXAA.
 import * as SH from './shaders.js';
@@ -65,6 +66,7 @@ export class Renderer {
     this.pFarShadow = P(SH.FAR_SHADOW_VS, SH.SHADOW_FS, 'farShadow');
     this.pFar = P(SH.FAR_VS, SH.FAR_FS, 'far');
     this.pTree = P(SH.TREE_VS, SH.TREE_FS, 'tree');
+    this.pGrass = P(SH.GRASS_VS, SH.GRASS_FS, 'grass');
     this.pGround = P(SH.GROUND_VS, SH.GROUND_FS, 'ground');
     this.pWater = P(SH.WATER_VS, SH.WATER_FS, 'water');
     this.pSky = P(SH.FS_VS, SH.SKY_FS, 'sky');
@@ -718,6 +720,9 @@ export class Renderer {
       this.stats.tris += c.oq * 2;
     }
 
+    // Strands of grass, near you.
+    this.drawGrass(sway);
+
     // Far proxies
     if (far) {
       gl.activeTexture(gl.TEXTURE2);
@@ -883,6 +888,68 @@ export class Renderer {
     gl.activeTexture(gl.TEXTURE0);
     gl.uniform1i(p.u.uRainMap, 8);
     gl.uniform3f(p.u.uRainMapO, m.x0, m.z0, RAIN_N);
+  }
+
+  // A blade of grass is three corners: two at the root, one at the tip. Drawn for a square of ground round you, one blade to each spot
+  // on a fixed grid; the shader leaves out the ones that are not on grass, or too far off.
+  drawGrass(sway) {
+    const gl = this.gl, gm = this.grassMap;
+    if (!gm || this.grassStrands === false || this.underwater) return;
+    if (!this.grassVAO) {
+      this.grassVAO = gl.createVertexArray();
+      gl.bindVertexArray(this.grassVAO);
+      const b = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, b);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-.5, 0, .5, 0, -.5, 1, .5, 1]), gl.STATIC_DRAW);
+      gl.enableVertexAttribArray(0);
+      gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+      gl.bindVertexArray(null);
+    }
+    const p = this.pGrass.use();
+    this.frameUniforms(p);
+    // The map of where grass grows, one pixel a column.
+    if (!this.texGrass) {
+      this.texGrass = gl.createTexture();
+      gl.activeTexture(gl.TEXTURE9);
+      gl.bindTexture(gl.TEXTURE_2D, this.texGrass);
+      for (const [k, v] of [[gl.TEXTURE_MIN_FILTER, gl.NEAREST], [gl.TEXTURE_MAG_FILTER, gl.NEAREST], [gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE], [gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE]]) gl.texParameteri(gl.TEXTURE_2D, k, v);
+      gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, GRASS_N, GRASS_N, 0, gl.RGBA, gl.UNSIGNED_BYTE, gm.rgba);
+      this.grassV = gm.version;
+    }
+    gl.activeTexture(gl.TEXTURE9);
+    gl.bindTexture(gl.TEXTURE_2D, this.texGrass);
+    // Only the rows that changed.
+    if (this.grassV !== gm.version) {
+      const rows = gm.takeRows();
+      if (rows) { gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1); gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, rows[0], GRASS_N, rows[1] - rows[0] + 1, gl.RGBA, gl.UNSIGNED_BYTE, gm.rgba.subarray(rows[0] * GRASS_N * 4, (rows[1] + 1) * GRASS_N * 4)); }
+      this.grassV = gm.version;
+    }
+    gl.uniform1i(p.u.uGrassMap, 9);
+    gl.uniform3f(p.u.uGrassMapO, gm.x0, gm.z0, GRASS_N);
+    gl.uniform3f(p.u.uCamForward, this.camForward[0], this.camForward[1], this.camForward[2]);
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, this.texPalette);
+    gl.uniform1i(p.u.uPalette, 1);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.uniform1f(p.u.uGrassT, this.grassT || 0);
+    gl.uniform1f(p.u.uSway, sway);
+    gl.disable(gl.CULL_FACE);
+    gl.bindVertexArray(this.grassVAO);
+    // Close in, thick and fine; further out, fewer and broader, and on out to the edge of the map of it.
+    // Three grids, each sparser than the last, laid over each other: how many blades there are thins out smoothly with distance and
+    // each grid only carries what the one before it cannot, so there is no ring where one stops and the next starts.
+    for (const [a, b, c, d, space, scale] of [[0, 0, 56, 70, .3, 1], [56, 70, 115, 130, .6, 1.2], [115, 130, 190, 210, 1.2, 1.6]]) {
+      const side = Math.ceil(d * 2 / space);
+      gl.uniform4f(p.u.uBand, a, b, c, d);
+      gl.uniform1f(p.u.uScale, scale);
+      gl.uniform1i(p.u.uSide, side);
+      gl.uniform1f(p.u.uSpace, space);
+      gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, side * side);
+    }
+    gl.enable(gl.CULL_FACE);
+    gl.bindVertexArray(null);
+    this.stats.draws++;
   }
 
   drawRain() {

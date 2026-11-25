@@ -279,6 +279,7 @@ out vec3 vNormal;
 out float vAO;
 out float vSky;
 flat out int vId;
+flat out int vDry;   // looks out into a pane of glass: the rain never gets to it
 const vec3 NORMALS[6]=vec3[6](vec3(1,0,0),vec3(-1,0,0),vec3(0,1,0),vec3(0,-1,0),vec3(0,0,1),vec3(0,0,-1));
 void main(){
   vec3 p=vec3(aPos.xyz)+uOrigin;
@@ -323,6 +324,7 @@ void main(){
   vAO=float(aInfo.y);
   vSky=float(aInfo.z)/255.;
   vId=int(aInfo.x);
+  vDry=int(aInfo.w&8u);
   gl_Position=uViewProj*vec4(p,1.);
 }`;
 
@@ -332,6 +334,7 @@ in vec3 vNormal;
 in float vAO;
 in float vSky;
 flat in int vId;
+flat in int vDry;
 uniform sampler2D uPalette;
 uniform int uGlassPass;
 uniform float uNightGlow;
@@ -532,7 +535,7 @@ void main(){
   // Rain: walls darken where it runs, and the ground goes dark and glossy, puddled in its low spots.
   float wetUp=0.,wetSide=0.;
   float outside=0.;
-  if(uWet>.003&&vSky>.04){
+  if(uWet>.003&&vSky>.04&&vDry==0){
     float fb=smoothstep(.25,.5,vSky);
     outside=underSky(vWorld+n*.5,fb);
     if(outside<.5&&abs(n.y)<.5) outside=wallOutside(vWorld,n,fb);
@@ -777,6 +780,99 @@ void main(){
   // dark as the voxel trees it carries on from.
   vec3 n=normalize(vec3(0.,.35,0.)+normalize(vec3(uCam.x-vWorld.x,0.,uCam.z-vWorld.z))*.9);
   vec3 c=shade(albedo,vWorld,n,1.,.62,dist);
+  outCol=vec4(applyFog(c,vWorld),1.);
+}`;
+
+// Strands of grass on the grass near you: a little tapering blade, a few to every block, each leaning its own way and stirring in the
+// wind, darker at the root than the tip. Where they go is worked out here from a fixed grid on the ground, so they stay put as you walk;
+// the rain map says how high the ground is in each column and whether its top is grass at all. They thin out and shrink away with
+// distance, so there is no edge to them.
+export const GRASS_VS = COMMON + FRAME_UNIFORMS + /* glsl */`
+layout(location=0) in vec2 aCorner;   // across (-.5 to .5) and up (0 to 1)
+uniform sampler2D uGrassMap;
+uniform vec3 uGrassMapO;
+uniform sampler2D uPalette;
+uniform float uGrassT;
+uniform float uSway;
+uniform int uSide;
+uniform float uSpace;
+uniform vec4 uBand;      // where this set of blades comes in (x to y) and goes out again (z to w), by distance from you
+uniform float uScale;    // each set its own size of blade, the same whatever the distance
+uniform vec3 uCamForward;
+out vec3 vWorld;
+out float vUp;
+flat out vec3 vCol;
+flat out float vCover;
+flat out float vFade;
+vec2 hash22(vec2 p){ vec3 q=fract(vec3(p.xyx)*vec3(.1031,.103,.0973)); q+=dot(q,q.yzx+33.33); return fract((q.xx+q.yz)*q.zy); }
+void main(){
+  int id=gl_InstanceID;
+  vec2 cell=floor(uCam.xz/uSpace)-float(uSide/2)+vec2(float(id%uSide),float(id/uSide));
+  vec2 h=hash22(cell), h2=hash22(cell+17.3);
+  vec2 p=(cell+h)*uSpace;
+  float dist=length(p-uCam.xz);
+  // Behind you, or out past the band: nothing to work out.
+  gl_Position=vec4(2.,2.,2.,1.);
+  vec3 fwd=uCamForward;
+  if(dist>uBand.w||(dist>3.&&length(fwd.xz)>.3&&dot((p-uCam.xz)/dist,normalize(fwd.xz))<-.35)) return;
+  // Clumps: some patches thick and long, some short and sparse.
+  float clump=hash22(floor(p/3.)+5.1).x;
+  // How many blades there should be here: all of them out to forty blocks, then fewer and fewer. Each grid carries its share of that
+  // over its own stretch, handing over to the next across a wide band. A blade is in if its own number is under its grid's share; one
+  // right at the edge of that dissolves in and out, rather than growing or shrinking, so no blade ever changes size as you walk.
+  vec2 h3=hash22(cell+41.7);
+  float want=pow(40./max(dist,40.),2.2)*11.1*uSpace*uSpace;
+  float wt=(uBand.y<=0.?1.:smoothstep(uBand.x,uBand.y,dist))*(1.-smoothstep(uBand.z,uBand.w,dist));
+  float share=min(1.,want)*wt;
+  float grow=step(h2.y,.55+clump*.45)*step(h3.x,share);
+  vFade=clamp((share-h3.x)/.18,0.,1.);
+  float scale=uScale;
+  vec2 m=(floor(p)+.5-uGrassMapO.xy)/uGrassMapO.z;
+  gl_Position=vec4(2.,2.,2.,1.);
+  vWorld=vec3(0.); vUp=0.; vCol=vec3(0.); vCover=0.;
+  if(uGrassMapO.z<=0.||grow<=.01||any(lessThan(m,vec2(0.)))||any(greaterThanEqual(m,vec2(1.)))) return;
+  vec4 t=textureLod(uGrassMap,m,0.);
+  int kind=int(t.g*255.+.5);
+  if(kind==0) return;
+  int top=kind==1?${M.GRASS}:kind==2?${M.GRASS2}:${M.GRASS_DRY};
+  float ground=t.r*255.+1.06;
+  float tall=(.18+.3*h2.x+.16*clump)*grow*scale;
+  float a=h.x*6.2832, w=(.11+.06*h.y)*scale;
+  vec3 across=vec3(cos(a),0.,sin(a));
+  // The wind leans them all the one way, in waves, and each has its own lean as well.
+  float wind=((sin(uGrassT*2.7-(p.x+p.y)*.31+h.y*1.6)*.5+.5)*.16+sin(uGrassT*7.3+h.x*6.3)*.025)*uSway*(1.-t.b*.6);
+  vec2 lean=vec2(cos(a*1.7),sin(a*1.7))*.07+normalize(vec2(1.,.4))*wind;
+  float up=aCorner.y;
+  // A flat strap, a touch narrower at the top than the root: not a spike.
+  vec3 wp=vec3(p.x,ground,p.y)+across*aCorner.x*w*(1.-up*.3)+vec3(lean.x*up*up,up*tall,lean.y*up*up);
+  vWorld=wp; vUp=up; vCover=t.b;
+  vCol=pow(texelFetch(uPalette,ivec2(top,0),0).rgb,vec3(2.2))*(.85+.3*h2.x);
+  gl_Position=uViewProj*vec4(wp,1.);
+}`;
+
+export const GRASS_FS = COMMON + FRAME_UNIFORMS + LIGHTING + /* glsl */`
+in vec3 vWorld;
+in float vUp;
+flat in vec3 vCol;
+flat in float vCover;
+flat in float vFade;
+layout(location=0) out vec4 outCol;
+void main(){
+  // A blade on its way in or out is there only in part: a fine scatter of its pixels, more of them the further in it is.
+  if(vFade<1.&&fract(52.9829189*fract(dot(gl_FragCoord.xy,vec2(.06711056,.00583715))))>vFade) discard;
+  float dist=length(vWorld-uCam);
+  // Dark down among the stems, catching the light at the tip; dimmer under cover, where the sky only gets in from the sides.
+  vec3 albedo=vCol*mix(.62,1.12,vUp);
+  // Wet the way the grass under it is: darker, and with a sheen off it at a glancing look. Less so under a tree or an awning.
+  float wet=uWet*(1.-vCover*.75);
+  albedo*=mix(1.,.8,wet);
+  vec3 nn=normalize(vec3(0.,1.,0.)+normalize(uCam-vWorld)*.35);
+  vec3 c=shade(albedo,vWorld,nn,mix(1.,.45,vCover),mix(.65,1.,vUp),dist);
+  if(wet>0.){
+    vec3 v=normalize(uCam-vWorld);
+    float f=pow(1.-abs(dot(nn,v)),3.);
+    c+=(mix(uHorizon,uSkyCol,.5)*.8+cityLight(vWorld)*.6)*(.45+.9*f)*wet*.95*mix(.65,1.,vUp);
+  }
   outCol=vec4(applyFog(c,vWorld),1.);
 }`;
 

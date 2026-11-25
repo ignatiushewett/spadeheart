@@ -1,4 +1,4 @@
-// The civilian stations' music: a handful of upbeat little instrumentals, the kind a station keeps on a loop between the talking, played
+// The civilian stations' music: a handful of low, moody little instrumentals, the kind a station keeps on a loop between the talking, played
 // one after another, round and round. Made here, note by note, a moment ahead of when it is heard: a drum kit, a bass line, a rhythm
 // part on the off beats, a pad under the choruses and a tune over the top that comes back round the way a hook does. It comes out of one
 // place and goes two ways: to your own radio, if you have tuned in, and out of the speakers dotted about the settlements, quietly, for
@@ -9,18 +9,18 @@ const hz = (m) => 440 * 2 ** ((m - 69) / 12);
 // Each song: its tempo and key, the chords of its verse and its chorus (a bar each), how it is played, and a little swing.
 // key is the tonic as a note number; the tune is picked from the major or minor pentatonic over it, so it sits on any of the chords.
 const SONGS = [
-  { bpm: 112, key: 60, minor: false, swing: .06, feel: 'pop',
-    verse: [[60, 64, 67, 71], [57, 60, 64, 67], [53, 57, 60, 64], [55, 59, 62, 65]],
-    chorus: [[53, 57, 60, 64], [55, 59, 62, 65], [52, 55, 59, 62], [57, 60, 64, 67]] },
-  { bpm: 98, key: 57, minor: true, swing: .14, feel: 'funk',
-    verse: [[57, 60, 64, 67], [57, 60, 64, 67], [62, 65, 69, 72], [64, 68, 71, 74]],
-    chorus: [[53, 57, 60, 64], [55, 59, 62, 65], [57, 60, 64, 67], [64, 68, 71, 74]] },
-  { bpm: 122, key: 62, minor: false, swing: 0, feel: 'drive',
-    verse: [[62, 66, 69], [59, 62, 66], [55, 59, 62], [57, 61, 64]],
-    chorus: [[55, 59, 62], [57, 61, 64], [59, 62, 66], [57, 61, 64]] },
-  { bpm: 104, key: 55, minor: false, swing: .1, feel: 'skank',
-    verse: [[55, 59, 62], [60, 64, 67], [55, 59, 62], [62, 66, 69]],
-    chorus: [[60, 64, 67], [62, 66, 69], [55, 59, 62], [52, 55, 59]] },
+  { bpm: 96, key: 57, minor: true, swing: .06, feel: 'pop',
+    verse: [[57, 60, 64, 67], [53, 57, 60, 64], [52, 55, 60, 64], [55, 59, 62, 65]],
+    chorus: [[53, 57, 60, 64], [55, 59, 62, 67], [52, 55, 59, 62], [57, 60, 64, 67]] },
+  { bpm: 94, key: 57, minor: true, swing: .14, feel: 'funk',
+    verse: [[57, 60, 64, 67], [57, 60, 64, 67], [62, 65, 69, 72], [52, 56, 59, 62]],
+    chorus: [[53, 57, 60, 64], [55, 59, 62, 65], [57, 60, 64, 67], [52, 56, 59, 62]] },
+  { bpm: 108, key: 62, minor: true, swing: 0, feel: 'drive',
+    verse: [[62, 65, 69], [58, 62, 65], [53, 57, 60], [55, 60, 64]],
+    chorus: [[58, 62, 65], [55, 60, 64], [62, 65, 69], [57, 61, 64]] },
+  { bpm: 88, key: 55, minor: true, swing: .1, feel: 'skank',
+    verse: [[55, 58, 62], [60, 63, 67], [55, 58, 62], [57, 62, 66]],
+    chorus: [[58, 63, 67], [57, 60, 65], [55, 58, 62], [57, 62, 66]] },
 ];
 // Intro, verse, chorus, verse, chorus, a last chorus, and out: about a minute and a half.
 const FORM = [['intro', 2], ['verse', 8], ['chorus', 8], ['verse', 8], ['chorus', 8], ['chorus', 4], ['outro', 2]];
@@ -35,8 +35,8 @@ export class StationMusic {
     // A small, boxy sound: what comes out of a cheap speaker.
     const hp = ctx.createBiquadFilter(), lp = ctx.createBiquadFilter(), level = ctx.createGain();
     hp.type = 'highpass'; hp.frequency.value = 95;
-    lp.type = 'lowpass'; lp.frequency.value = 4200;
-    level.gain.value = 2.6;
+    lp.type = 'lowpass'; lp.frequency.value = 3300;
+    level.gain.value = 5.5;
     level.connect(hp); hp.connect(lp);
     this.radio = ctx.createGain(); this.radio.gain.value = 0;
     this.world = ctx.createGain(); this.world.gain.value = 0;
@@ -47,9 +47,9 @@ export class StationMusic {
     const bus = (type, f, q = .7) => { const b = ctx.createBiquadFilter(); b.type = type; b.frequency.value = f; b.Q.value = q; b.connect(level); return b; };
     this.drums = bus('lowpass', 9000);
     this.bass = bus('lowpass', 650, 1.2);
-    this.keys = bus('lowpass', 2300);
+    this.keys = bus('lowpass', 1500);
     this.pad = bus('lowpass', 1500);
-    this.lead = bus('lowpass', 3600);
+    this.lead = bus('lowpass', 1700, .9);
     // The tune with a slap of echo on it.
     const echo = ctx.createDelay(1), fb = ctx.createGain(), wet = ctx.createGain();
     echo.delayTime.value = .27; fb.gain.value = .28; wet.gain.value = .3;
@@ -73,12 +73,12 @@ export class StationMusic {
       if (rnd() < (strong ? busy + .2 : busy * .55)) {
         deg = Math.max(0, Math.min(scale.length - 1, deg + Math.round((rnd() - .5) * 4)));
         const len = rnd() < .3 ? 4 : rnd() < .5 ? 2 : 1;
-        out.push({ at, note: s.key + 12 + scale[deg], len });
+        out.push({ at, note: s.key + scale[deg], len });
         at += len;
       } else at += 1;
     }
     // The phrase comes to rest on the key note.
-    if (out.length) out[out.length - 1].note = s.key + 12 + (rnd() < .5 ? 0 : 12);
+    if (out.length) out[out.length - 1].note = s.key + (rnd() < .5 ? 0 : 12);
     return out;
   }
 
@@ -126,7 +126,7 @@ export class StationMusic {
     if (fill && st % 2 === 1) this.snare(t, .22 + (st - 12) * .05);
     if (s.feel === 'skank' && st === 8) this.snare(t, .35);
     const hat = full || s.feel === 'funk' ? true : st % 2 === 0;
-    if (hat && !fill) this.hat(t, st % 4 === 2 ? .2 : .1, s.feel !== 'drive' && st === 14 && full);
+    if (hat && !fill) this.hat(t, st % 4 === 2 ? .13 : .06, s.feel !== 'drive' && st === 14 && full);
     if (name === 'outro' && p.at === 1) return;
     // Bass: on the root, up to the octave and the fifth, and a step into the next chord.
     const bp = s.feel === 'drive' ? [0, 2, 4, 6, 8, 10, 12, 14] : s.feel === 'funk' ? [0, 3, 6, 7, 10, 14] : s.feel === 'skank' ? [0, 6, 8, 14] : [0, 6, 8, 11, 14];
@@ -137,13 +137,13 @@ export class StationMusic {
     }
     // The rhythm part: chords chopped on the off beats, or pushed on the and of two.
     const kp = s.feel === 'skank' ? [4, 12] : s.feel === 'funk' ? [2, 5, 10, 13] : s.feel === 'drive' ? [0, 3, 6, 10, 12] : [2, 6, 10, 14];
-    if (name !== 'intro' && kp.includes(st)) for (const m of chord) this.voice(this.keys, t, hz(m), six * (s.feel === 'drive' ? 1.6 : .9), 'square', .032, .003);
+    if (name !== 'intro' && kp.includes(st)) for (const m of chord) { this.voice(this.keys, t, hz(m), six * (s.feel === 'drive' ? 1.8 : 1.2), 'triangle', .05, .004); this.voice(this.keys, t, hz(m) * 1.004, six * (s.feel === 'drive' ? 1.8 : 1.2), 'sine', .03, .004); }
     // A pad held under the choruses.
     if (full && st === 0) for (const m of chord) { this.voice(this.pad, t, hz(m) * 1.003, six * 15.5, 'sawtooth', .018, .12); this.voice(this.pad, t, hz(m) * .997, six * 15.5, 'sawtooth', .018, .12); }
-    // The tune: in the second half of each verse and all through the choruses, the hook played twice over, the octave up in the chorus.
+    // The tune: in the second half of each verse and all through the choruses, the hook played twice over, a little louder in the chorus.
     if ((name === 'verse' && p.at >= 4) || full) {
       const hook = this.hooks[this.song][full ? 'chorus' : 'verse'], pos = (p.at % 2) * 16 + st;
-      for (const q of hook) if (q.at === pos) this.voice(this.lead, t, hz(q.note + (full ? 12 : 0)), six * q.len * .95, 'square', .045, .006, true);
+      for (const q of hook) if (q.at === pos) this.voice(this.lead, t, hz(q.note), six * q.len * 1.05, 'sawtooth', full ? .065 : .05, .02, true);
     }
   }
 

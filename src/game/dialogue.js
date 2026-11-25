@@ -54,12 +54,34 @@ export class Dialogue {
   loreOf(npc) { return npc.campKey ? LORE[npc.campKey] : null; }
 
   // Opening line.
+  // What one of your group says when you walk up to them. They know who you are.
+  companionGreeting(npc) {
+    const g = this.g, P = g.player, you = String(P.charName || '').split(' ')[0] || 'you', hurt = npc.hp < npc.maxHp * .4, night = g.tod < .22 || g.tod > .88;
+    const lines = [`Hey, ${you}.`, `There you are, ${you}.`, `${you}. What do you need?`, 'Good to see you in one piece.', 'What are we doing?', 'Still here. Still kicking.'];
+    const bond = {
+      Sibling: [`Hey, ${you}. You eating enough?`, 'Mum would have hated all this, you know.', `${you}. Don't do anything stupid out there.`],
+      Cousin: [`${you}! Thought you had wandered off again.`, 'Family reunion, is it?', 'Never thought it would be you and me at the end of the world.'],
+      Partner: [`Hey, you. ${you}.`, 'Come here. You look tired.', 'I keep checking the radio for you, you know.'],
+      'Old friend': [`${you}. Like old times, this.`, 'Remember when the worst thing was the Monday train?', 'You still owe me a beer, for the record.'],
+      'Childhood friend': [`${you}! You remember the old creek? Feels like a hundred years ago.`, 'We used to play at this, you know. Zombies. Wish we had not.', `If ten-year-old ${you} could see you now.`],
+      Neighbour: ['Who would have thought, eh? Neighbours to the end.', 'At least you stopped mowing at six in the morning.', `${you}. Never thought I would be glad to see you every day.`],
+      Workmate: ['Never thought I would miss the office.', `${you}. This is worse than the quarterly reviews.`, 'Still clocking in, I see.'],
+      Roommate: ['You left the light on again. Kidding.', `${you}. Same as ever.`, 'Who is doing the dishes now, then?'],
+    }[npc.bond];
+    if (bond) lines.push(...bond, ...bond);
+    if (hurt) lines.push('Not my best day. I will live.', 'Could do with patching up, if you have something.');
+    if (night) lines.push('Long night.', 'You should get some sleep, you know.');
+    return pick(lines);
+  }
+
   greeting(npc) {
     const P = this.g.player, flags = P.dlg.met;
     const key = npc.loreId || npc.personaId;
     // Once you are Trusted somewhere, everybody there knows who you are, whether or not you have spoken before.
     const first = !flags[key] && !(npc.camp >= 0 && this.standing(npc.camp) >= 25);
     flags[key] = (flags[key] || 0) + 1;
+    // Your own people know you: by name, and by what you are to each other.
+    if (npc.kind === 'follower') return this.companionGreeting(npc);
     if (npc.kind === 'roamer' && P.wanted[-1] > 0) return 'You have got some nerve, after that.';
     if (npc.kind === 'roamer' && npc.factionId && this.g.npcs.owesBail(npc.factionId - 1)) {
       const id = npc.factionId - 1, wait = this.g.npcs.bailWait(id);
@@ -157,7 +179,15 @@ export class Dialogue {
     if (food && !npc.fed) list.push({ id: 'share', ask: `Here, take this. (${ITEMS[food].name})`, say: pick(['Oh. Thank you. You do not know what that means.', 'I will not forget that. People say that a lot. I mean it.', 'You are all right, you know that?']), food, standing: 1 });
     if (npc.kind === 'roamer' && npc.factionId && !g.npcs.admitted(npc.factionId - 1)) list.push({ id: 'papers', ask: `How does anyone get into ${npc.campName}?`, say: `They don't, not without papers. ${g.npcs.citizenFee(npc.factionId - 1).toLocaleString('en-US')} spades, one time, and any of us out here can sign you up. It's good until you die. Don't try the wall, either. They'll shoot you and they'll remember you.` });
     const room = g.npcs.followers.length < g.npcs.crewRoom();
-    if (npc.kind === 'follower') list.push({ id: 'dismiss', ask: 'Head on home. I will be all right from here.', say: 'If you are sure. Watch yourself out there.', dismiss: true });
+    // A patrol sent out to help you: you can tell them they are done, and they head back.
+    if (npc.kind === 'roamer' && npc.squad && npc.squad.help) list.push({ id: 'helpdone', ask: 'Thanks for coming out. We are good here, you can head back.', say: pick(['Copy that. Glad we could help. Stay safe.', 'All right. We will let them know at the wall. Watch yourself.', 'Good. Shout on the radio if it goes bad again.']), helpDone: true });
+    // Sent home, not sent away: they go back to their settlement and stay in the group. Letting someone go is done from the Group menu.
+    if (npc.kind === 'follower' && npc.order !== 'camp') {
+      const hc = g.npcs.crewHomeCamp(npc), there = hc && npc.x > hc.x0 + 2 && npc.x < hc.x1 - 2 && npc.z > hc.z0 + 2 && npc.z < hc.z1 - 2;
+      if (hc) list.push(there
+        ? { id: 'home', ask: 'Stay here for now. I will come and find you.', say: 'All right. I will be around when you need me.', home: true }
+        : { id: 'home', ask: `Head back to ${hc.name}. I will find you there.`, say: 'If you are sure. Watch yourself out there.', home: true });
+    }
     // A gun for hire, at the bar: they come for money, not for friendship, and anyone can pay.
     else if (npc.hire && room) list.push({ id: 'hire', ask: `[Hire] I need a gun out there. (${npc.hire.fee.toLocaleString('en-US')} spades)`, say: pick(['Money first. Then I go where you go.', 'Paid up front, and I do not do suicide runs. Deal.', 'You pay, I shoot. Lead the way.']), hire: true });
     else if (npc.kind === 'wanderer' && npc.armed && !npc.kid && !npc.role && room) list.push({ id: 'recruit', ask: 'Walk with me for a while.', say: pick(['Safer in numbers. All right, for now.', 'Why not. I was not getting anywhere on my own.', 'You look like you know how to stay alive. I will take that.']), recruit: true });
@@ -225,6 +255,8 @@ export class Dialogue {
     if (t.reveal) this.reveal(npc);
     if (t.recruit) g.npcs.recruit(npc);
     if (t.dismiss) g.npcs.dismiss(npc);
+    if (t.home) g.npcs.sendHome(npc);
+    if (t.helpDone && npc.squad) npc.squad.seekT = 0;
     if (t.rest) { P.health = Math.min(100, P.health + 6); if (!npc.fed2) { npc.fed2 = true; this.addStanding(npc.camp, 1); } }
     if (t.set) P.dlg.flags[t.set] = 1;
     if (t.standing && !(part && P.dlg.flags[`rep_${part.id}_${t.id}`])) {

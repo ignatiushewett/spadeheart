@@ -7,7 +7,7 @@ export const SLOT = { SKIN: 0, SHIRT: 1, SHIRT2: 2, PANTS: 3, SHOES: 4, HAIR: 5,
 export const HUMAN_VARIANT_START = 192;
 // heavy, medium and light are armour for the watch, by how far out they work: the pair in front of each gate, the patrols, and the
 // people on the gates and walls. Only how they look: what armour actually does is the same for all of them.
-export const WARDROBE = { civ: [192, 16], mil: [208, 16], scrap: [224, 8], raider: [232, 8], med: [240, 16], heavy: [256, 16], medium: [272, 16], light: [288, 16], grease: [304, 8], clergy: [312, 4], qz: [316, 8] };
+export const WARDROBE = { civ: [192, 16], mil: [208, 16], scrap: [224, 8], raider: [232, 8], med: [240, 16], heavy: [256, 16], medium: [272, 16], light: [288, 16], grease: [304, 8], clergy: [312, 4], qz: [316, 8], L_reyes: [324, 1], L_wen: [325, 1], L_okafor: [326, 1], L_whitaker: [327, 1], L_halloran: [328, 1], L_rat: [329, 1], L_brandt: [330, 1], L_loretta: [331, 1], L_finch: [332, 1] };
 // Carried weapons, drawn from the actor mesh. The id travels in the instance data.
 export const NPC_WEAPON = { pistol: 1, rifle: 2, shotgun: 3, smg: 4, sniper: 5, lmg: 6, crossbow: 7, bat: 8, machete: 9, katana: 10, axe: 11, spear: 12 };
 const SCALE = .1;
@@ -248,7 +248,7 @@ const dogBody = (part, box) => {
 
 // One row per variant. Rows below HUMAN_VARIANT_START are infected.
 function buildVariantTexture(gl) {
-  const W = 16, H = 324;
+  const W = 16, H = 336;
   const tex = new Uint8Array(W * H * 4);
   const rng = makeRng(90210);
   const SKINS = [[230, 190, 160], [200, 150, 115], [150, 100, 70], [100, 68, 48], [70, 48, 36]];
@@ -310,14 +310,28 @@ function buildVariantTexture(gl) {
     // Whatever stops a bite: a padded jacket or a cut-down vest over everyday clothes, maybe a cap. The ones behind the wall.
     light: (o) => { o.shirt = rng.pick([...FLANNEL, ...WORN]); o.vest = rng.pick([[74, 70, 58], [58, 54, 48], [88, 76, 56], ...LEATHER]); o.shirt2 = rng.pick(WORN); o.pants = rng.pick([...JEANS, ...CAMO]); o.shoes = [44, 34, 26]; if (rng() < .45) { o.hat = rng.pick([...WORN, ...CAMO]); o.flags |= 1; } if (rng() < .4) o.flags |= 4; },
   };
-  const wardrobeOf = (row) => (row < 208 ? 'civ' : row < 224 ? 'mil' : row < 232 ? 'scrap' : row < 240 ? 'raider' : row < 256 ? 'med' : row < 272 ? 'heavy' : row < 288 ? 'medium' : row < 304 ? 'light' : row < 312 ? 'grease' : row < 316 ? 'clergy' : 'qz');
+  // Each settlement's leader has a look of their own: what they wore before, and what the job has made of it. Still faded and worn
+  // like everyone else's, so they stand out without looking as if they came from somewhere else.
+  const LEADER_LOOKS = [
+    { shirt: [46, 48, 56], vest: [46, 48, 56], shirt2: [214, 212, 204], pants: [58, 60, 66], shoes: [22, 20, 20] },                         // the Refuge's administrator: a suit
+    { shirt: [30, 40, 62], vest: [30, 40, 62], shirt2: [196, 186, 160], pants: [40, 40, 44], shoes: [26, 22, 20], hat: [28, 36, 58], flags: 1 },  // the harbormaster: peacoat and cap
+    { shirt: [168, 128, 48], vest: [52, 96, 64], shirt2: [168, 128, 48], pants: [86, 64, 44], shoes: [52, 36, 26] },                       // the facilitator: a bright cardigan
+    { shirt: [86, 92, 60], vest: [64, 70, 46], shirt2: [150, 132, 96], pants: [86, 92, 60], shoes: [24, 20, 18], hat: [104, 30, 34], flags: 1 },   // the officer: service dress and a beret
+    { shirt: [22, 22, 26], vest: [22, 22, 26], shirt2: [220, 218, 210], pants: [22, 22, 26], shoes: [18, 16, 16] },                         // the judge: black robe
+    { shirt: [126, 62, 38], vest: [46, 36, 30], shirt2: [140, 110, 50], pants: [52, 48, 40], shoes: [30, 24, 20], hat: [140, 40, 36], flags: 1 | 4 },  // Mother Rat: patchwork and a bandana
+    { shirt: [210, 210, 204], vest: [210, 210, 204], shirt2: [64, 120, 124], pants: [64, 120, 124], shoes: [176, 176, 170] },               // the chief of medicine: white coat over scrubs
+    { shirt: [92, 40, 48], vest: [214, 110, 30], shirt2: [92, 40, 48], pants: [50, 65, 95], shoes: [40, 34, 30], hat: [60, 58, 64], flags: 1 },    // the block captain: hi-vis over a hoodie
+    { shirt: [28, 28, 32], vest: [28, 28, 32], shirt2: [226, 224, 218], pants: [28, 28, 32], shoes: [18, 16, 15] },                         // the pastor: black, with the collar
+  ];
+  const wardrobeOf = (row) => (row < 208 ? 'civ' : row < 224 ? 'mil' : row < 232 ? 'scrap' : row < 240 ? 'raider' : row < 256 ? 'med' : row < 272 ? 'heavy' : row < 288 ? 'medium' : row < 304 ? 'light' : row < 312 ? 'grease' : row < 316 ? 'clergy' : row < 324 ? 'qz' : 'leader');
+  WARD.leader = (o, row) => { const L = LEADER_LOOKS[row - 324] || LEADER_LOOKS[0]; Object.assign(o, { hat: [0, 0, 0], flags: 0 }, L); };
   for (let row = 0; row < H; row++) {
     const zombie = row < HUMAN_VARIANT_START;
     const base = rng.pick(SKINS);
     const o = { skin: base, shirt: null, pants: null, shoes: rng.pick(SHOES), hair: rng.pick(HAIR), hat: [0, 0, 0], vest: null, shirt2: null, flags: 0 };
     if (zombie) o.skin = [base[0] * .72 + 26, base[1] * .78 + 34, base[2] * .68 + 24];
     if (zombie) OUTFITS[rng.int(0, OUTFITS.length - 1)](o);
-    else WARD[wardrobeOf(row)](o);
+    else WARD[wardrobeOf(row)](o, row);
     const bald = rng() < .08;
     const dirt = zombie ? rng.range(.62, .9) : rng.range(.8, .96);
     const put = (col, c, a = 255, tint = 1) => {

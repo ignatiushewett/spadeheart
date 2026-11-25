@@ -56,7 +56,8 @@ export function makeMesher(L) {
     }
     return near ? 4 : 0;
   };
-  function quad(t, x, y, z, ax, du, dv, n, id, ao, sky) {
+  // dry: the face looks out into a pane of glass (a window sill, the frame round it), so no rain reaches it whatever is beyond.
+  function quad(t, x, y, z, ax, du, dv, n, id, ao, sky, dry = 0) {
     grow(t, 32);
     const b = t.buf;
     let i = t.n;
@@ -70,7 +71,7 @@ export function makeMesher(L) {
     const cloth = !hold && (FLAGS[id] & F_CLOTH);
     const emit = (px, py, pz, a) => {
       b[i++] = px; b[i++] = py; b[i++] = pz; b[i++] = ni;
-      b[i++] = id; b[i++] = a; b[i++] = sky; b[i++] = (wave && py === topY ? 1 : 0) | hold | (cloth ? pinned(px, py, pz) : 0);
+      b[i++] = id; b[i++] = a; b[i++] = sky; b[i++] = (wave && py === topY ? 1 : 0) | hold | (cloth ? pinned(px, py, pz) : 0) | (dry ? 8 : 0);
     };
     if (flip) {
       emit(x + ux, y + uy, z + uz, a1);
@@ -179,7 +180,7 @@ export function makeMesher(L) {
               if (wy >= topAt(ox, oz, sx, sz + 4)) open++;
               if (wy >= topAt(ox, oz, sx - 2, sz - 2)) open++;
               if (wy >= topAt(ox, oz, sx + 2, sz + 2)) open++;
-              v = id | ((lip ? 255 : a0 | (a1 << 2) | (a2 << 4) | (a3 << 6)) << 8) | (open << 16);
+              v = id | ((lip ? 255 : a0 | (a1 << 2) | (a2 << 4) | (a3 << 6)) << 8) | (open << 16) | (nbG && !selfG ? 1 << 20 : 0);
               any = true;
             }
           }
@@ -209,7 +210,7 @@ export function makeMesher(L) {
           if (nz > 0) z += 1;
           const id = v & 255, ao = (v >> 8) & 255, sky = (v >> 16) & 15;
           const target = (!lod && (FLAGS[id] & F_GLASS)) ? glass : opaque;
-          quad(target, x, y, z, ax, w, h, a, id, ao, Math.round(sky / 8 * 255));
+          quad(target, x, y, z, ax, w, h, a, id, ao, Math.round(sky / 8 * 255), (v >> 20) & 1);
           i += w;
         }
       }

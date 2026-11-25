@@ -15,6 +15,7 @@ export class RainMap {
     this.gapTop = new Uint8Array(RAIN_N * RAIN_N);
     this.floor = new Uint8Array(RAIN_N * RAIN_N);
     this.rgba = new Uint8Array(RAIN_N * RAIN_N * 4);
+    this.topId = new Uint8Array(RAIN_N * RAIN_N);   // what the top block is: grass grows strands, a road does not
     this.x0 = -1e6;
     this.z0 = -1e6;
     this.pending = new Int32Array(RAIN_N * RAIN_N);
@@ -43,12 +44,12 @@ export class RainMap {
     const nx0 = Math.floor(cx / 8) * 8 - N / 2, nz0 = Math.floor(cz / 8) * 8 - N / 2;
     if (nx0 !== this.x0 || nz0 !== this.z0) {
       // Slide what is already known across, and queue only the new strip.
-      const top = new Uint8Array(N * N), hang = new Uint8Array(N * N), gapTop = new Uint8Array(N * N), floor = new Uint8Array(N * N);
+      const top = new Uint8Array(N * N), hang = new Uint8Array(N * N), gapTop = new Uint8Array(N * N), floor = new Uint8Array(N * N), topId = new Uint8Array(N * N);
       const dx = nx0 - this.x0, dz = nz0 - this.z0;
       this.pendN = 0;
       for (let iz = 0; iz < N; iz++) for (let ix = 0; ix < N; ix++) {
         const ox = ix + dx, oz = iz + dz, i = ix + iz * N;
-        if (ox >= 0 && oz >= 0 && ox < N && oz < N) { const o = ox + oz * N; top[i] = this.top[o]; hang[i] = this.hang[o]; gapTop[i] = this.gapTop[o]; floor[i] = this.floor[o]; }
+        if (ox >= 0 && oz >= 0 && ox < N && oz < N) { const o = ox + oz * N; top[i] = this.top[o]; hang[i] = this.hang[o]; gapTop[i] = this.gapTop[o]; floor[i] = this.floor[o]; topId[i] = this.topId[o]; }
         // Not looked at yet: covered until it is, so no rain falls into a room in the meantime.
         else { this.pending[this.pendN++] = i; top[i] = 255; }
       }
@@ -58,7 +59,7 @@ export class RainMap {
         list.sort((a, b) => Math.abs((a % N) - mid) + Math.abs(((a / N) | 0) - mid) - Math.abs((b % N) - mid) - Math.abs(((b / N) | 0) - mid));
         this.pending.set(list);
       }
-      this.top = top; this.hang = hang; this.gapTop = gapTop; this.floor = floor;
+      this.top = top; this.hang = hang; this.gapTop = gapTop; this.floor = floor; this.topId = topId;
       this.x0 = nx0; this.z0 = nz0;
     }
     let budget = 1500;
@@ -73,13 +74,14 @@ export class RainMap {
 
   // Everything the shaders need, one pixel per column.
   packed() {
-    const { top, gapTop, floor, rgba } = this;
-    for (let i = 0, n = top.length; i < n; i++) { const o = i * 4; rgba[o] = top[i]; rgba[o + 1] = gapTop[i]; rgba[o + 2] = floor[i]; }
+    const { top, gapTop, floor, rgba, topId } = this;
+    for (let i = 0, n = top.length; i < n; i++) { const o = i * 4; rgba[o] = top[i]; rgba[o + 1] = gapTop[i]; rgba[o + 2] = floor[i]; rgba[o + 3] = topId[i]; }
     return rgba;
   }
 
   scan(i) {
     const N = RAIN_N, w = this.w, x = this.x0 + (i % N), z = this.z0 + ((i / N) | 0);
+    this.topId[i] = 0;
     if (x < 0 || z < 0 || x >= WX || z >= WZ) { this.top[i] = 0; this.hang[i] = 0; this.gapTop[i] = 0; this.floor[i] = 0; return; }
     if (!w.loadMask[(x >> 5) + (z >> 5) * CW]) {
       // Not built yet: no rain here until it is, then the real answer.
@@ -90,6 +92,7 @@ export class RainMap {
     let y = Math.min(255, w.colTopCy((x >> 5) + (z >> 5) * CW) * 32 + 31);
     while (y > 0 && !w.get(x, y, z)) y--;
     this.top[i] = y;
+    this.topId[i] = w.get(x, y, z);
     let a = y - 1;
     while (a > 0 && w.get(x, a, z)) a--;
     // A ledge up to three blocks thick with open air under it drips off its edge: an eave, an awning, the rim along the top of a wall.

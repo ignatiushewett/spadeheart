@@ -505,6 +505,17 @@ export function makeGenerator(L) {
       case P.BALE: { const y = STREET_Y + terr[z * WX + x]; if (a % 3) box(x, y, z, x + 2, y + 1, z + 1, M.HAY); else box(x, y, z, x + 1, y + 1, z + 2, M.HAY); break; }
       case P.TREE: if (ground[z * WX + x] === G.WALK) tree(x, z, a, 0); break;
       case P.PARKTREE: tree(x, z, a, 1 + a % 3); break;
+      case P.STUMP: {
+        // A cut tree: a knee-high stump with the pale cut on top, and now and then the trunk left lying beside it.
+        const y = STREET_Y + terr[z * WX + x], h = 1 + a % 2;
+        for (let k = 0; k < h - 1; k++) put(x, y + k, z, M.TRUNK);
+        put(x, y + h - 1, z, M.LOG);
+        if (a % 6 === 0) {
+          const along = (a >> 3) % 2, len = 3 + (a >> 4) % 3, side = (a >> 6) % 2 ? 1 : -1;
+          for (let k = 1; k <= len; k++) { const lx = along ? x + k : x + side * 2, lz = along ? z + side * 2 : z + k; put(lx, STREET_Y + terr[lz * WX + lx], lz, M.LOG); }
+        }
+        break;
+      }
       case P.LAMP:
         for (let y = 0; y < 9; y++) put(x, base + y, z, M.IRON);
         put(x, base + 9, z, M.IRON); put(x + 1, base + 9, z, M.IRON); put(x + 1, base + 8, z, M.STEEL);

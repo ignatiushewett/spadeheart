@@ -22,6 +22,7 @@ import { START_CAMP, CITIZENSHIP, papersFor, ITEMS, rollLoot, rollZombieDrop, CA
 import { STYLES } from './shared/layout.js';
 import { Weather } from './game/weather.js';
 import { RainMap } from './engine/rainmap.js';
+import { GrassMap } from './engine/grassmap.js';
 import { Drips } from './game/drips.js';
 import { Dogs } from './game/dogs.js';
 import { Bikes } from './game/bike.js';
@@ -268,6 +269,8 @@ class Game {
     this.particles = new Particles(gl, this.world);
     this.rainMap = new RainMap(this.world);
     this.renderer.rainMap = this.rainMap;
+    this.grassMap = new GrassMap(this.world);
+    this.renderer.grassMap = this.grassMap;
     this.drips = new Drips(this);
     this.horde = new Horde(this.world, this.layout, this.actors, this.particles);
     this.horde.weather = this.weather;
@@ -931,21 +934,26 @@ class Game {
   // Right-click held with the building out: everything you can build, to pick from.
   openBuildMenu() { if (!this.ui.modal && this.player.alive && !(this.bikes && this.bikes.ride)) this.openModal(() => this.ui.openBuild()); }
 
-  // Where a settlement's speakers are: the bar's, loudest; one at the mechanic's; one on the benches round the big fire; and a few out
-  // in the corners where people live, among the beds. Worked out once.
+  // Where a settlement's speakers are: the bar's, loudest; one at the mechanic's; and the rest out where people live, among the beds.
+  // Worked out once.
   speakersFor(c) {
     const out = [], far = (x, z) => out.every((q) => Math.hypot(q.x - x, q.z - z) > 14);
     const add = (x, z, k, bar = false) => { if (x !== undefined && far(x, z)) out.push({ x, z, k, bar }); };
     if (c.bar && c.bar.keep) add(c.bar.keep.x, c.bar.keep.z, 1.3, true);
     const mech = (c.vendors || []).find((q) => q.role === 'mechanic');
     if (mech) add(mech.x, mech.z, .55);
-    const fire = (c.fires || []).find((f) => f.big), seats = c.pois.filter((q) => q.seat && q.kind === 'sit');
-    if (fire && seats.length) { const s = seats.reduce((a, q) => (Math.hypot(q.x - fire.x, q.z - fire.z) < Math.hypot(a.x - fire.x, a.z - fire.z) ? q : a)); add(s.x, s.z, .45); }
     // Among the beds in the middle of each quarter of the place, not out by the wall.
     const beds = c.pois.filter((q) => q.kind === 'sleep'), mx = (c.x0 + c.x1) / 2, mz = (c.z0 + c.z1) / 2;
     for (const [cx, cz] of [[(c.x0 + mx) / 2, (c.z0 + mz) / 2], [(c.x1 + mx) / 2, (c.z0 + mz) / 2], [(c.x0 + mx) / 2, (c.z1 + mz) / 2], [(c.x1 + mx) / 2, (c.z1 + mz) / 2]]) {
       if (!beds.length) break;
       const b = beds.reduce((a, q) => (Math.hypot(q.x - cx, q.z - cz) < Math.hypot(a.x - cx, a.z - cz) ? q : a));
+      add(b.x, b.z, .38);
+    }
+    // And one more where people live, among the beds furthest from every other speaker, well in from the wall.
+    const inner = beds.filter((q) => q.x > c.x0 + 30 && q.x < c.x1 - 30 && q.z > c.z0 + 30 && q.z < c.z1 - 30);
+    if (inner.length && out.length) {
+      const gap = (q) => Math.min(...out.map((o) => Math.hypot(o.x - q.x, o.z - q.z)));
+      const b = inner.reduce((a, q) => (gap(q) > gap(a) ? q : a));
       add(b.x, b.z, .38);
     }
     if (!out.length) add(c.cx, c.cz, .38);
@@ -968,14 +976,14 @@ class Game {
       const late = this.tod > 23 / 24 || this.tod < 5 / 24;
       for (const sp of c.speakers) {
         if (late && !sp.bar) continue;
-        const q = a.spatial(sp.x, STREET_Y + 3, sp.z, 8), g = q.gain * sp.k;
+        const q = a.spatial(sp.x, STREET_Y + 3, sp.z, 8), g = q.gain * sp.k * .9;
         if (g > best) { best = g; pan = q.pan; }
       }
     }
     const tuned = this.ui.radioMusic, c = tuned >= 0 ? this.layout.camps[tuned] : null;
     const on = !!c && !siren && sim.state[c.id].status === 'holding' && P.alive && (!this.ui.modal || LIVE_MODALS.has(this.ui.modal));
     if (c && sim.state[c.id].status !== 'holding') this.ui.radioMusic = -1;
-    a.setStation(on ? .6 : 0, best < .004 ? 0 : best, pan);
+    a.setStation(on ? .9 : 0, best < .004 ? 0 : best, pan);
   }
 
   // A modal opens over the game: the view racks out of focus, and unless it is one of LIVE_MODALS the sim stops.
@@ -2206,7 +2214,7 @@ class Game {
       }
       this.jobs.startVisit(c);
       this.saveGame();
-      if (kit === 'survival') { this.wakeUp(c, bed, () => {}); return; }
+      if (kit === 'survival') { this.npcs.startFor = c.id; this.wakeUp(c, bed, () => {}); return; }
       this.ui.banner(c.name, `You came in with nothing. Find ${leader.name}, who runs this place: they will get you set up.`);
     });
   }
@@ -2857,6 +2865,20 @@ class Game {
     }
   }
 
+  // The top of any glass over (x, z) above height y, open to the sky: where a drop lands if there is a pane in the way. -1 if the sky
+  // is clear above y; -2 if something that is not glass covers it (a roof the rain map has not caught up with), so no drop lands there.
+  glassOver(x, y, z) {
+    const W = this.world;
+    let top = -1;
+    for (let k = 0; k < 28; k++) {
+      const id = W.get(x, y + k, z);
+      if (!id) continue;
+      if (isGlass(id)) top = y + k;
+      else return -2;
+    }
+    return top;
+  }
+
   // Up against a window: a splash or a drip here would look as if it were on the inside of the glass, so there is none.
   byGlass(x, y, z) {
     const W = this.world;
@@ -2874,6 +2896,7 @@ class Game {
     const P = this.player, play = this.state === 'play', map = this.rainMap;
     // The roofs decide where the rain shows now, drop by drop, so a window still has weather behind it.
     map.update(cam.x, cam.z);
+    if (play) this.grassMap.update(cam.x, cam.z);
     r.rainVis = 1;
     r.rainIndoor = play ? Math.min(1, Math.max(0, (1 - P.skyVis) / .92)) : 0;
     if (play) this.drips.update(dt, cam);
@@ -2894,8 +2917,12 @@ class Game {
         const x = Math.floor(cam.x + Math.cos(a) * d), z = Math.floor(cam.z + Math.sin(a) * d);
         if (x < 1 || z < 1 || x >= WX || z >= WZ || this.layout.lot[z * WX + x]) continue;
         // On whatever it hits first: the street, or a tent, an awning, a roof. Not on the one over your own head.
-        const y = Math.max(this.world.terrainTop(x, z), map.at(x, z) + 1);
-        if (y > cam.y + 2 || this.byGlass(x, y, z)) continue;
+        let y = Math.max(this.world.terrainTop(x, z), map.at(x, z) + 1);
+        // Glass over it: the drop lands on the glass, not on the floor beneath, and you see it hit from under the pane too.
+        const gy = this.glassOver(x, y, z);
+        if (gy === -2) continue;
+        if (gy >= 0) y = gy + 1;
+        else if (y > cam.y + 2 || this.byGlass(x, y, z)) continue;
         // A splash is as bright as whatever is shining on it: the sky, the camp's lamps and fires, and a little more in your own torch beam.
         const lit = r.spot && ((x - cam.x) * r.camForward[0] + (y - cam.y) * r.camForward[1] + (z - cam.z) * r.camForward[2]) / Math.hypot(x - cam.x, y - cam.y, z - cam.z) > .9;
         const L = r.lightAt(x, z), t = lit ? .45 : 0;
@@ -2909,8 +2936,11 @@ class Game {
           const a = rand() * 6.283, d = 2 + Math.sqrt(rand()) * 24;
           const x = Math.floor(cam.x + Math.cos(a) * d), z = Math.floor(cam.z + Math.sin(a) * d);
           if (x < 1 || z < 1 || x >= WX || z >= WZ || this.layout.lot[z * WX + x]) continue;
-          const y = Math.max(this.world.terrainTop(x, z), map.at(x, z) + 1);
-          if (y > cam.y + 2 || this.byGlass(x, y, z)) continue;
+          let y = Math.max(this.world.terrainTop(x, z), map.at(x, z) + 1);
+          const gy = this.glassOver(x, y, z);
+          if (gy === -2) continue;
+          if (gy >= 0) y = gy + 1;
+          else if (y > cam.y + 2 || this.byGlass(x, y, z)) continue;
           const ux = x + .5 - cam.x, uy = y - cam.y, uz = z + .5 - cam.z, ul = Math.hypot(ux, uy, uz) || 1;
           const lit = r.spot > 0 && (ux * r.camForward[0] + uy * r.camForward[1] + uz * r.camForward[2]) / ul > .9;
           const L = r.lightAt(x, z), k2 = 9;

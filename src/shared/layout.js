@@ -54,7 +54,7 @@ export const STYLES = [
 ];
 const S = Object.fromEntries(STYLES.map((s, i) => [s.name, i]));
 
-export const P = { CAR: 1, TREE: 2, LAMP: 3, HYDRANT: 4, TRASH: 5, DUMPSTER: 6, CHECKPOINT: 7, PARKTREE: 8, BENCH: 9, NEWS: 10, ROCK: 11, BALE: 12, TRACTOR: 13 };
+export const P = { CAR: 1, TREE: 2, LAMP: 3, HYDRANT: 4, TRASH: 5, DUMPSTER: 6, CHECKPOINT: 7, PARKTREE: 8, BENCH: 9, NEWS: 10, ROCK: 11, BALE: 12, TRACTOR: 13, STUMP: 14 };
 export const PROP_STRIDE = 6;
 
 export const ROLES = {
@@ -438,6 +438,13 @@ export function buildLayout(seed = 1609) {
     e *= 1 - .75 * sstep(1 - lineDist(x, z, GIBSON_ROAD) / 240);
     e += sstep((z - 2450) / 400) * sstep((1750 - x) / 600) * (14 + 34 * ridged(x, z, .006, .35, 2.2, 5));
     e *= 1 - .85 * farmK(x, z);
+    // Out past the western edge, a long way off: a mountain range running the whole length of the map, north to south. A line of peaks
+    // and saddles, lower than Mt. Page, rising out of the hill country beyond the world and never reaching back into it.
+    if (x < -120) {
+      const spine = -760 + 150 * (fbm2(z * .0011 + 41, 7.3, 2) - .5) * 2, d = Math.abs(x - spine);
+      const k = sstep(1 - d / 300) * sstep((-120 - x) / 300);
+      if (k > 0) e += k * (30 + 58 * ridged(x, z, .0065, 1.57, 1.8, 13)) + sstep(1 - d / 110) * 26 * fbm2(z * .009 + 3, x * .009, 3);
+    }
     e *= .25 + .75 * Math.max(sstep((coastX[Math.max(0, Math.min(WZ - 1, z | 0))] - x - 100) / 650), mT * .8);
     return Math.max(0, Math.min(236, e));
   };
@@ -1583,7 +1590,12 @@ export function buildLayout(seed = 1609) {
       const j = r2(x, z);
       // Yards and town greens get the odd tree; the country gets as many as the forest there wants.
       const dens = townId[i] || campMask[i] ? .09 + (lot[i - 4] || lot[i + 4] ? -.04 : .1) * fbm2(x * .03, z * .03, 2) : forestAt(x, z) * .8;
-      if (j < dens) addProp(P.PARKTREE, x + Math.floor(j * 40) % 4, z + Math.floor(j * 70) % 4, Math.floor(j * 9999));
+      // The woods round a settlement have been cut for firewood and for the wall: closest in, a lot of what was a tree is a stump now,
+      // and there are stumps where there were trees that are gone altogether.
+      const cut = townId[i] || campMask[i] || forestAt(x, z) < .15 ? 0 : (1 - sstep((campDist(x, z) - 4) / 70)) * sstep(campDist(x, z) / 4);
+      const px = x + Math.floor(j * 40) % 4, pz = z + Math.floor(j * 70) % 4, seedT = Math.floor(j * 9999);
+      if (j < dens) addProp(cut > 0 && r2(x + 7, z + 1) < cut * .55 ? P.STUMP : P.PARKTREE, px, pz, seedT);
+      else if (cut > 0 && r2(x + 2, z + 9) < cut * .16) addProp(P.STUMP, x + 1 + Math.floor(r2(z, x + 4) * 3), z + 1 + Math.floor(r2(x, z + 4) * 3), Math.floor(r2(z + 9, x) * 9999));
       // Trinity is thicker than any other wood in the state: a second stand of trees between the first.
       const tk = townId[i] || campMask[i] ? 0 : trinityK(x, z);
       if (tk > .2 && r2(x + 3, z + 3) < tk * .85) addProp(P.PARKTREE, x + 3, z + 3, Math.floor(r2(z + 3, x) * 9999));

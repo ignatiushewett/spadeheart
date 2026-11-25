@@ -364,9 +364,9 @@ export function planCamp(def, id, r, ground) {
     c.maxY = Math.max(c.maxY, YB + 32);
     c.clerk = { x: x1 - (D - 5) + .5, z: pz + .5, yaw: Math.PI / 2, doorX: x1 - 1.5, doorZ: pz + .5 };
     c.spots.hq = { x: x1 + 2.5, z: pz - 7.5 };
-    // Where the Reverend preaches from: up at the altar end on the north side, facing down that side's pews to the door. And the aisle,
-    // halfway down, where he walks when there is no service.
-    c.spots.pulpit = { x: x1 - (D - 8) + .5, z: z0 + 6 + .5, yaw: Math.PI / 2 };
+    // Where the Reverend preaches from: up at the altar end on the left side as you come in, facing down that side's pews to the door.
+    // And the aisle, halfway down.
+    c.spots.pulpit = { x: x1 - (D - 8) + .5, z: z1 - 6 + .5, yaw: Math.PI / 2 };
     c.spots.aisle = { x: x1 - 14 + .5, z: pz + .5, yaw: Math.PI / 2 };
     light(x1 - 2, pz, 15); light(x1 - 13, pz, 13); light(x1 - 24, pz, 13);
     for (let k = 0; k < 4; k++) c.pois.push({ x: x1 + 2.5, z: pz - 4.5 + k * 3, kind: 'stand', yaw: -Math.PI / 2 });
@@ -2089,7 +2089,7 @@ function stampPart(p, c, box, put, car, letterAt) {
         for (let v = 3 + a; v <= 8 - a; v++) for (let u = mid - 3 + a; u <= mid + 3 - a; u++) C(v, y, u, k === 3 ? M.WOOD_D : M.SHINGLE_R);
       }
       for (let y = YB + 27; y <= YB + 31; y++) C(5, y, mid, M.IRON);
-      for (const k of [-1, 1]) C(5, YB + 29, mid + k, M.IRON);
+      for (const k of [-1, 1]) C(5, YB + 30, mid + k, M.IRON);
       // The yard's colours off the corner, and sandbags either side of the door from the last time.
       for (const a of [mid - 8, mid + 8]) for (let y = YB + 6; y <= YB + 13; y++) C(2, y, a, y > YB + 11 ? p.flag2 : p.flag1);
       for (let u = 0; u < Wd; u++) if (Math.abs(u - mid) > 3) for (let v = 0; v <= 1; v++) { C(v, YB, u, M.SANDBAG); if (h2(u, v) % 2) C(v, YB + 1, u, M.SANDBAG); }
