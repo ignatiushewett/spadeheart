@@ -871,7 +871,7 @@ void main(){
   if(wet>0.){
     vec3 v=normalize(uCam-vWorld);
     float f=pow(1.-abs(dot(nn,v)),3.);
-    c+=(mix(uHorizon,uSkyCol,.5)*.8+cityLight(vWorld)*.6)*(.45+.9*f)*wet*.95*mix(.65,1.,vUp);
+    c+=(mix(uHorizon,uSkyCol,.5)*.8+cityLight(vWorld)*.6)*(.45+.9*f)*wet*.95*mix(.65,1.,vUp)*mix(.45,1.,smoothstep(3.,25.,dist));
   }
   outCol=vec4(applyFog(c,vWorld),1.);
 }`;

@@ -129,7 +129,7 @@ function mapNoise(a, b) {
 }
 
 // Menus that leave the game running behind them.
-const LIVE_MODALS = new Set(['dialog', 'map', 'inventory', 'crewpanel']);
+const LIVE_MODALS = new Set(['dialog', 'trade', 'map', 'inventory', 'crewpanel']);
 
 class Game {
   constructor() {
