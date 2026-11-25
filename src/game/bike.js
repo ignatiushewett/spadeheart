@@ -743,6 +743,17 @@ export class Bikes {
       }
       if (best < 6) continue;
       const count = kind === 'raider' ? 2 + Math.floor(Math.random() * 3) : 1, gang = x * 7 + z, night = g.renderer.sky.night > .5;
+      // Every bike of the crew on open road: none of them started inside a wreck, a bus or anything else left in the street.
+      const free = (px, pz) => {
+        for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
+          const cx = Math.floor(px + dx), cz = Math.floor(pz + dz), y = W.terrainTop(cx, cz);
+          for (let k = 0; k <= 3; k++) if (W.solid(cx, y + k, cz)) return false;
+        }
+        return true;
+      };
+      let ok = true;
+      for (let i = 0; i < count && ok; i++) ok = free(x + .5 - Math.sin(yaw) * 7 * i, z + .5 + Math.cos(yaw) * 7 * i);
+      if (!ok) continue;
       let lead = null;
       for (let i = 0; i < count; i++) {
         const bx = x + .5 - Math.sin(yaw) * 7 * i, bz = z + .5 + Math.cos(yaw) * 7 * i, by = this.ground(bx, bz, W.terrainTop(Math.floor(bx), Math.floor(bz)) + 2);

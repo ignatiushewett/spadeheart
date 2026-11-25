@@ -62,10 +62,13 @@ export class Dogs {
     return null;
   }
 
-  // Can a dog stand here: walkable for people in that camp, the same test the residents use.
+  // Can a dog stand here: walkable for people in that camp, the same test the residents use, and nothing solid in the block itself:
+  // the walking map is two blocks to a square, and a crate or the corner of a stall can sit in half of one.
   open(c, x, z) {
+    const w = this.g.world, fx = Math.floor(x), fz = Math.floor(z);
+    if (w.solid(fx, STREET_Y, fz) || w.solid(fx, STREET_Y + 1, fz)) return false;
     if (!c.nav) return true;
-    const cx = (Math.floor(x) - c.x0) >> 1, cz = (Math.floor(z) - c.z0) >> 1;
+    const cx = (fx - c.x0) >> 1, cz = (fz - c.z0) >> 1;
     if (cx < 0 || cz < 0 || cx >= c.navW || cz >= c.navD) return false;
     return !c.nav[cx + cz * c.navW];
   }
@@ -91,7 +94,9 @@ export class Dogs {
       const moving = !o.arrived || (o.state > .5 && o.state < 2);
       const back = moving ? 1.6 : .9, side = moving ? 1.1 : 1.3;
       const sy = Math.sin(o.yaw || 0), cy = Math.cos(o.yaw || 0);
-      d.tx = o.x - sy * back + cy * side * d.side; d.tz = o.z - cy * back - sy * side * d.side;
+      const nx = o.x - sy * back + cy * side * d.side, nz = o.z - cy * back - sy * side * d.side;
+      // Only a new spot once the old one is really out of place: a person turning on the spot does not send the dog back and forth.
+      if (d.tx === undefined || Math.hypot(nx - d.tx, nz - d.tz) > (moving ? .8 : 1.8) || !this.open(c, d.tx, d.tz)) { d.tx = nx; d.tz = nz; }
       // Their person indoors, on a bench, somewhere a dog cannot stand: the nearest open ground beside them will do.
       if (!this.open(c, d.tx, d.tz)) {
         let best = null, bd = 1e9;
@@ -113,9 +118,18 @@ export class Dogs {
       else if (d.mode === 'kid') d.mode = 'idle';
       if (d.mode === 'pet' && d.mate) {
         const m = d.mate;
-        if (m.dead || !m.arrived || m.camp !== d.camp) d.mode = 'idle';
-        else { d.tx = m.x + Math.sin(m.yaw || 0) * 1.2; d.tz = m.z + Math.cos(m.yaw || 0) * 1.2; }
-        if (d.mode === 'pet' && Math.hypot(d.x - d.tx, d.z - d.tz) < .6) {
+        // Too long getting there (no way through the crowd or round the stall): it gives up and goes back to its own business.
+        d.petTry = (d.petTry || 0) + dt;
+        if (m.dead || !m.arrived || m.camp !== d.camp || d.petTry > 14) { d.mode = 'idle'; d.petTry = 0; }
+        else if (!d.petSpot || Math.hypot(d.petSpot[2] - m.x, d.petSpot[3] - m.z) > .5) {
+          // In front of them if it can stand there, otherwise the nearest open ground beside them; chosen once, not every step.
+          let q = [m.x + Math.sin(m.yaw || 0) * 1.2, m.z + Math.cos(m.yaw || 0) * 1.2];
+          if (!this.open(c, q[0], q[1])) q = this.openNear(c, m.x, m.z) || q;
+          d.petSpot = [q[0], q[1], m.x, m.z];
+        }
+        if (d.mode === 'pet') { d.tx = d.petSpot[0]; d.tz = d.petSpot[1]; }
+        if (d.mode === 'pet' && Math.hypot(d.x - d.tx, d.z - d.tz) < .9) {
+          d.petTry = 0; d.petSpot = null;
           // Arrived: they stop what they are doing for a moment.
           d.petT = 5 + rand() * 5; d.petBy = m; d.mode = 'idle'; d.t = 2 + rand() * 6;
           m.petT = d.petT; m.petDog = d;
@@ -129,7 +143,9 @@ export class Dogs {
     // In a panic, nobody's dog sits about: it keeps close and moving.
     if (panic > .4) settle = 0;
     const dist = Math.hypot(d.tx - d.x, d.tz - d.z);
-    const want = dist < .5 ? 0 : dist > 7 || panic > .4 ? 4.6 : dist > 2.5 ? 2.6 : 1.4;
+    // Once there it stays there until the spot is a good step away, rather than stopping and starting on the edge of it.
+    if (dist < .5) d.there = true; else if (dist > 1.3) d.there = false;
+    const want = d.there ? 0 : dist > 7 || panic > .4 ? 4.6 : dist > 2.5 ? 2.6 : 1.4;
     d.v += (want - d.v) * Math.min(1, dt * (want > d.v ? 3 : 5));
     if (d.v > .05 && dist > .05) {
       // Straight there when it can see the way; otherwise round by the paths the people use, and it keeps to them until it is
@@ -146,7 +162,8 @@ export class Dogs {
       if (moved < 1e-4) { d.v = 0; d.stuck = (d.stuck || 0) + dt; }
       else { d.stuck = 0; d.phase += moved * 2.8; }
       if (d.stuck > 1.2) { d.stuck = 0; if (o) d.hold = 4 + rand() * 4; else if (d.mode !== 'pet') this.wander(d, c); else d.mode = 'idle'; }
-      d.yaw = Math.atan2(dx, dz);
+      // Faces the way it actually went, and only when it actually went somewhere.
+      if (moved > .004) d.yaw = Math.atan2(d.x - bx, d.z - bz);
     }
     d.state = d.v > 3.2 ? 1 : d.v > .3 ? .7 : settle;
     d.ys = this.ease(d.ys, d.yaw, dt * 5);
@@ -165,7 +182,7 @@ export class Dogs {
   // Where to head right now: the target itself if nothing is in the way, or the next point on a path round whatever is.
   steer(d, c, dt) {
     const clear = (x0, z0, x1, z1) => {
-      const n = Math.ceil(Math.hypot(x1 - x0, z1 - z0) / .8);
+      const n = Math.ceil(Math.hypot(x1 - x0, z1 - z0) / .4);
       for (let k = 1; k <= n; k++) if (!this.open(c, x0 + (x1 - x0) * k / n, z0 + (z1 - z0) * k / n)) return false;
       return true;
     };
@@ -195,7 +212,7 @@ export class Dogs {
       if (kids.length) { d.mode = 'kid'; d.kid = pick(kids); d.t = 15 + rand() * 20; return; }
     } else if (r < .42) {
       const idle = st.npcs.filter((n) => !n.kid && !n.dead && n.arrived && n.task && !(n.petT > 0) && (n.task.kind === 'stand' || n.task.kind === 'warm' || n.task.kind === 'market' || n.task.kind === 'talk') && Math.hypot(n.x - d.x, n.z - d.z) < 30);
-      if (idle.length) { d.mode = 'pet'; d.mate = pick(idle); return; }
+      if (idle.length) { d.mode = 'pet'; d.mate = pick(idle); d.petTry = 0; d.petSpot = null; return; }
     }
     for (let t = 0; t < 8; t++) {
       const p = pick(c.pois);

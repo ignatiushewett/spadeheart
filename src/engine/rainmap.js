@@ -65,7 +65,7 @@ export class RainMap {
     let budget = 1500;
     if (this.retry.length) { const again = this.retry.splice(0, 500); for (const i of again) { this.scan(i); budget -= 3; } }
     while (this.pendN > 0 && budget > 0) { this.scan(this.pending[--this.pendN]); budget -= 3; }
-    for (let k = 0; k < 360 && budget > 0; k++, budget--) {
+    for (let k = 0; k < 120 && budget > 0; k++, budget--) {
       this.scan(this.sweep);
       this.sweep = (this.sweep + 1) % (N * N);
     }
@@ -89,7 +89,12 @@ export class RainMap {
       if (this.retry.length < 4096) this.retry.push(i);
       return;
     }
-    let y = Math.min(255, w.colTopCy((x >> 5) + (z >> 5) * CW) * 32 + 31);
+    // From the top of the tallest thing in this stretch of the map, down to this column's own top: unless it has been looked at
+    // before and nothing has been built up here since, in which case only from a little above where its top was. In a street of tall
+    // buildings that is most of the blocks looked at, saved.
+    const col = (x >> 5) + (z >> 5) * CW, prev = this.top[i];
+    let y = Math.min(255, w.colTopCy(col) * 32 + 31);
+    if (prev > 0 && prev < 250 && !w.editTop[col]) y = Math.min(y, prev + 4);
     while (y > 0 && !w.get(x, y, z)) y--;
     this.top[i] = y;
     this.topId[i] = w.get(x, y, z);

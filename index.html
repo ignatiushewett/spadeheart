@@ -9,14 +9,18 @@
 <link rel="preload" href="fonts/quantico-400.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="fonts/quantico-700.woff2" as="font" type="font/woff2" crossorigin>
 <style>
+/* Geo is cut small for its size: this is Geo a quarter bigger, so it reads at the size it is set. */
+@font-face { font-family: "Geo Big"; font-weight: 400; font-display: swap; size-adjust: 125%; src: url(fonts/geo-400.woff2) format("woff2"); }
 @font-face { font-family: Quantico; font-weight: 400; font-display: swap; src: url(fonts/quantico-400.woff2) format("woff2"); }
 @font-face { font-family: Quantico; font-weight: 700; font-display: swap; src: url(fonts/quantico-700.woff2) format("woff2"); }
 @font-face { font-family: "Kode Mono"; font-weight: 400; font-display: swap; src: url(fonts/kode-mono-400.woff2) format("woff2"); }
 :root {
   --ink: #e9e4d8; --dim: #a39d8f; --faint: #6c675c; --amber: #c8453a; --amber-d: #6e2620; --red: #d8493b; --green: #7fb069; --blue: #6aa6c8;
   --panel: rgba(14, 14, 13, .86); --panel-2: rgba(30, 29, 26, .72); --line: rgba(233, 228, 216, .14);
+  --talk: "Geo Big", "Kode Mono", monospace;   /* people talking: chatter, dialogue and your replies */
   --mono: "Kode Mono", "Cascadia Mono", Consolas, "Courier New", monospace;
   --sans: Quantico, Bahnschrift, "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  --title: Quantico, Bahnschrift, "Segoe UI", sans-serif;
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; background: #000; overflow: hidden; color: var(--ink); font: 14px/1.4 var(--sans); user-select: none; }
@@ -32,7 +36,7 @@ h1, h2, h3 { margin: 0; font-weight: 600; }
 #menu { flex-direction: column; justify-content: flex-end; align-items: flex-end; padding: 0 6vw 8vh 0; box-sizing: border-box; background: radial-gradient(ellipse 40vw 55vh at 100% 100%, rgba(0,0,0,.5) 0%, rgba(0,0,0,0) 100%); }
 .menu-title { display: flex; align-items: center; justify-content: center; width: 224px; gap: 13px; margin: 0 0 22px; filter: drop-shadow(0 2px 6px rgba(0,0,0,.85)) drop-shadow(0 0 22px rgba(0,0,0,.65)); }
 .menu-title svg { width: 45px; height: 42px; flex: none; }
-.menu-title h1 { white-space: nowrap; flex: none; margin: 0; color: var(--ink); font-size: 38px; font-weight: 700; line-height: 1; letter-spacing: .035em; }
+.menu-title h1 { font-family: var(--title); white-space: nowrap; flex: none; margin: 0; color: var(--ink); font-size: 38px; font-weight: 700; line-height: 1; letter-spacing: .035em; }
 /* The first A is a spade, cut to the same height and weight as the letters round it. */
 .menu-title h1 .logo-a svg { height: .7em; width: auto; margin: 0 .03em; vertical-align: baseline; display: inline-block; }
 #menu .menu-list { gap: 6px; width: 224px; }
@@ -300,7 +304,7 @@ body.waking #hud > * { visibility: hidden; }
 #dmg i { position: absolute; left: -70px; top: -220px; width: 140px; height: 54px; border-radius: 50%; background: radial-gradient(ellipse at center, rgba(216,50,40,.8), rgba(216,50,40,0) 70%); transform-origin: 70px 220px; animation: dmg .9s forwards; }
 @keyframes dmg { to { opacity: 0; } }
 /* Its own width, whatever part of the screen it is on: near an edge it hangs off it rather than squeezing into more lines. */
-.floater { position: absolute; transform: translate(-50%,-100%); width: max-content; max-width: 300px; text-align: center; color: #efe9d9; font-family: var(--mono); line-height: 1.25; text-shadow: 0 1px 3px #000, 0 0 6px rgba(0,0,0,.75); pointer-events: none; display: none; }
+.floater { position: absolute; transform: translate(-50%,-100%); width: max-content; max-width: 300px; text-align: center; color: #efe9d9; font-family: var(--talk); line-height: 1.25; text-shadow: 0 1px 3px #000, 0 0 6px rgba(0,0,0,.75); pointer-events: none; display: none; }
 .marker { position: absolute; font: 11px var(--mono); color: #bfe6ff; transform: translate(-50%,-100%); text-align: center; text-shadow: 0 1px 2px #000; display: none; }
 .marker::after { content: ""; display: block; width: 8px; height: 8px; border: 2px solid #6ec6ff; transform: rotate(45deg); margin: 3px auto 0; }
 #devmenu { position: fixed; z-index: 45; left: 26px; top: 190px; width: 300px; display: none; padding: 10px 12px 12px; background: rgba(12,12,10,.9); border: 1px solid var(--line); font: 12px/1.4 var(--mono); }
@@ -565,11 +569,11 @@ body.talking.reading-contract::before { height: 0; }
 #dialog { align-items: flex-end; background: linear-gradient(0deg, rgba(0,0,0,.72), rgba(0,0,0,0) 46%); }
 #dialog-panel .panel-head { border-bottom: 0; padding: 12px 20px 2px; flex-wrap: wrap; }
 #dialog-panel .panel-body { padding: 4px 20px 14px; }
-#dlg-text { font-size: 18px; line-height: 1.5; margin: 0 0 12px; min-height: 3em; }
+#dlg-text { font-size: 18px; line-height: 1.5; margin: 0 0 12px; min-height: 3em; font-family: var(--talk); }
 #dlg-standing { color: var(--amber); font-size: 12px; font-family: var(--mono); }
 /* What you can say, the way Fallout lays it out: every line in one numbered column, the whole of what you would say, the way out last. */
 .dlg-opts { display: flex; flex-direction: column; align-items: stretch; gap: 1px; max-height: 36vh; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
-.dlg-opts button { text-align: left; padding: 5px 10px; min-height: 30px; font: 16px/1.35 var(--mono); border-left: 2px solid transparent; }
+.dlg-opts button { text-align: left; padding: 5px 10px; min-height: 30px; font: 16px/1.35 var(--talk); border-left: 2px solid transparent; }
 .dlg-opts button .kbd { margin-right: 6px; }
 .dlg-opts button:hover, .dlg-opts button.sel { border-left-color: var(--amber); color: var(--amber); background: rgba(200,69,58,.08); }
 .dlg-opts button.seen { color: var(--dim); }
@@ -597,7 +601,7 @@ body.talking #hud > *:not(#caption) { visibility: hidden; }
 .board { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; margin: 2px 0 12px; max-height: 34vh; overflow-y: auto; }
 .board .card { display: flex; flex-direction: column; gap: 3px; text-align: left; padding: 9px 11px 10px; font: inherit; color: inherit; background: rgba(255,255,255,.035); border: 1px solid rgba(255,255,255,.08); border-left: 3px solid #9fd0ff; cursor: pointer; }
 .board .card:hover { background: rgba(159,208,255,.09); border-color: rgba(159,208,255,.35); border-left-color: #9fd0ff; }
-.board .card .tag { font-family: Quantico, Bahnschrift, 'Segoe UI', sans-serif; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--dim); display: flex; justify-content: space-between; gap: 6px; }
+.board .card .tag { font-family: var(--sans); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--dim); display: flex; justify-content: space-between; gap: 6px; }
 .board .card .tag i { font-style: normal; color: #9fd0ff; text-transform: none; letter-spacing: .02em; }
 .board .card b { color: var(--ink); font-size: 15px; font-weight: 600; line-height: 1.25; }
 .board .card .pay { color: var(--amber); font-family: var(--mono); font-size: 13px; }
