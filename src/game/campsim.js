@@ -38,7 +38,7 @@ export const OP_NOTICE = 1.25;   // scouts and travellers see a big push coming 
 export const OP_EMERGENCY = 1 / 24;   // the least notice anyone gets of an operation, even when the wall has already gone
 export const OP_GAP = 2;     // days of peace a camp is owed between one operation and the next
 // One word each, and enough of them that a whole run through the fall of every camp should not need the same one twice.
-const OP_WORDS = ['Lantern', 'Harbor', 'Anvil', 'Bridge', 'Sparrow', 'Hammer', 'Ledger', 'Bell', 'Ferry', 'Subway', 'Tenement', 'Orchard', 'Steeple', 'Compass', 'Furnace', 'Trellis', 'Causeway', 'Gull', 'Ember', 'Watchman', 'Turnstile', 'Hydrant', 'Skyline', 'Pigeon', 'Rampart', 'Viaduct', 'Foundry', 'Mason', 'Crossing', 'Mercy',
+const OP_WORDS = ['Lantern', 'Harbor', 'Anvil', 'Bridge', 'Sparrow', 'Hammer', 'Ledger', 'Bell', 'Ferry', 'Tramline', 'Tenement', 'Orchard', 'Steeple', 'Compass', 'Furnace', 'Trellis', 'Causeway', 'Gull', 'Ember', 'Watchman', 'Turnstile', 'Hydrant', 'Skyline', 'Pigeon', 'Rampart', 'Viaduct', 'Foundry', 'Mason', 'Crossing', 'Mercy',
   'Copper', 'Winter', 'Ashfall', 'Hollow', 'Bastion', 'Crowbar', 'Kettle', 'Rooftop', 'Sandbag', 'Tinderbox', 'Boxcar', 'Ironside', 'Gaslight', 'Stairwell', 'Lockstep', 'Blackout', 'Whistle', 'Halyard', 'Rivet', 'Girder', 'Trestle', 'Cinder', 'Marrow', 'Bulwark', 'Palisade', 'Hearth', 'Longshot', 'Backstop', 'Crosscut', 'Overpass',
   'Thimble', 'Sextant', 'Gantry', 'Fireline', 'Nightfall', 'Daybreak', 'Holdfast', 'Tollgate', 'Sentry', 'Barricade', 'Tarpaulin', 'Boilermaker', 'Foghorn', 'Lamplight', 'Keystone', 'Cornerstone', 'Grindstone', 'Flagstone', 'Headlong', 'Stonewall', 'Breakwater', 'Floodgate', 'Drawbridge', 'Pawnshop', 'Fishmonger', 'Tinsmith', 'Cobbler', 'Ragman', 'Chimney', 'Coalbin',
   'Dumbwaiter', 'Fuselage', 'Harrow', 'Pitchfork', 'Plumbline', 'Ratchet', 'Sawhorse', 'Scaffold', 'Shoebox', 'Slingshot', 'Spillway', 'Switchback', 'Tailgate', 'Thornbush', 'Tightrope', 'Trapdoor', 'Tripwire', 'Woodpile', 'Wrecker', 'Yardarm'];
@@ -808,8 +808,44 @@ export class CampSim {
       ['Nice and quiet on the wall this hour.', `Do not say that out loud, ${n1}. You know what happens.`],
       [`What did you eat today, ${n2}?`, 'Beans. And before you ask, yesterday too.'],
       ['Someone left a cake at the door of the station this morning.', `There was a cake. ${n1} saw to that.`],
+      // Some of them run a little longer: the two of them going back and forth, the way they do when nothing else is on.
+      [`${n2}, what did you do before all this?`, 'Insurance. I sold flood cover to people who lived on hills.', 'And now?', 'Now I tell people when it is going to rain. Same job, really.'],
+      ['A listener asks if the dead can swim.', 'They cannot. They walk along the bottom.', `Thank you, ${n2}. Nobody is sleeping tonight.`],
+      ['We have a letter. Somebody wants us to settle an argument: is a hot dog a sandwich?', 'It is not.', 'It is bread with something in it.', `${n1}, we have one generator. Do not waste it on this.`],
+      ['Do you miss the internet?', 'I miss being told what to think about.', 'You are on the radio. You tell people what to think about.', 'Yes. It is exhausting.'],
+      [`I found a crossword in a drawer, ${n2}.`, 'Done?', 'Done in pen, by somebody else, wrong. I am fixing it.'],
+      ['Today in history: nothing happened. It was lovely.', 'Do you remember lovely?', 'Barely. It had cafes in it.'],
+      ['The kids at the school asked what a fax machine was.', 'What did you tell them?', 'That it was a printer that called you on the phone.', 'They did not believe you.', 'Nobody ever did.'],
+      ['Our weather station is a bucket on the roof.', 'And how is the bucket?', 'Full. Draw your own conclusions.'],
+      [`${n2} has been teaching the dog to sit on air.`, 'It sits when I say on air.', 'It sits whenever anyone says anything.', 'Then it is a very good listener. Better than some.'],
+      ['Somebody asked if we will read the football scores.', 'There are no football scores.', 'I could make some up.', 'Albion two, the dead nil. Every week.'],
+      ['I had a dream I was stuck in traffic.', 'A nightmare.', 'It was wonderful. Everybody was alive and furious.'],
+      [`What is the first thing you will do when this is over, ${n2}?`, 'Have a bath.', 'That is it?', 'A long one. With the door locked.'],
+      ['People keep asking what day it is.', 'What do you tell them?', 'A day you are here for. It is the only one that counts.'],
+      ['Book club this week is the one book we have.', 'Again?', 'It gets better every time. The ending changes depending on who reads it out.'],
+      [`${n2} tried to make bread.`, 'It was bread.', 'It was a brick. We put it on the wall. It is holding.'],
+      ['Has anybody seen a working watch?', 'Why?', `Because ${n2} says it is noon and I say it is not.`, 'It is noon somewhere.', 'Not here.'],
+      ['Remember lifts?', 'A little room that took you upstairs.', 'Madness. Now we just have stairs and regret.'],
+      ['We got a request to say hello to everyone on the north wall.', 'Hello, north wall.', 'They say hello back, and could someone bring them a coat.'],
+      ['I counted the stars last night.', 'How many?', 'More than before. There is nothing in the way of them now.', 'That is almost nice.', 'Almost.'],
+      [`Quiz question, ${n2}. What is the capital of Ballarat?`, 'Wherever the wall is still standing.', 'I was going to say Albion.', 'Not anymore.'],
+      ['Somebody wants to know if it is safe to swim in the lake.', 'Ask the lake.', 'The lake is not taking questions.'],
+      ['I miss the sound of a lawnmower.', 'You hated the sound of a lawnmower.', 'I miss hating it.'],
+      ['Reminder: the dead do not knock.', 'So if someone knocks, answer it.', 'Probably. Look first.'],
+      [`${n2}, did you eat my tin of peaches?`, 'Define my.', 'It had my name on it.', 'It had a name on it. It was hard to read.'],
+      ['Thirty-one people in the kitchen line this morning, and not one fight.', 'A record.', 'Put it on the board.'],
+      ['Somebody wrote in to say we talk too much.', 'Did they say what about?', 'No. They just wanted to be on the radio.', 'And now they are. Hello.'],
+      ['Do you think anyone hears us out there?', 'Somebody does. The batteries in the town keep getting used.', 'That is one way to count listeners.'],
+      ['If you hear knocking on the station door, that is the wind.', 'It is not the wind.', 'Today it is the wind.'],
+      [`I have been thinking, ${n2}.`, 'Dangerous.', 'About after. What it will look like.', 'Smaller. Quieter.', 'Kinder?', 'If we make it.'],
+      ['Someone asked us to play their wedding song.', 'Which one?', `They hummed it. Go on, ${n2}, hum it.`, 'Congratulations, whoever you are.'],
+      ['The rooster on the east side has started crowing at midnight.', 'He has given up on mornings.', 'Same.'],
     ];
-    if (late) banter.push(['Still with us at this hour?', 'Then you are on watch, or you cannot sleep. Either way, so are we.']);
+    if (late) banter.push(['Still with us at this hour?', 'Then you are on watch, or you cannot sleep. Either way, so are we.'],
+      ['Graveyard shift, everyone.', 'Do not call it that.', 'Night shift, then.', 'Thank you.'],
+      ['If you are on the wall tonight, look up once. Just once.', 'And then back down.', 'Yes. Back down. Quickly.']);
+    if (morning) banter.push(['Good morning to everyone who made it through the night.', 'And to everyone who did not sleep, good morning anyway.'],
+      [`${n2} is not a morning person.`, 'There are no morning people anymore. There are people who are awake.']);
 
     // The people who run things, on with their own news.
     const own = [];
@@ -855,7 +891,7 @@ export class CampSim {
     const r = Math.random(), lastWeather = recent.slice(-4).some((n) => n.topic === 'weather');
     if (r < .2 && !lastWeather) return [{ who: h1, text: this.civWeather(), topic: 'weather' }];
     if (r < .45) return [{ who: h1, text: fresh(relayed) }];
-    if (r < .62) { const [x, y] = fresh(banter); return [{ who: h1, text: x }, { who: h2, text: y }]; }
+    if (r < .62) { const lines = fresh(banter); return lines.map((text, i) => ({ who: i % 2 ? h2 : h1, text })); }
     // Whose turn: everyone gets an even chance, whoever has the most to say, and nobody who was just on.
     const voices = [...new Set(own.map((o) => o[0]))], justOn = new Set(recent.slice(-4).map((n) => n.who));
     const who = pickFrom(voices.filter((v) => !justOn.has(v)).length ? voices.filter((v) => !justOn.has(v)) : voices);

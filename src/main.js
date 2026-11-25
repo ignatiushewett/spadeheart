@@ -981,7 +981,8 @@ class Game {
       }
     }
     const tuned = this.ui.radioMusic, c = tuned >= 0 ? this.layout.camps[tuned] : null;
-    const on = !!c && !siren && sim.state[c.id].status === 'holding' && P.alive && (!this.ui.modal || LIVE_MODALS.has(this.ui.modal));
+    // Out of the station's range it goes quiet, and comes back when you do.
+    const on = !!c && !siren && this.ui.inRange(`civ:${c.id}`) && sim.state[c.id].status === 'holding' && P.alive && (!this.ui.modal || LIVE_MODALS.has(this.ui.modal));
     if (c && sim.state[c.id].status !== 'holding') this.ui.radioMusic = -1;
     a.setStation(on ? .9 : 0, best < .004 ? 0 : best, pan);
   }

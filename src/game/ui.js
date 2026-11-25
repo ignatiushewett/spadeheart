@@ -14,6 +14,8 @@ const $ = (id) => document.getElementById(id);
 // The water as the map canvas paints it, so nothing shows where the map runs out.
 const OCEAN = '#152c37';
 const SHOW_INFECTED_ON_MAP = false;   // the red wash and the dots for the dead, on the big map
+const RADIO_OPS_RANGE = 1400;   // blocks from a settlement's wall its operations channel still reaches
+const RADIO_CIV_RANGE = 380;    // and its civilian station
 const SHOW_WORLD_MARKERS = false;    // quest markers floating in the 3D view (the compass and the map carry them instead)
 const fmt = (n) => Math.round(n).toLocaleString('en-US');
 // A camp with nothing happening at it, as the player reads it.
@@ -1480,8 +1482,20 @@ export class UI {
 
   // Whether a channel's calls come up on screen as well as going on its log: every channel does unless you turn it off.
   notifies(key) {
+    // Out of range there is nothing to hear; what you set for the channel is kept, and back in range it is as you left it.
+    if (!this.inRange(key)) return false;
     const set = this.g.player.radioNotify || {};
     return set[key] ?? true;
+  }
+
+  // How far a settlement's radio carries: its operations channel a long way, its civilian station only round about it. Measured from
+  // its wall.
+  inRange(key) {
+    if (key === 'crew') return true;
+    const [kind, id] = key.split(':'), c = this.g.layout.camps[+id], P = this.g.player;
+    if (!c) return false;
+    const d = Math.max(0, c.x0 - P.x, P.x - c.x1, c.z0 - P.z, P.z - c.z1);
+    return d <= (kind === 'ops' ? RADIO_OPS_RANGE : RADIO_CIV_RANGE);
   }
 
   // The radio: every channel you can pick up, and the one you are on. Your crew; and each settlement you know of, twice: its
@@ -1489,7 +1503,12 @@ export class UI {
   renderRadio() {
     const g = this.g, P = g.player, sim = g.campSim, home = sim.lastCamp >= 0 ? sim.lastCamp : P.home;
     const chans = [{ key: 'crew', name: 'Private Frequency' }];
-    for (const c of g.layout.camps) if (P.discovered[c.id]) chans.push({ key: `ops:${c.id}`, name: `${c.name} Operations`, id: c.id }, { key: `civ:${c.id}`, name: `${c.name} Civilian Radio`, id: c.id, civ: true });
+    // Only the stations you can pick up from here.
+    for (const c of g.layout.camps) {
+      if (!P.discovered[c.id]) continue;
+      if (this.inRange(`ops:${c.id}`)) chans.push({ key: `ops:${c.id}`, name: `${c.name} Operations`, id: c.id });
+      if (this.inRange(`civ:${c.id}`)) chans.push({ key: `civ:${c.id}`, name: `${c.name} Civilian Radio`, id: c.id, civ: true });
+    }
     if (!chans.some((q) => q.key === this.radioChan)) this.radioChan = 'crew';
     const ch = chans.find((q) => q.key === this.radioChan);
     $('radio-chans').innerHTML = chans.map((q) => `<button class="chan${q.key === ch.key ? ' on' : ''}" data-chan="${q.key}"><span>${q.name}</span></button>`).join('');

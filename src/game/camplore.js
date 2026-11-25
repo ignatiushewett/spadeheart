@@ -13,7 +13,7 @@ export const LORE = {
       {
         id: 'reyes', name: 'Odalys Reyes', role: 'leader', title: 'Administrator of the Refuge', weapon: 'pistol', wardrobe: 'L_reyes',
         greet: {
-          first: 'New face. Good. New faces buy things. I am Odalys, and before you ask, nobody elected me. I ran dispatch for the MTA for nineteen years, and when the trains stopped I was the only person who still knew where everybody was.',
+          first: 'New face. Good. New faces buy things. I am Odalys, and before you ask, nobody elected me. I ran dispatch for Albion Transit for nineteen years, and when the trams stopped I was the only person who still knew where everybody was.',
           again: ['Back again. Market is open, wall is up, and I have a list.', 'You still have all your fingers. That makes you an asset.', 'Talk fast. I have two caravans and a bad generator.'],
           hurt: 'You are bleeding on my floor. See Doc Abara before you talk to me.',
           night: 'It is late. The wall crew gets nervous at night, so keep that thing pointed down.',
@@ -43,7 +43,7 @@ export const LORE = {
       {
         id: 'lucky', name: 'Lucky Chen', role: 'general', title: 'General Goods', weapon: 'smg', wardrobe: 'civ',
         greet: { first: 'Lucky. Three generations on Quay Street, and I am the first one who ever sold a can of peaches for more than a car. Do not haggle. I can see you are about to haggle.', again: ['What do you need? Everything is the same price, but sadder.', 'Back again. My favourite regular. I have two regulars.'] },
-        topics: [{ id: 'lucky', ask: 'Why do they call you Lucky?', say: 'Because on the first day I closed early to go to a wedding in Flushing, my cousin. Everybody on my block who stayed open is out there walking around. My cousin did not make it either, so. Lucky. It is a joke. You can laugh, everyone else does.', standing: 1 }],
+        topics: [{ id: 'lucky', ask: 'Why do they call you Lucky?', say: 'Because on the first day I closed early to go to a wedding out in Severn Bay, my cousin. Everybody on my block who stayed open is out there walking around. My cousin did not make it either, so. Lucky. It is a joke. You can laugh, everyone else does.', standing: 1 }],
       },
       {
         id: 'saltz', name: 'Manny Saltz', role: 'arms', title: 'Arms Dealer', weapon: 'shotgun', wardrobe: 'scrap',
@@ -172,7 +172,7 @@ export const LORE = {
       {
         id: 'whitaker', name: 'SSgt. Cole Whitaker', role: 'leader', title: 'Commanding', weapon: 'rifle', wardrobe: 'L_whitaker',
         greet: {
-          first: 'Stand easy. Whitaker, 69th Infantry, what is left of it. Our orders on day nine were to fall back across the state line and blow the crossings behind us. There were eleven thousand civilians on this side. We got on the radio and said we could not read them. We are still having that radio trouble.',
+          first: 'Stand easy. Whitaker, 3rd Infantry, what is left of it. Our orders on day nine were to fall back across the state line and blow the crossings behind us. There were eleven thousand civilians on this side. We got on the radio and said we could not read them. We are still having that radio trouble.',
           again: ['Report.', 'Make it quick, I have a perimeter to walk.', 'You are out of uniform, but I will let it go.'],
           hurt: 'Medic! No, belay that. Get yourself seen to and come back when you can stand at attention.',
           night: 'Night watch is doubled. Do not skyline yourself on the wall.',
@@ -181,15 +181,15 @@ export const LORE = {
         topics: [
           { id: 'orders', ask: 'You disobeyed orders?', say: 'I am aware. I think about the court-martial sometimes. I would quite like to be court-martialed. It would mean there was a court.', then: ['anyone', 'rank'] },
           { id: 'anyone', sub: true, ask: 'Have you heard from anyone in command?', say: 'A voice on the net in week two ordered every Guard unit to Atlanta. Sounded very sure of himself. We tried raising him last month. Now it is an automated tone. I had the men stop listening. It was bad for morale.', standing: 1 },
-          { id: 'rank', sub: true, ask: 'Why are they still following you?', say: 'Because I walk the wall at 0300, and I eat last. I was a high school gym teacher in Yonkers six weeks a year, and a staff sergeant the other forty-six. The stripes do not mean anything now. So I have to.', standing: 2 },
+          { id: 'rank', sub: true, ask: 'Why are they still following you?', say: 'Because I walk the wall at 0300, and I eat last. I was a high school gym teacher in Weston six weeks a year, and a staff sergeant the other forty-six. The stripes do not mean anything now. So I have to.', standing: 2 },
           { id: 'civ', ask: 'What about the civilians in here?', say: 'Everyone gets a job and a rifle. Everyone trains at the range, including Mrs. Petrakis, who is seventy-three and shoots better than my corporals. I do not run a refugee settlement. I run a garrison, and they are the garrison.' },
           { id: 'drill', ask: 'Your people look sharp. Any advice?', say: 'Watch your six, watch your ammo, and do not go into a building you cannot get out of. Stack your block kits at the door behind you. Three seconds of plank has saved more lives here than I have.', standing: 1 },
-          { id: 'depot', ask: 'Anything specific you need done?', req: { standing: 10 }, say: 'The armory on Carrow Avenue, in Albion. 69th Regiment, our home. We left in a hurry and there are crates of 5.56 behind a door we never got back to. It is thick with them around there. I cannot spare a squad. You look like you can count to forty.', then: ['depot_yes'], once: true },
+          { id: 'depot', ask: 'Anything specific you need done?', req: { standing: 10 }, say: 'The armory on Carrow Avenue, in Albion. The old Guard drill hall, our home. We left in a hurry and there are crates of 5.56 behind a door we never got back to. It is thick with them around there. I cannot spare a squad. You look like you can count to forty.', then: ['depot_yes'], once: true },
           { id: 'depot_yes', sub: true, ask: 'Consider it done, Sergeant.', say: 'Clear the street first. I want it cold before I send a truck. Dismissed.', job: 'union_depot' },
           { id: 'depot_done', pay: 'union_depot', req: { flag: 'union_depot_done', notFlag: 'union_depot_paid' }, ask: 'Street outside the armory is clear.', say: 'Good. Truck rolls at first light. You did that alone, and I have men here who will not go into Albion in a squad. You ever want a stripe, you come see me. Here. It is a real M249, and it is not on anyone\'s books.', standing: 15, give: { lmg: 1, ammo_rifle: 200 } },
           { id: 'trust', ask: 'Request resupply, Sergeant.', req: { standing: 25 }, say: 'Granted. Sign for it. That is a joke, nobody has signed for anything since August.', give: { ammo_rifle: 90, grenade: 2 }, daily: true },
         ],
-        favours: { union_depot: { title: 'Clear the 69th Armory', type: 'kill', u: .115, v: .171, need: 40, reward: 380, desc: 'Put down forty infected around the 69th Regiment Armory on Carrow Avenue, in Albion, so a truck can get in.' } },
+        favours: { union_depot: { title: 'Clear the Carrow Avenue Armory', type: 'kill', u: .115, v: .171, need: 40, reward: 380, desc: 'Put down forty infected around the Guard armory on Carrow Avenue, in Albion, so a truck can get in.' } },
       },
       {
         id: 'petrakis', name: 'Mrs. Petrakis', role: 'local', title: 'Marksman', weapon: 'sniper', wardrobe: 'civ', spot: 'hq',
@@ -235,7 +235,7 @@ export const LORE = {
           { id: 'tried', sub: true, ask: 'Have you ever found anyone innocent?', say: 'Eleven of nineteen. People forget that part. The hearings are not a formality. If you ever need one, you shall have a very good defense.', standing: 1 },
           { id: 'food', ask: 'You really grow all this yourselves?', say: 'Eight hundred acres of it, once we are done. The Arnhem families spent a hundred and fifty years making the best soil in Ballarat, and the banks had most of it off them before any of this. There are six thousand mouths inside this wall and in the settlements that trade with us. In three months that is the only thing in the city that matters.', standing: 1 },
           { id: 'met', ask: 'What about the museums in Albion?', say: 'A Greek vase will not feed anyone. But I have sent two teams for the State House charter, because somebody must, and I will not explain myself further.' },
-          { id: 'seed', ask: 'Is there a way I could serve Providence?', req: { standing: 10 }, say: 'There is. The Conservatory Garden moved its heirloom seed bank down to the Shakespeare Garden shed, just north of us. We have four strains of everything and that is not enough. It is dangerous ground, and you would be doing it for strangers\' grandchildren.', then: ['seed_yes'], once: true },
+          { id: 'seed', ask: 'Is there a way I could serve Providence?', req: { standing: 10 }, say: 'There is. The Weston co-op kept an heirloom seed bank in the store under the grain elevator, just north of us. We have four strains of everything and that is not enough. It is dangerous ground, and you would be doing it for strangers\' grandchildren.', then: ['seed_yes'], once: true },
           { id: 'seed_yes', sub: true, ask: 'I will bring you the seeds.', say: 'I expected no less. Mind the Weston road.', job: 'sheep_seeds' },
           { id: 'seed_done', pay: 'sheep_seeds', req: { flag: 'sheep_seeds_done', notFlag: 'sheep_seeds_paid' }, ask: 'Your seed bank, Judge.', say: 'Do you know, in forty-one years on the bench, no one has ever handed me anything that made me cry? Sit down. You are getting the tomatoes. They are not on the market, those tomatoes. You are an honored citizen of Providence, and that is a court order.', standing: 16, give: { medkit: 2, beans: 6, water: 6 } },
           { id: 'trust', ask: 'Could Providence spare provisions?', req: { standing: 25 }, say: 'Citizens draw from the common stores. Here is your ration, and do not sell it, I would know.', give: { beans: 4, water: 4, medkit: 1 }, daily: true },
@@ -262,7 +262,7 @@ export const LORE = {
       },
     ],
     barks: {
-      guard: ["Movement over by the Great Lawn.", "No firing inside the wall, you know the rule.", "They're thin today.", "I can smell the kitchen from up here. It's killing me."],
+      guard: ["Movement over by the fields.", "No firing inside the wall, you know the rule.", "They're thin today.", "I can smell the kitchen from up here. It's killing me."],
       folk: ["Watch the rows!", "Hearing's at two.", "Is that a real rug?", "First frost's maybe six weeks out.", "I've got watch at four and weeding at six.", "She found him innocent, you know.", "Who left the greenhouse open?"],
     },
   },
@@ -287,7 +287,7 @@ export const LORE = {
           { id: 'paint', ask: 'Why paint the walls?', say: 'Because it is ours. Because Fort Vigil is the color of a bureaucrat. And because when the dead come up to our wall, the last thing they see will be a twelve-foot pink rat with a middle finger. I am not saying they notice. I am saying I notice.' },
           { id: 'squat', ask: 'What needs doing?', req: { standing: 10 }, say: 'I am not asking you to do anything, because I do not do that. But there is a building on Foundry Street, the Foundry squat, that held out longer than anybody, and the people in there have gone quiet, and somebody ought to go kill everything on that block and see. I just think that is an interesting thing that a person could do.', then: ['squat_yes'], once: true },
           { id: 'squat_yes', sub: true, ask: 'I am the person who could do it.', say: 'Well, I did not ask you. Remember that when you tell it later. Bring a shotgun.', job: 'tompkins_csquat' },
-          { id: 'squat_done', pay: 'tompkins_csquat', req: { flag: 'tompkins_csquat_done', notFlag: 'tompkins_csquat_paid' }, ask: 'The block around C-Squat is clear.', say: 'And the people? No. No, I can see from your face. They went out swinging? Of course they did. I was at their wedding, those two, in 1994, it had a tuba. Take this. It is hers, and she would hate you, and she would want you to have it.', standing: 15, give: { sledge: 1, dynamite: 3 } },
+          { id: 'squat_done', pay: 'tompkins_csquat', req: { flag: 'tompkins_csquat_done', notFlag: 'tompkins_csquat_paid' }, ask: 'The block around the Foundry squat is clear.', say: 'And the people? No. No, I can see from your face. They went out swinging? Of course they did. I was at their wedding, those two, in 1994, it had a tuba. Take this. It is hers, and she would hate you, and she would want you to have it.', standing: 15, give: { sledge: 1, dynamite: 3 } },
           { id: 'trust', ask: 'Anything in the free box?', req: { standing: 25 }, say: 'Everything in the free box is free. That is why it is the free box. Do not take the good stuff, I have been saving it. Ah, take the good stuff.', give: { dynamite: 1, ammo_shell: 24, whiskey: 1 }, daily: true },
         ],
         favours: { tompkins_csquat: { title: 'Clear the Foundry squat', type: 'kill', u: .7617, v: .0854, need: 35, reward: 320, desc: 'Kill thirty-five infected on the Foundry Street block around the squat, and find out what became of the people inside.' } },
@@ -395,17 +395,17 @@ export const LORE = {
       },
       {
         id: 'marcus', name: 'Marcus Tull', role: 'arms', title: 'Arms and Security', weapon: 'sniper', wardrobe: 'civ',
-        greet: { first: 'Marcus. Two tours in Fallujah, and then I came home and drove the M60 bus to LaGuardia for twenty years. Coach asked me to look after the wall. I played for her in the nineties. You do not tell Coach no. What do you need?', again: ['Need something?', 'Water tower is mine at sundown. Do not walk the east side around then.'] },
+        greet: { first: 'Marcus. Two tours in Fallujah, and then I came home and drove the 60 bus out to Esperance for twenty years. Coach asked me to look after the wall. I played for her in the nineties. You do not tell Coach no. What do you need?', again: ['Need something?', 'Water tower is mine at sundown. Do not walk the east side around then.'] },
         topics: [{ id: 'iraq', ask: 'Is this anything like Fallujah?', say: 'No. Over there, I never knew who was coming for me. Here I always know, and I can see them from a mile away. Nobody is confused about whose side anyone is on. I have got to say, I sleep better. Tell Coach I said that and I will deny it.', standing: 1 }],
       },
       {
         id: 'ray', name: 'Deacon Ray', role: 'junk', title: 'Keeps the Salvage', weapon: 'bat', wardrobe: 'scrap',
-        greet: { first: 'Ray. Deacon at Abyssinian, and I had a chop shop on 145th for about thirty years. The Lord knew about both. Bring me scrap, and I will give you a fair price, which is more than I gave most people.', again: ['What have you got?', 'Coach says I have to give you a fair price. So I am.'] },
-        topics: [{ id: 'shop', ask: 'A deacon with a chop shop?', say: 'Son, every car in this wall came through me. Half of them, I already knew. There is a Buick out on 124th I stole twice. I look at it and I say, well, look at you now, doing something useful. Same as me.', standing: 1 }],
+        greet: { first: 'Ray. Deacon at Mount Carver, and I had a chop shop on Tanner Street for about thirty years. The Lord knew about both. Bring me scrap, and I will give you a fair price, which is more than I gave most people.', again: ['What have you got?', 'Coach says I have to give you a fair price. So I am.'] },
+        topics: [{ id: 'shop', ask: 'A deacon with a chop shop?', say: 'Son, every car in this wall came through me. Half of them, I already knew. There is a Buick out on Mill Street I stole twice. I look at it and I say, well, look at you now, doing something useful. Same as me.', standing: 1 }],
       },
       {
-        id: 'reverend', name: 'Rev. Isaiah Cole', role: 'local', title: 'Abyssinian Baptist', weapon: 'pistol', wardrobe: 'clergy', spot: 'hq',
-        greet: { first: 'Peace be with you. I am the Reverend Isaiah Cole. People ask me if this is the Rapture, and I tell them that the Lord does not usually do His work on the 2 train.', again: ['Peace.', 'Service at sundown, if you are in need. And even if you are not.'] },
+        id: 'reverend', name: 'Rev. Isaiah Cole', role: 'local', title: 'Mount Carver Baptist', weapon: 'pistol', wardrobe: 'clergy', spot: 'hq',
+        greet: { first: 'Peace be with you. I am the Reverend Isaiah Cole. People ask me if this is the Rapture, and I tell them that the Lord does not usually do His work on the number 2 tram.', again: ['Peace.', 'Service at sundown, if you are in need. And even if you are not.'] },
         topics: [
           { id: 'faith', ask: 'Do you still believe, after all this?', say: 'I have buried two hundred people. I asked the Lord why at every one of them. He has not answered. I find I am not done asking, and I think that may be all that faith ever was. Are you carrying anything you would like to set down? I do not need to know what it is.', standing: 2 },
           { id: 'gun', ask: 'You carry a pistol, Reverend?', say: 'The Lord is my shepherd. Mr. Smith and Mr. Wesson are also very supportive.' },
@@ -413,8 +413,8 @@ export const LORE = {
       },
     ],
     barks: {
-      guard: ["Coach says hold the line, so we hold the line.", "I got him, I got him.", "Buses are shaking on 124th.", "I can smell Tiny from up here. Lord."],
-      folk: ["You eat yet?", "Choir's at five.", "Who's got next on the court?", "That boy's got a jump shot, I'm telling you.", "Coach said so.", "Y'all save me a plate."],
+      guard: ["Coach says hold the line, so we hold the line.", "I got him, I got him.", "Buses are shaking on Mill Street.", "I can smell Tiny from up here. Lord."],
+      folk: ["You eat yet?", "Choir's at five.", "Who's on water today?", "That boy can fix anything with a bit of wire, I'm telling you.", "Coach said so.", "Y'all save me a plate."],
     },
   },
 
