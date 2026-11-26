@@ -131,7 +131,7 @@ for (const k of ['PAINT_Y', 'PAINT_K', 'BARN_R', 'CONT_G', 'RUST', 'STAINED', 'C
   for (let c = 0; c < 3; c++) PALETTE[id * 4 + c] = PALETTE[src * 4 + c];
   PALETTE[id * 4 + 3] = FLAGS[src] | F_CLOTH | F_FLAG;
   HP[id] = HP[src];
-  FLAGS[id] = FLAGS[src] | F_CLOTH;
+  FLAGS[id] = FLAGS[src] | F_CLOTH | F_FLAG;
   FLAG_OF[src] = id;
 }
 export const isLoot = (id) => (FLAGS[id] & F_LOOT) !== 0;

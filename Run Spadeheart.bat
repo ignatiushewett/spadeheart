@@ -21,4 +21,14 @@ if not exist node_modules\electron\dist\electron.exe (
   pause
   exit /b 1
 )
-start "" "node_modules\electron\dist\electron.exe" .
+rem From Steam (launch options --steam, or Steam's own launch variables), wait for the game to close instead of letting go of it straight
+rem away: Steam counts playtime, and draws its overlay, only while the program it started is still running.
+set STEAMRUN=
+if defined SteamGameId set STEAMRUN=1
+if defined SteamAppId set STEAMRUN=1
+for %%a in (%*) do if /i "%%~a"=="--steam" set STEAMRUN=1
+if defined STEAMRUN (
+  "node_modules\electron\dist\electron.exe" . --steam
+  exit /b 0
+)
+start "" "node_modules\electron\dist\electron.exe" . %*

@@ -69,9 +69,9 @@ const HOMES = new Set(['shack', 'tenement', 'block', 'tent', 'shelter']);   // p
 
 // The bar, in its own terms (u along the front, v from the back wall out to the yard). It is lined up with the camp's 2x2 nav cells,
 // which pair u and v as (0,1), (2,3) and so on, so the doorway and the gaps between things leave whole cells free.
-const BAR_W = 20, BAR_D = 18;              // footprint, building and yard together
+const BAR_W = 20, BAR_D = 22;              // footprint, building and yard together
 const BAR_PAD = 3;                         // blocks kept clear of other buildings all round
-const BAR_FRONT = 10;                      // v of the front wall; the porch is the two rows past it, the yard beyond
+const BAR_FRONT = 14;                      // v of the front wall; the porch is the two rows past it, the yard beyond. A deep room.
 const BAR_WALL_H = 6;                      // wall height; the roof starts on top
 const BAR_ROOF_STEP = 3;                   // rows of roof to each step up: a low pitch
 const BAR_DOOR = [8, 11], BAR_DOOR_H = 4;  // u range and height of the doorway
@@ -79,13 +79,13 @@ const BAR_WINDOWS = [[2, 5], [14, 17]];    // u ranges of the front windows
 const BAR_COUNTER = [3, 16];               // u range of the counter, at v = 3
 const BAR_STOOLS = [4, 6, 8, 10, 12, 14, 16]; // u of each stool, at v = 5: the length of the counter
 const BAR_TABLES = [1];                    // u of each standing table, at v = 6, against a side wall
-const BAR_HIGH_TABLES = [[5, 8], [14, 8], [10, 7]]; // u, v of the high tables in the room, clear of the row along the stools
-const BAR_HEARTH_V = 7;                    // v of the fire, in the right-hand wall
-const BAR_BEAMS = [3, 6, 9];               // v of the beams across under the roof
-const BAR_LAMPS = [[5, 6], [14, 6]]; // u, v of the lamps hung under the beams
+const BAR_HIGH_TABLES = [[5, 8], [14, 8], [10, 7], [5, 11], [13, 11], [10, 10]]; // u, v of the high tables in the room, clear of the row along the stools
+const BAR_HEARTH_V = 9;                    // v of the fire, in the right-hand wall, halfway down the room
+const BAR_BEAMS = [3, 6, 9, 12];           // v of the beams across under the roof
+const BAR_LAMPS = [[5, 6], [14, 6], [5, 12], [14, 12]]; // u, v of the lamps hung under the beams
 const BAR_POSTS = [1, 6, 13, 18];          // u of the porch posts, at v = BAR_FRONT + 2
 const BAR_BENCHES = [[2, 5], [14, 17]];    // u ranges of the porch benches, at v = BAR_FRONT + 1
-const BAR_YARD_V = 15;                     // v of the yard tables
+const BAR_YARD_V = 19;                     // v of the yard tables
 const BAR_YARD_TABLES = [2, 16];           // u of the left end of each two-long yard table, a nav cell each
 
 export function planCamp(def, id, r, ground) {
@@ -773,7 +773,7 @@ export function planCamp(def, id, r, ground) {
       c.spots.bar = { x: wx(BW / 2), z: wz(BAR_FRONT + 3.5) };
       c.spots.barYard = { x: wx(BW / 2), z: wz(BD + 1.5) };
       // The room takes its colour from the fire: firelight across it, strongest at the hearth, warm lamplight out in the yard.
-      light(Math.floor(wx(BW / 2)), Math.floor(wz(5)), 17, FIRE);
+      light(Math.floor(wx(BW / 2)), Math.floor(wz(BAR_FRONT / 2)), 18, FIRE);
       light(Math.floor(wx(BW / 2)), Math.floor(wz(BAR_YARD_V)), 12);
       light(Math.floor(wx(BW - 2)), Math.floor(wz(BAR_HEARTH_V)), 14, FIRE);
       // The fire in the hearth burns like any other in the camp, flames and all; it is under a roof, so the rain never gets it.
@@ -1391,8 +1391,8 @@ function stampPart(p, c, box, put, car, letterAt) {
       for (const [u, v] of [[0, 0], [W2 - 1, 0], [0, F], [W2 - 1, F]]) for (let y = 0; y < H; y++) T(u, y, v, M.LOG);
       // Lit windows either side of the door and down each side (the right-hand side has the fireplace).
       for (const [a, b] of BAR_WINDOWS) for (let u = a; u <= b; u++) for (let y = 2; y <= 3; y++) T(u, y, F, M.GLASS_C);
-      for (const v of [4, 5, 8, 9]) for (let y = 2; y <= 3; y++) T(0, y, v, M.GLASS_C);
-      for (const v of [3, 4]) for (let y = 2; y <= 3; y++) T(W2 - 1, y, v, M.GLASS_C);
+      for (const v of [4, 5, 8, 9, 12, 13]) for (let y = 2; y <= 3; y++) T(0, y, v, M.GLASS_C);
+      for (const v of [3, 4, 12, 13]) for (let y = 2; y <= 3; y++) T(W2 - 1, y, v, M.GLASS_C);
       // A low-pitched roof of rusted sheet: a step in every few rows up to a dark ridge, gable ends boarded in.
       for (let k = 0; ; k++) {
         const va = k * BAR_ROOF_STEP, vb = F - k * BAR_ROOF_STEP;
@@ -1430,7 +1430,7 @@ function stampPart(p, c, box, put, car, letterAt) {
       for (const u of BAR_STOOLS) T(u, 0, 5, M.WOOD_D);
       for (const u of BAR_TABLES) { T(u, 0, 6, M.WOOD_D); T(u, 1, 6, M.PLANK); }
       // High tables in the middle of the room, on a rug.
-      for (let v = 6; v <= 9; v++) for (let u = 5; u <= W2 - 6; u++) T(u, -1, v, M.CARPET);
+      for (let v = 6; v <= F - 2; v++) for (let u = 5; u <= W2 - 6; u++) T(u, -1, v, M.CARPET);
       for (const [u, v] of BAR_HIGH_TABLES) { T(u, 0, v, M.WOOD_D); T(u, 1, v, M.PLANK); }
       // Beams across under the roof, and the lamps hung from them.
       for (const v of BAR_BEAMS) for (let u = 1; u < W2 - 1; u++) T(u, H - 1, v, M.WOOD_D);

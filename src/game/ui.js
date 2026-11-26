@@ -1,7 +1,7 @@
 // HTML overlay: HUD, menus, inventory, trading, dialogue, maps.
 import { WX, WZ, CS } from '../shared/constants.js';
 import { ROLES } from '../shared/layout.js';
-import { ITEMS, WEAPON_ORDER, BLOCKS, BUILD_PIECES, KITS, CAMP_START, TRUST_LOCK, START_CAMP, startingGear } from './items.js';
+import { ITEMS, WEAPON_ORDER, BLOCKS, KITS, CAMP_START, TRUST_LOCK, START_CAMP, startingGear } from './items.js';
 import { DIFFICULTY } from './horde.js';
 import { standingName, LORE } from './dialogue.js';
 import { OP_PAY, CREW_ARMOUR, CREW_GUNS, CREW_GUN_NAMES, crewArmourTier, crewGunStats } from './npcs.js';
@@ -824,25 +824,16 @@ export class UI {
       $('wname').textContent = it.name;
       if (it.type === 'gun') {
         $('ammo').innerHTML = `${P.reloadT > 0 && !(it.perShell || it.cylinder) ? '<small>reloading</small>' : P.mags[P.weapon] ?? 0} <small>/ ${P.count(it.ammo)}</small>`;
-      } else if (it.type === 'block' && P.buildPiece()) {
-        // A piece: what it is and what it is made of, and what you have against what it takes.
-        const pc = P.buildPiece(), have = P.freeBuild() ? Infinity : P.count(P.weapon);
-        $('wname').textContent = `${pc.name}, ${it.name}`;
-        $('ammo').innerHTML = `<span style="color:${have < pc.cost ? 'var(--red)' : 'inherit'}">${have === Infinity ? '&infin;' : have}</span> <small>/ ${pc.cost}</small>`;
       } else if (it.type === 'block' && P.freeBuild()) {
         $('ammo').innerHTML = '&infin;';
       } else if (it.type === 'throw' || it.type === 'block') {
         $('ammo').innerHTML = `${P.count(P.weapon)}`;
       } else $('ammo').innerHTML = '';
     } else { $('wname').textContent = ''; $('ammo').innerHTML = ''; }
-    // With the building out, a mouse under the name says what right-click does; held, its button fills until the menu comes up.
+    // With the building out, a mouse under the name says what right-click does.
     {
       const hint = $('rmb-hint'), on = !riding && !!it && it.type === 'block';
       if (hint.classList.contains('on') !== on) hint.classList.toggle('on', on);
-      if (on) {
-        const v = (P.rmbT != null && !P.rmbMenu ? Math.min(1, P.rmbT / .3) : 0).toFixed(2);
-        if (hint.dataset.p !== v) { hint.dataset.p = v; hint.style.setProperty('--p', v); }
-      }
     }
     const list = P.weapons();
     const hb = $('hotbar');
@@ -2633,81 +2624,6 @@ export class UI {
   }
 
   // --- Map -------------------------------------------------------------------------------------------------------
-  // The building menu: the materials along the top, the pieces under them drawn in the material you have picked. A slot goes red
-  // when you do not have enough for it.
-  openBuild() {
-    this.open('buildmenu', false);
-    const panel = $('bm-panel');
-    if (!panel.dataset.wired) {
-      panel.dataset.wired = 1;
-      panel.addEventListener('contextmenu', (e) => { e.preventDefault(); this.g.resume(); });
-    }
-    this.renderBuild();
-    this.bmCur = null; this.bmHover = null;
-    this.buildCursor(0, 0, !!document.pointerLockElement);
-  }
-
-  // While the game still has the mouse, the build menu draws a pointer of its own and moves it by the mouse's motion; once the mouse
-  // is free, the real cursor does the job and this one goes.
-  buildCursor(a, b, locked) {
-    const el = $('bm-cursor');
-    if (!el) return;
-    if (!locked) { el.style.display = 'none'; this.bmCur = null; return; }
-    const c = this.bmCur || (this.bmCur = { x: innerWidth / 2, y: innerHeight / 2 });
-    c.x = Math.max(0, Math.min(innerWidth - 2, c.x + a)); c.y = Math.max(0, Math.min(innerHeight - 2, c.y + b));
-    el.style.display = 'block'; el.style.left = `${c.x}px`; el.style.top = `${c.y}px`;
-    const slot = document.elementFromPoint(c.x, c.y)?.closest('.bm-slot') || null;
-    if (slot !== this.bmHover) { if (this.bmHover) this.bmHover.classList.remove('hot'); this.bmHover = slot; if (slot) { slot.classList.add('hot'); slot.onmouseenter && slot.onmouseenter(); } }
-  }
-
-  buildClick() { if (this.bmHover && this.bmHover.isConnected) this.bmHover.click(); }
-
-  renderBuild() {
-    const g = this.g, P = g.player, cur = ITEMS[P.weapon]?.type === 'block' ? P.weapon : P.blockPick() || 'block_wood';
-    const col = BLOCK_COL[cur] || '#b08a55', tip = $('bm-tip');
-    // A piece, drawn flat from the side its icon looks at, a square to a block.
-    const pieceIcon = (p) => {
-      const pts = p.cells.map(([u, v, w]) => (p.view === 'top' ? [u, w] : p.view === 'side' ? [w, -v] : [u, -v]));
-      const xs = pts.map((q) => q[0]), ys = pts.map((q) => q[1]), x0 = Math.min(...xs), y0 = Math.min(...ys), wd = Math.max(...xs) - x0 + 1, ht = Math.max(...ys) - y0 + 1;
-      const n = Math.max(wd, ht), ox = (n - wd) / 2, oy = (n - ht) / 2, seen = new Set();
-      let d = '';
-      for (const [a, b] of pts) { const k = `${a},${b}`; if (seen.has(k)) continue; seen.add(k); d += `M${a - x0 + ox + .06} ${b - y0 + oy + .06}h.88v.88h-.88z`; }
-      return `<svg viewBox="0 0 ${n} ${n}"><path fill="${col}" d="${d}"/></svg>`;
-    };
-    const free = P.freeBuild(), many = (n) => (n === Infinity ? '&infin;' : n);
-    $('bm-mats').innerHTML = BLOCKS.map((id) => {
-      const n = free ? Infinity : P.count(id);
-      return `<div class="bm-slot mat${!P.buildPiece() && id === cur ? ' on' : ''}${n ? '' : ' short'}" data-mat="${id}">${iconFor(id)}<b>${many(n)}</b></div>`;
-    }).join('');
-    const have = free ? Infinity : P.count(cur);
-    $('bm-matname').textContent = `in ${ITEMS[cur].name}`;
-    $('bm-pieces').innerHTML = BUILD_PIECES.map((p) => `<div class="bm-slot${P.piece === p.id ? ' on' : ''}${have < p.cost ? ' short' : ''}" data-piece="${p.id}">${pieceIcon(p)}<b>${p.cost}</b></div>`).join('');
-    tip.innerHTML = 'Pick a material to place blocks one at a time, or a structure to put up whole.';
-    const say = (el) => {
-      if (el.dataset.mat) { const id = el.dataset.mat, n = free ? Infinity : P.count(id); tip.innerHTML = `${ITEMS[id].name}<span class="${n ? '' : 'bad'}">${n === Infinity ? 'Unlimited in Creative' : n ? `${n} carried` : 'You have none'}</span>`; return; }
-      const p = BUILD_PIECES.find((q) => q.id === el.dataset.piece);
-      tip.innerHTML = `${p.name}<span class="${have < p.cost ? 'bad' : ''}">${p.cost} ${ITEMS[cur].name}${have === Infinity ? '' : `, you have ${have}`}</span>`;
-    };
-    for (const el of document.querySelectorAll('#bm-mats .bm-slot, #bm-pieces .bm-slot')) {
-      el.onmouseenter = () => say(el);
-      el.onclick = () => {
-        if (el.dataset.mat) {
-          const id = el.dataset.mat;
-          if (!P.has(id)) { say(el); return; }
-          P.piece = null;
-          P.selectWeapon(id);
-        } else {
-          // A piece starts out in timber, if there is any; right-click changes it after.
-          P.piece = el.dataset.piece;
-          const wood = P.has('block_wood') ? 'block_wood' : P.blockPick();
-          if (wood) P.selectWeapon(wood);
-        }
-        g.audio.simple('click');
-        g.resume();
-      };
-    }
-  }
-
   openMap() {
     this.open('map', false);
     const P = this.g.player;

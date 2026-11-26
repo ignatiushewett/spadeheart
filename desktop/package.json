@@ -13,5 +13,8 @@
   },
   "allowScripts": {
     "electron@33.2.1": true
+  },
+  "dependencies": {
+    "steamworks.js": "^0.4.0"
   }
 }

@@ -357,24 +357,6 @@ body.waking #hud > * { visibility: hidden; }
 .detail { color: var(--dim); font-size: 13px; min-height: 58px; padding-top: 10px; border-top: 1px solid var(--line); margin-top: 10px; }
 /* The inventory, a tab to each kind of thing, the way a Pip-Boy does it: big rows in the mono face, and the one under the pointer laid out
    in full on the right. */
-/* The building menu, held open on right-click. */
-#bm-panel { width: auto; }
-.bm-sub { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--dim); margin: 0 0 8px; display: flex; gap: 8px; }
-.bm-sub + .bm-grid + .bm-sub { margin-top: 18px; }
-.bm-sub span { color: var(--faint); text-transform: none; letter-spacing: 0; }
-.bm-grid { display: grid; grid-template-columns: repeat(8, 64px); gap: 4px; }
-.bm-slot { position: relative; width: 64px; height: 64px; display: flex; align-items: center; justify-content: center; background: var(--panel-2); border: 1px solid var(--line); cursor: pointer; }
-.bm-slot:hover, .bm-slot.hot { border-color: rgba(233,228,216,.38); }
-.bm-slot.on { border-color: var(--amber); box-shadow: inset 0 -2px 0 var(--amber); }
-.bm-slot svg { width: 36px; height: 36px; }
-.bm-slot.mat svg { width: 52px; height: 26px; }
-.bm-slot b { position: absolute; right: 5px; bottom: 3px; font: 11px var(--mono); color: var(--dim); font-weight: 400; }
-.bm-slot.short svg { opacity: .32; }
-.bm-slot.short b { color: var(--red); }
-.bm-slot.short { border-color: rgba(216,73,59,.4); }
-#bm-tip .bad { color: var(--red); }
-#bm-cursor { position: fixed; z-index: 60; width: 14px; height: 20px; pointer-events: none; display: none; filter: drop-shadow(0 1px 1px rgba(0,0,0,.7)); }
-#bm-tip span { color: var(--faint); margin-left: 8px; }
 .inv-tabs { display: flex; gap: 2px; padding: 0 14px; border-bottom: 1px solid var(--line); flex: none; overflow-x: auto; scrollbar-width: none; }
 .inv-tab { padding: 10px 14px 9px; color: var(--dim); font-family: inherit; font-size: 15px; font-weight: 600; border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; background: none; cursor: pointer; }
 .inv-tab small { color: var(--faint); font-size: 11px; margin-left: 4px; }
@@ -412,8 +394,6 @@ body.waking #hud > * { visibility: hidden; }
 #rmb-hint { display: none; align-items: center; justify-content: flex-end; gap: 6px; margin-top: 4px; font-size: 11px; color: var(--dim); }
 #rmb-hint.on { display: flex; }
 #rmb-hint svg { width: 11px; height: 15px; }
-#rmb-hint .fill { transform-box: fill-box; transform-origin: bottom; transform: scaleY(var(--p, 0)); }
-#rmb-hint b { color: var(--faint); font-weight: 400; }
 #inv-list .empty { grid-column: 1 / -1; color: var(--faint); font: 14px var(--mono); padding: 14px 12px; }
 #inv-detail { font-family: var(--mono); }
 /* The crew: each of them a row down the left, and the one picked laid out in full on the right, with what can be bought for them. */
@@ -689,7 +669,7 @@ body.talking #hud > *:not(#caption) { visibility: hidden; }
   <div id="weapon-box">
     <div id="ammo"></div>
     <div id="wname"></div>
-    <div id="rmb-hint"><svg viewBox="0 0 11 15" aria-hidden="true"><rect x=".5" y=".5" width="10" height="14" rx="4.5" fill="none" stroke="currentColor"/><path d="M5.5 1v6" stroke="currentColor"/><path d="M6 1.2a4 4 0 0 1 4 4V7H6z" fill="currentColor" opacity=".35"/><path class="fill" d="M6 1.2a4 4 0 0 1 4 4V7H6z" fill="var(--amber)"/></svg><span>Change material</span><b>/</b><span>Hold for build menu</span></div>
+    <div id="rmb-hint"><svg viewBox="0 0 11 15" aria-hidden="true"><rect x=".5" y=".5" width="10" height="14" rx="4.5" fill="none" stroke="currentColor"/><path d="M5.5 1v6" stroke="currentColor"/><path d="M6 1.2a4 4 0 0 1 4 4V7H6z" fill="currentColor" opacity=".35"/></svg><span>Change material</span></div>
     <div id="hotbar"></div>
   </div>
   <div id="prompt"></div>
@@ -819,7 +799,7 @@ body.talking #hud > *:not(#caption) { visibility: hidden; }
       <div class="controls-grid">
         <span class="kbd">WASD</span><span>Move</span><span class="kbd">Shift</span><span>Sprint</span>
         <span class="kbd">Space</span><span>Jump / swim up</span><span class="kbd">C</span><span>Crouch (quieter)</span>
-        <span class="kbd">LMB</span><span>Fire, swing, throw, place</span><span class="kbd">RMB</span><span>Aim, place block</span>
+        <span class="kbd">LMB</span><span>Fire, swing, throw, place</span><span class="kbd">RMB</span><span>Aim, change material</span>
         <span class="kbd">R</span><span>Reload</span><span class="kbd">E</span><span>Search, talk, trade</span>
         <span class="kbd">1-9 / Wheel</span><span>Change weapon</span><span class="kbd">G</span><span>Quick grenade</span>
         <span class="kbd">H</span><span>Quick heal</span><span class="kbd">F</span><span>Flashlight (nights are dark)</span>
@@ -846,20 +826,6 @@ body.talking #hud > *:not(#caption) { visibility: hidden; }
       <button id="p-menu">Save and quit to menu</button>
     </div>
   </div>
-</div>
-
-<div id="buildmenu" class="screen center">
-  <div class="panel" id="bm-panel">
-    <div class="panel-head"><h2>Build</h2><span class="mono" style="color:var(--faint);font-size:12px">Tap right-click to change material</span></div>
-    <div class="panel-body">
-      <div class="bm-sub">Materials</div>
-      <div class="bm-grid" id="bm-mats"></div>
-      <div class="bm-sub">Structures <span id="bm-matname"></span></div>
-      <div class="bm-grid" id="bm-pieces"></div>
-    </div>
-    <div class="s-hint" id="bm-tip"></div>
-  </div>
-  <svg id="bm-cursor" viewBox="0 0 14 20"><path d="M1 1v15l4-4 3 7 3-1-3-7h5z" fill="#e9e4d8" stroke="#111" stroke-width="1"/></svg>
 </div>
 
 <div id="inventory" class="screen center">

@@ -9,3 +9,6 @@ desktop.ini
 .DS_Store
 *.log
 node_modules/
+
+# Written by desktop/stamp-version.js for Steam builds only
+version.txt

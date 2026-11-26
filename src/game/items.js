@@ -63,25 +63,8 @@ export const ITEMS = {
   metrocard: { name: 'Albion Transit Pass', type: 'junk', value: 1, weight: .01, stack: true, desc: 'Insufficient fare.' },
 };
 
-// Building: the three materials, and the things you can put up from them in one go. A piece is laid out from where you aim, the way you
-// face: u to your right, v up, w away from you. It costs a block for every cell of it that is not already filled. `view` is which side
-// its icon shows it from.
+// Building: the materials, a block at a time.
 export const BLOCKS = ['block_wood', 'block_log', 'block_brick', 'block_conc', 'block_stone', 'block_sandbag', 'block_tin', 'block_steel', 'block_glass'];
-const span = (a, b) => { const o = []; for (let k = a; k <= b; k++) o.push(k); return o; };
-const cellsOf = (fn) => { const o = []; for (const u of span(-3, 3)) for (const v of span(0, 4)) for (const w of span(0, 5)) if (fn(u, v, w)) o.push([u, v, w]); return o; };
-export const BUILD_PIECES = [
-  // Sized to you: you stand nearly three blocks tall, so a wall is four, a doorway three high, and a window is at your eyes.
-  { id: 'wall', name: 'Wall', view: 'front', cells: cellsOf((u, v, w) => w === 0 && Math.abs(u) <= 2 && v <= 3) },
-  { id: 'door', name: 'Doorway', view: 'front', cells: cellsOf((u, v, w) => w === 0 && Math.abs(u) <= 2 && v <= 3 && !(u === 0 && v <= 2)) },
-  { id: 'window', name: 'Window', view: 'front', cells: cellsOf((u, v, w) => w === 0 && Math.abs(u) <= 2 && v <= 3 && !(Math.abs(u) <= 1 && v === 2)) },
-  { id: 'low', name: 'Barricade', view: 'front', cells: cellsOf((u, v, w) => w === 0 && Math.abs(u) <= 2 && v <= 1) },
-  { id: 'pillar', name: 'Pillar', view: 'front', cells: cellsOf((u, v, w) => w === 0 && u === 0 && v <= 4) },
-  { id: 'floor', name: 'Floor', view: 'top', cells: cellsOf((u, v, w) => v === 0 && Math.abs(u) <= 2 && w <= 4) },
-  { id: 'stairs', name: 'Stairs', view: 'side', cells: cellsOf((u, v, w) => Math.abs(u) <= 1 && w <= 3 && v <= w) },
-  // Six across, so the way in can be two wide in the middle of the front.
-  { id: 'shed', name: 'Shed', view: 'front', cells: cellsOf((u, v, w) => u >= -2 && u <= 3 && w <= 4 && (v === 4 || (v <= 3 && (u === -2 || u === 3 || w === 0 || w === 4) && !(w === 0 && (u === 0 || u === 1) && v <= 2)))) },
-];
-for (const p of BUILD_PIECES) p.cost = p.cells.length;
 
 export const WEAPON_ORDER = ['crowbar', 'axe', 'sledge', 'pistol', 'revolver', 'smg', 'shotgun', 'rifle', 'deer', 'hunting', 'lmg', 'rocket', 'grenade', 'dynamite', 'block_wood', 'block_conc', 'block_steel', 'block_brick', 'block_log', 'block_sandbag', 'block_tin', 'block_stone', 'block_glass'];
 

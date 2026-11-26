@@ -2,7 +2,7 @@
 // Vertex layout (8 bytes): x,y,z,normal | id,ao,sky,lift (bit 0 on a grass block's top edge: the shader raises it in the wind;
 // bit 1 on leaves meshed for distance, which hold still)
 import { CS, WX, WZ, STREET_Y, G } from './constants.js';
-import { FLAGS, F_GLASS, F_LEAF, F_CLOTH, M, PANE } from './materials.js';
+import { FLAGS, F_GLASS, F_LEAF, F_CLOTH, F_FLAG, M, PANE } from './materials.js';
 
 const P = CS + 2;
 const PP = P * P;
@@ -157,6 +157,9 @@ export function makeMesher(L) {
               // Leaves and crops can be walked into, so with your head in one you are looking at everything round it from the inside:
               // the faces of the leaves next to it, the branch it grows off, the ground under a crop. Those are drawn, not culled.
               if (!vis && (FLAGS[nb] & F_LEAF) && !(TREE_LEAF[nb] && TREE_LEAF[id])) vis = true;
+              // Anything that moves (leaves, cloth, a flag) keeps its faces against what does not, and what does not keeps its faces
+              // against it: when it swings off a wall, a branch or its pole, there is a side behind it and not a hole into nothing.
+              if (!vis && ((FLAGS[id] & (F_LEAF | F_CLOTH)) || (FLAGS[nb] & F_CLOTH)) && (FLAGS[id] & (F_LEAF | F_CLOTH)) !== (FLAGS[nb] & (F_LEAF | F_CLOTH))) vis = true;
               // Grass beside a path or anything else at the same height: its side is drawn too, so when the wind lifts the grass there is
               // a side under it and not a slit.
               if (!vis && ny === 0 && WAVE[id] && !WAVE[nb] && !at(x, y + 1, z) && !at(x + nx, y + 1, z + nz)) vis = true;
@@ -194,7 +197,8 @@ export function makeMesher(L) {
           // Grass is kept to small pieces, so the wave can bend it. Leaves near enough to sway are kept to single faces: every corner
           // is then shared outright with the faces round it and they all move as one, where a big merged face would bend in a straight
           // line past its neighbours' corners and open slits between them.
-          const cap = WAVE[v & 255] ? 4 : !lod && (FLAGS[v & 255] & F_LEAF) ? 1 : !lod && (FLAGS[v & 255] & F_CLOTH) ? 1 : CS;
+          // A flag waves at any distance, so its faces are never merged: a big face would bend in a straight line past the ones round it.
+          const cap = WAVE[v & 255] ? 4 : !lod && (FLAGS[v & 255] & F_LEAF) ? 1 : (FLAGS[v & 255] & F_FLAG) || (!lod && (FLAGS[v & 255] & F_CLOTH)) ? 1 : CS;
           let w = 1;
           while (i + w < CS && w < cap && mask[i + w + j * CS] === v) w++;
           let h = 1;

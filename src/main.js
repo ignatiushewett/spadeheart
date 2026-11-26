@@ -37,7 +37,7 @@ const nextFrame = () => new Promise((r) => { requestAnimationFrame(r); setTimeou
 const DAY_SECONDS = 1500;
 const GARVEY_V = 5;        // which build of Carver Yard a save's edits belong to
 const WEST_V = 1;          // which lie of the land west of Weston a save's edits belong to (Mt Page and Fort Vigil moved south)
-const CAMPS_V = 3;         // which plan of the camps' insides a save's edits belong to (3: the bar and clinic face the lanes, St. Brigid's)
+const CAMPS_V = 4;         // which plan of the camps' insides a save's edits belong to (3: the bar and clinic face the lanes, St. Brigid's; 4: a deeper bar)
 const MAP_V = 4;           // where the settlements stand (2: B.S.R.C., St. Brigid's, Fort Vigil, Providence and the Docks moved; 3: and again, with Triage and Dayton Exchange; 4: Concord)
 // The ground that changed when they moved: Albion, Severn Bay and Dayton, whose streets go round the walls inside them, the fields Providence
 // moved across, and Triage's old and new ground by Gibson. (Out west is WEST_AREA's.)
@@ -741,13 +741,6 @@ class Game {
     });
     window.addEventListener('keyup', (e) => { I.keys[e.code] = false; });
     window.addEventListener('mousedown', (e) => {
-      // The build menu, if the mouse is still held by the game: its own pointer clicks the tiles, and right-click shuts it.
-      if (this.ui.modal === 'buildmenu' && this.locked) {
-        e.preventDefault();
-        if (e.button === 0) this.ui.buildClick();
-        else if (e.button === 2) this.resume();
-        return;
-      }
       if (this.state === 'play' && this.locked) {
         if (this.wakeFx) { e.preventDefault(); return; }
         I.mouse[e.button] = true;
@@ -757,11 +750,8 @@ class Game {
     });
     window.addEventListener('mouseup', (e) => {
       I.mouse[e.button] = false;
-      // The build menu opened with the button down. Some browsers keep the mouse until it comes up: let it go now.
-      if (this.ui.modal === 'buildmenu' && document.pointerLockElement) document.exitPointerLock();
     });
     window.addEventListener('mousemove', (e) => {
-      if (this.ui.modal === 'buildmenu') { if (this.locked) this.ui.buildCursor(e.movementX, e.movementY, true); else this.ui.buildCursor(e.clientX, e.clientY, false); return; }
       if (this.locked) { I.mouseDX += e.movementX; I.mouseDY += e.movementY; }
     });
     window.addEventListener('wheel', (e) => {
@@ -771,7 +761,6 @@ class Game {
     document.addEventListener('pointerlockchange', () => {
       const was = this.locked;
       this.locked = document.pointerLockElement === canvas;
-      if (this.ui.modal === 'buildmenu') this.ui.buildCursor(0, 0, this.locked);
       if (was && !this.locked && this.state === 'play' && !this.ui.modal && this.player.alive && !this.devOpen) this.pause();
     });
     canvas.addEventListener('click', () => { if (this.state === 'play' && !this.ui.modal) this.lock(); });
@@ -931,8 +920,6 @@ class Game {
     }
   }
 
-  // Right-click held with the building out: everything you can build, to pick from.
-  openBuildMenu() { if (!this.ui.modal && this.player.alive && !(this.bikes && this.bikes.ride)) this.openModal(() => this.ui.openBuild()); }
 
   // Where a settlement's speakers are: the bar's, loudest; one at the mechanic's; and the rest out where people live, among the beds.
   // Worked out once.
@@ -3588,7 +3575,8 @@ class Game {
 const game = new Game();
 window.ACEZ = game;
 // The version is the commit the game was last pulled or pushed at, read out of the copy's own git folder: the same code GitHub shows.
-// Where there is no git folder (a download of the files on their own), it is the version name instead.
+// Where there is no git folder, a build stamped by desktop/stamp-version.js (the Steam upload) shows the commit from its version.txt, and
+// anything else (a download of the files on their own) shows the version name.
 {
   const v = document.getElementById('menu-version');
   if (v) {
@@ -3603,7 +3591,10 @@ window.ACEZ = game;
           try { hash = await get(`.git/${ref}`); } catch { const packed = await get('.git/packed-refs'); hash = (packed.split(/\r?\n/).find((l) => l.endsWith(` ${ref}`)) || '').split(' ')[0]; }
         }
         if (/^[0-9a-f]{7,40}$/.test(hash || '')) v.textContent = hash.slice(0, 7);
-      } catch { /* no git folder here: keep the version name */ }
+      } catch {
+        // No git folder here: the stamped commit if there is one, else keep the version name.
+        try { const s = await get('version.txt'); if (/^[0-9a-f]{7,40}$/.test(s)) v.textContent = s.slice(0, 7); } catch { /* not stamped */ }
+      }
     })();
   }
 }

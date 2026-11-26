@@ -854,7 +854,7 @@ export class CampSim {
     const by = (m) => `${m.name}, ${m.title}`;
     for (const m of cast) {
       if (isPastor(m)) {
-        own.push([by(m), 'Service in the church from nine. All are welcome, whatever you believe.'], [by(m), 'I am asking for volunteers to sit with the sick tonight. Nobody should be alone in there.'], [by(m), 'The church stays open all night for anyone who cannot sleep. Come in out of the dark.']);
+        own.push([by(m), 'Service in the church from nine in the morning until five in the afternoon. All are welcome, whatever you believe.'], [by(m), 'I am asking for volunteers to sit with the sick tonight. Nobody should be alone in there.'], [by(m), 'The church stays open all night for anyone who cannot sleep. Come in out of the dark.']);
         if (s.buried > 0) own.push([by(m), 'We hold a memorial at sundown for the ones we lost. I will read the names.']);
       } else if (m.role === 'general') {
         own.push([by(m), `Fresh ${pickFrom(['beans', 'bandages', 'tinned peaches', 'batteries', 'rice', 'candles'])} in at the counter. First come, first served.`], [by(m), `I am short on ${pickFrom(['salt', 'soap', 'matches', 'thread'])}. Bring some in and I will pay over the odds.`], [by(m), 'Trading at the counter until dark. Fair weights and no credit.']);
@@ -883,7 +883,7 @@ export class CampSim {
     if (late) own.push([`${bar[0]} ${bar[1]}, Bar`, `Card game tonight. ${name()} is dealing.`], [`${bar[0]} ${bar[1]}, Bar`, 'Open late. The first round is on nobody.']);
     if (!cast.some(isPastor) && c.spots.pulpit) {
       const rev = this.civName(c, 'pastor');
-      own.push([`${rev[0]} ${rev[1]}, Pastor`, 'Service in the church from nine. All are welcome, whatever you believe.'], [`${rev[0]} ${rev[1]}, Pastor`, 'I am asking for volunteers to sit with the sick tonight. Nobody should be alone in there.']);
+      own.push([`${rev[0]} ${rev[1]}, Pastor`, 'Service in the church from nine in the morning until five in the afternoon. All are welcome, whatever you believe.'], [`${rev[0]} ${rev[1]}, Pastor`, 'I am asking for volunteers to sit with the sick tonight. Nobody should be alone in there.']);
     }
     if (s.buried > 0 && !own.some((o) => /memorial/.test(o[1]))) relayed.push(`A memorial at sundown for the ones we lost. ${name()} is reading the names.`);
 

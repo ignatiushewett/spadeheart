@@ -1,7 +1,7 @@
 // First-person player: movement, voxel collision, weapons, inventory and vitals.
 import { WATER_Y, WX, WZ } from '../shared/constants.js';
 import { M, FLAGS, F_GLASS, isLoot, isBed } from '../shared/materials.js';
-import { ITEMS, WEAPON_ORDER, BLOCKS, BUILD_PIECES, startingGear } from './items.js';
+import { ITEMS, WEAPON_ORDER, BLOCKS, startingGear } from './items.js';
 import { clamp, damp } from '../engine/math.js';
 import { SKIN_TONE_COUNT } from './viewmodel.js';
 
@@ -182,14 +182,12 @@ export class Player {
   // Whether you have any of something to hold: the sandbox always has every building material.
   has(id) { return this.count(id) > 0 || (ITEMS[id]?.type === 'block' && this.freeBuild()); }
 
-  // Building is one item: whichever material you have picked, held as a single block or as a piece to put up whole.
+  // Building is one item: whichever material you have picked, a block at a time.
   blockPick() {
     if (ITEMS[this.weapon]?.type === 'block' && this.has(this.weapon)) return this.weapon;
     if (this.lastBlock && this.has(this.lastBlock)) return this.lastBlock;
     return BLOCKS.find((id) => this.has(id)) || null;
   }
-
-  buildPiece() { return this.piece ? BUILD_PIECES.find((p) => p.id === this.piece) || null : null; }
 
   // B gets the building out, or with it already out, changes the material, the same as a tap of right-click.
   selectBlocks() {
@@ -680,15 +678,8 @@ export class Player {
         else if (this.cook > 0) this.throwItem(it, id);
       }
     } else if (it.type === 'block') {
-      // Right-click: a tap changes the material, held it brings up everything you can build.
-      if (rPressed) { this.rmbT = 0; this.rmbMenu = false; }
-      if (rmb && this.rmbT != null) {
-        this.rmbT += dt;
-        if (this.rmbT > .3 && !this.rmbMenu) { this.rmbMenu = true; this.g.openBuildMenu(); }
-      } else if (this.rmbT != null) {
-        if (!this.rmbMenu) this.cycleMaterial();
-        this.rmbT = null; this.rmbMenu = false;
-      }
+      // Right-click changes the material.
+      if (rPressed) this.cycleMaterial();
       if (this.swapT <= 0 && this.fireCd <= 0 && lmb) this.placeBlock(it, id, pressed);
     }
     // The melee tools and fists double as block cutters on RMB; placing uses the block kit.
@@ -996,8 +987,7 @@ export class Player {
     this.g.audio.simple('swing');
   }
 
-  // What placing would do right now: the cells it would fill, what it costs, and whether it can. A single block, or a whole piece laid out
-  // from the cell you are pointing at, square to the way you face.
+  // What placing would do right now: the cell it would fill, what it costs, and whether it can.
   buildPlan() {
     const g = this.g, it = ITEMS[this.weapon];
     if (!this.alive || !it || it.type !== 'block' || g.ui.modal || (g.bikes && g.bikes.ride)) return null;
@@ -1006,23 +996,13 @@ export class Player {
     if (!hit) return null;
     const x = hit.x + hit.nx, y = hit.y + hit.ny, z = hit.z + hit.nz;
     if (w.get(x, y, z)) return null;
-    const piece = this.buildPiece();
-    let cells;
-    if (!piece) cells = [[x, y, z]];
-    else {
-      const ax = Math.abs(f[0]) > Math.abs(f[2]), fx = ax ? Math.sign(f[0]) : 0, fz = ax ? 0 : Math.sign(f[2]) || 1, rx = -fz, rz = fx;
-      cells = [];
-      for (const [u, v, d] of piece.cells) {
-        const cx = x + u * rx + d * fx, cy = y + v, cz = z + u * rz + d * fz;
-        if (!w.get(cx, cy, cz)) cells.push([cx, cy, cz]);
-      }
-    }
+    const cells = [[x, y, z]];
     const have = this.freeBuild() ? Infinity : this.count(this.weapon), cost = cells.length;
     let why = null;
     if (!cost) why = 'Nothing to build there';
     else if (cells.some(([cx, cy, cz]) => this.cellTaken(cx, cy, cz))) why = 'Someone is in the way';
     else if (have < cost) why = `Needs ${cost} ${it.name}, you have ${have}`;
-    return { cells, cost, why, piece };
+    return { cells, cost, why };
   }
 
   // Nobody gets built into: not you, not anyone else, living or dead on their feet.
@@ -1065,16 +1045,14 @@ export class Player {
     const g = this.g, w = g.world;
     const plan = this.buildPlan();
     if (!plan) return;
-    // A piece goes up once per click; a block at a time can be held down.
-    if (plan.piece && !pressed) return;
     if (plan.why) { if (pressed) g.ui.toast(plan.why); return; }
     let placed = 0;
     for (const [x, y, z] of plan.cells) if (w.set(x, y, z, it.mat)) placed++;
     if (!placed) return;
     if (!this.freeBuild()) this.remove(id, placed);
-    this.fireCd = plan.piece ? .45 : .2;
+    this.fireCd = .2;
     const [x, y, z] = plan.cells[0], m = id === 'block_steel' ? 'steel' : id === 'block_conc' ? 'conc' : 'wood';
-    g.audio.simple(`${plan.piece ? 'build' : 'place'}_${m}`, x, y, z);
+    g.audio.simple(`place_${m}`, x, y, z);
     g.horde.nearDirty = true;
     g.stats.placed += placed;
   }
