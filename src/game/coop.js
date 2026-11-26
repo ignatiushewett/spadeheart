@@ -143,10 +143,9 @@ export class Coop {
   }
 
   render() {
-    const body = document.getElementById('coop-body'), foot = document.getElementById('coop-foot'), via = document.getElementById('coop-via');
+    const body = document.getElementById('coop-body'), foot = document.getElementById('coop-foot');
     if (!body || this.g.ui.modal !== 'coop') return;
     const n = this.net, esc = (s) => String(s).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
-    via.textContent = n ? `${n.label}: ${n.selfName}` : '';
     let html = '', ft = '';
     if (this.view === 'browse' && n && n.usesCodes) {
       html += '<div class="coop-note">Host to get a room code. Friends join with it.</div>';
@@ -185,16 +184,17 @@ export class Coop {
         const name = me ? n.selfName : (this.names && this.names[id]) || shared[id] || (isHost ? (L.data && L.data.name) : '') || 'Joining...';
         left += `<div class="coop-slot${me ? ' me' : ''}"><span class="idx">${i + 1}</span><b>${esc(name)}</b>${isHost ? '<span class="host">(Host)</span>' : ''}</div>`;
       }
+      if (L && L.code) left += `<div class="coop-code"><span>Room code</span><b>${esc(L.code)}</b>${this.host ? '<button class="btn" id="coop-copy">Copy</button>' : ''}</div>`;
       // Top right, a look at where the game starts: the settlement picked, or for Random, all of them.
       const S = this.host ? this.settings : this.lobbySettings(L);
       const at = !S ? null : S.camp === 'random' ? { key: 'random', name: 'Random' } : this.g.layout.camps.find((c) => c.key === S.camp);
       const map = at ? `<div class="coop-map"><img src="images/camps/${esc(at.key)}.jpg" alt=""><span>${esc(at.name)}</span></div>` : '';
-      let right = '<div class="coop-top"><div><div class="ng-label" style="margin-top:0">Game</div>';
-      if (L && L.code) right += `<div class="coop-code"><span>Room code</span><b>${esc(L.code)}</b>${this.host ? '<button class="btn" id="coop-copy">Copy</button>' : ''}</div>`;
+      let right = map;
+      left += '<div class="ng-label">Game</div>';
       const commit = String(this.version()).split(':')[1] || '';
       const state = this.host ? (n.usesCodes ? (n.roomOpen ? 'Open' : 'Reconnecting...') : 'Open') : this.hostStarted ? 'In game. Joining...' : 'Waiting for the host';
-      right += `<div class="coop-kv"><span>Status</span><b>${state}</b></div><div class="coop-kv"><span>Players</span><b>${ids.length} / ${max}</b></div><div class="coop-kv"><span>Connection</span><b>${esc(n.label)}</b></div>${commit ? `<div class="coop-kv"><span>Version</span><b>${esc(commit)}</b></div>` : ''}</div>${map}</div>`;
-      right += '<div class="ng-label">Settings</div>';
+      left += `<div class="coop-kv"><span>Status</span><b>${state}</b></div><div class="coop-kv"><span>Players</span><b>${ids.length} / ${max}</b></div><div class="coop-kv"><span>Connection</span><b>${esc(n.label)}</b></div>${commit ? `<div class="coop-kv"><span>Version</span><b>${esc(commit)}</b></div>` : ''}`;
+      right += `<div class="ng-label"${map ? '' : ' style="margin-top:0"'}>Settings</div>`;
       if (S) {
         const cur = RANGES.find((q) => q.r === S.range) || RANGES[1], preset = presetOf(S);
         const rows = [
@@ -259,7 +259,6 @@ export class Coop {
       if (!v) return;
       n.selfName = v;
       try { localStorage.setItem('spadeheart.coopName', v); } catch { /* private mode */ }
-      via.textContent = `${n.label}: ${n.selfName}`;
     });
   }
 
