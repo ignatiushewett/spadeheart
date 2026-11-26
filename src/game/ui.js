@@ -423,7 +423,7 @@ export class UI {
     const pct = (v) => `${Math.round(v * 100)}%`;
     const shows = {
       view: (v) => `${v}`, scale: pct, cap: (v) => fmt(v), fov: (v) => `${v}`, sens: (v) => v.toFixed(2), volume: pct, music: pct,
-      grain: (v) => (v > 0 ? pct(v) : 'Off'), uiScale: pct, uiAlpha: pct, brightness: pct, sway: (v) => (v > 0 ? pct(v) : 'Off'), bob: (v) => (v > 0 ? pct(v) : 'Off'), shake: (v) => (v > 0 ? pct(v) : 'Off'),
+      grain: (v) => (v > 0 ? pct(v) : 'Off'), uiScale: pct, uiAlpha: pct, brightness: pct, vibrance: pct, sway: (v) => (v > 0 ? pct(v) : 'Off'), bob: (v) => (v > 0 ? pct(v) : 'Off'), shake: (v) => (v > 0 ? pct(v) : 'Off'),
       adsSens: (v) => `×${v.toFixed(2)}`,
     };
     // After any change: what has to happen beyond storing the value.
@@ -433,6 +433,7 @@ export class UI {
       uiScale: () => document.documentElement.style.setProperty('--ui-scale', s.uiScale),
       uiAlpha: () => document.documentElement.style.setProperty('--ui-alpha', s.uiAlpha ?? 1),
       drips: () => { if (!s.drips) g.drips.clear(); },
+      vibrance: () => g.applyLight(), brightness: () => g.applyLight(),
       view: () => g.applySettings(false), scale: () => g.applySettings(false), motion: () => g.applySettings(false), dof: () => g.applySettings(false),
     };
     // Every range and checkbox carries the name of its setting; they all work the same way.

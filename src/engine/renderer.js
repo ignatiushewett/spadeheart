@@ -1188,6 +1188,7 @@ export class Renderer {
       gl.uniform1f(p.u.uAspect, w / h);
       gl.uniform1f(p.u.uHurt, fx.hurt || 0);
       gl.uniform1f(p.u.uSat, fx.sat ?? .74);
+      if (p.u.uVibrance) gl.uniform1f(p.u.uVibrance, this.vibrance ?? 1);
       gl.uniform1f(p.u.uTime, this.time);
       gl.uniform1f(p.u.uFlash, fx.flash || 0);
       if (p.u.uGlare) gl.uniform1f(p.u.uGlare, this.glare || 0);

@@ -2309,6 +2309,7 @@ uniform vec3 uFlareData; // sun uv.xy, visibility
 uniform float uAspect;
 uniform float uHurt;
 uniform float uSat;
+uniform float uVibrance;
 uniform float uTime;
 uniform float uFlash;
 uniform float uGlare;   // staring into the sun
@@ -2393,6 +2394,13 @@ void main(){
   // Soft toe and shoulder.
   col=mix(col,col*col*(3.-2.*col),.42);
   col*=vec3(.965,.995,1.005);   // a shade on the cool side overall
+  // Vibrance, the player's setting. At 1 the picture is exactly as graded. Above it the duller colours are lifted the most (grey
+  // streets and skin more than what is already strong); below it, colour drains out evenly.
+  if(uVibrance!=1.){
+    float vL=dot(col,vec3(.299,.587,.114)), vS=max(col.r,max(col.g,col.b))-min(col.r,min(col.g,col.b));
+    float vk=uVibrance>1.?1.+(uVibrance-1.)*(1.-clamp(vS*1.6,0.,1.)):uVibrance;
+    col=clamp(mix(vec3(vL),col,vk),0.,1.);
+  }
   // Vignette, hurt pulse, infection tint.
   float vig=smoothstep(.95,.15,r2*1.7);
   col*=mix(.42,1.,vig);

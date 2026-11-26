@@ -744,7 +744,7 @@ body.talking #hud > *:not(#caption) { visibility: hidden; }
     <button id="m-continue" disabled>Continue</button>
     <button id="m-chars">Characters</button>
     <button id="m-sandbox">Sandbox</button>
-    <button id="m-coop">Co-op</button>
+    <button id="m-coop">Multiplayer</button>
     <button id="m-settings">Settings</button>
     <button id="m-controls">Controls</button>
     <button id="m-quit" style="display:none">Quit</button>
@@ -764,7 +764,7 @@ body.talking #hud > *:not(#caption) { visibility: hidden; }
 
 <div id="coop" class="screen center">
   <div class="panel" id="coop-panel" style="width:min(620px,94vw);max-height:96vh;overflow:auto">
-    <div class="panel-head"><h2>Co-op</h2><span id="coop-via" class="mono" style="color:var(--dim);font-size:12px"></span></div>
+    <div class="panel-head"><h2>Multiplayer</h2><span id="coop-via" class="mono" style="color:var(--dim);font-size:12px"></span></div>
     <div class="panel-body" id="coop-body"></div>
     <div class="panel-foot" id="coop-foot"></div>
   </div>
@@ -793,6 +793,7 @@ body.talking #hud > *:not(#caption) { visibility: hidden; }
         <div class="row" data-hint="Sets field of view, camera shake, film grain, HUD scale and interface opacity together. Cinematic is tighter and rougher with a lighter HUD; Casual is wide and steady with the HUD at full size."><label>Style</label><select id="s-look"><option value="cinematic">Cinematic</option><option value="casual">Casual</option><option value="custom" disabled>Custom</option></select><span></span></div>
         <div class="row" data-hint="How much of the city you see at once, in degrees. Wider shows more but makes things smaller."><label>Field of view</label><input type="range" id="s-fov" data-k="fov" min="60" max="120" step="1"><output id="s-fov-o"></output></div>
         <div class="row" data-hint="Lifts or darkens the whole picture. Nights are meant to be dark; raise this if you cannot see anything at all."><label>Brightness</label><input type="range" id="s-bright" data-k="brightness" min="0.6" max="1.6" step="0.05"><output id="s-bright-o"></output></div>
+        <div class="row" data-hint="How strong the colours are. 100% is the game's own look. Higher brings out the duller colours most; lower drains them."><label>Vibrance</label><input type="range" id="s-vibrance" data-k="vibrance" min="0" max="2" step="0.05"><output id="s-vibrance-o"></output></div>
         <div class="row" id="s-vsync-row" style="display:none" data-hint="Off lets the frame rate go past your screen's refresh rate (the default). On holds it to the refresh rate. Takes effect when you next start the game."><label>V-Sync</label><select id="s-vsync"><option value="off">Off</option><option value="on">On</option></select><span></span></div>
         <div class="row" data-hint="Caps the frame rate. Saves power and heat on a laptop."><label>FPS limit</label><select id="s-fps"><option value="0">Off</option><option value="30">30</option><option value="60">60</option><option value="90">90</option><option value="120">120</option><option value="144">144</option></select><span></span></div>
         <div class="row" data-hint="How much your view and your gun sway as you walk."><label>View bobbing</label><input type="range" id="s-bob" data-k="bob" min="0" max="1.5" step="0.05"><output id="s-bob-o"></output></div>

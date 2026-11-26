@@ -165,7 +165,7 @@ class Game {
 
   defaultSettings() {
     return { ...LOOKS.cinematic, quality: 'ultra', view: 416, scale: 1, cap: 24000, sens: 1, volume: .8, motion: false, dof: true, fpsCap: 0, muteSiren: false, clock24: false, drips: true, grassWave: false, sway: 1, minimap: true, chatterNoHud: true, hitmarker: false, crosshair: false,
-      bob: 1, music: 1, adsSens: 1, invertY: false, toggleAim: false, toggleCrouch: false, showFps: false, defaultsV: 8 };
+      bob: 1, music: 1, vibrance: 1, adsSens: 1, invertY: false, toggleAim: false, toggleCrouch: false, showFps: false, defaultsV: 8 };
   }
 
   loadSettings() {
@@ -217,7 +217,7 @@ class Game {
     I.toggleAim = !!s.toggleAim;
     I.toggleCrouch = !!s.toggleCrouch;
     this.audio.setVolume(s.volume, s.music ?? 1);
-    if (this.renderer) this.renderer.brightness = s.brightness ?? 1;
+    if (this.renderer) { this.renderer.brightness = s.brightness ?? 1; this.renderer.vibrance = s.vibrance ?? 1; }
   }
 
   setQualityPreset(key) {
@@ -2218,7 +2218,7 @@ class Game {
         P.dlg.flags.introDone = true;
         this.saveGame();
         if (kit === 'survival') { this.wakeUp(c, bed, () => {}); return; }
-        this.ui.banner(c.name, 'Co-op. Your kit is on you.');
+        this.ui.banner(c.name, 'Multiplayer. Your kit is on you.');
         return;
       }
       // The sandbox skips the introductions: you walk in already carrying your kit, and nobody sends you to see anyone.

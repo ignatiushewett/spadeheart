@@ -29,11 +29,11 @@ export const RANGES = [
 const RANGE_DEFAULT = 72;
 const RESPAWNS = [5, 12, 30];
 // What everyone starts with (the kits of the main game), and where the dead come back.
-const LOADOUTS = [['survival', 'Survival'], ['drifter', 'Hard'], ['regular', 'Medium'], ['veteran', 'Easy'], ['creative', 'Creative']];
+const LOADOUTS = [['survival', 'Standard'], ['drifter', 'Hard'], ['regular', 'Medium'], ['veteran', 'Easy'], ['creative', 'Creative']];
 const SPAWNS = [['with', 'With a player'], ['away', 'Away from everyone']];
 // Ready-made sets of settings. Changing any one of them after makes it Custom.
 const PRESETS = {
-  survival: { name: 'Survival', note: 'The standard game: the survival kit in Carver Yard, lose what you carry, come back beside a player.', set: { loadout: 'survival', camp: 'garvey', keep: false, ff: true, spawn: 'with', respawn: 12, range: 72 } },
+  survival: { name: 'Survival', note: 'The standard game: the standard kit in Carver Yard, lose what you carry, come back beside a player.', set: { loadout: 'survival', camp: 'garvey', keep: false, ff: true, spawn: 'with', respawn: 12, range: 72 } },
   deathmatch: { name: 'Deathmatch', note: 'A full kit in a random settlement, keep what you carry, friendly fire, room to spread out, and come back away from everyone.', set: { loadout: 'veteran', camp: 'random', keep: true, ff: true, spawn: 'away', respawn: 5, range: 104 } },
   creative: { name: 'Creative', note: 'Every weapon and endless building blocks, keep what you carry, no friendly fire.', set: { loadout: 'creative', keep: true, ff: false, spawn: 'with', respawn: 5, range: 72 } },
 };
@@ -207,7 +207,7 @@ export class Coop {
           else right += `<div class="coop-kv"><span>${label}</span><b>${esc((opts.find(([v]) => String(v) === String(val)) || [, val])[1])}</b></div>`;
         }
         const note = preset !== 'custom' ? PRESETS[preset].note : 'Custom settings.';
-        right += `<div class="coop-note">${note} Guest range: ${cur.note.toLowerCase()}${this.host && this.coopSave ? ` Continue picks up your last co-op game (day ${this.coopSave.day}).` : ''}</div>`;
+        right += `<div class="coop-note">${note} Guest range: ${cur.note.toLowerCase()}${this.host && this.coopSave ? ` Continue picks up your last multiplayer game (day ${this.coopSave.day}).` : ''}</div>`;
         void camp;
       } else right += '<div class="coop-note">The host\'s settings show here.</div>';
       html += `<div class="coop-lobby"><div>${left}</div><div>${right}</div></div>`;
@@ -277,10 +277,9 @@ export class Coop {
     this.render();
   }
 
-  // The host's settings, as last chosen on this computer.
+  // The host's settings: every new lobby starts on the Survival preset.
   loadSettings() {
-    let s = {};
-    try { s = JSON.parse(localStorage.getItem('spadeheart.coopSettings2') || '{}') || {}; } catch { /* private mode, or nothing saved */ }
+    const s = { ...PRESETS.survival.set };
     const camps = this.g.layout.camps;
     this.settings = {
       range: RANGES.some((q) => q.r === s.range) ? s.range : RANGE_DEFAULT,
@@ -463,7 +462,7 @@ export class Coop {
     g.pickups = [];
     g.spawnPending = false;
     this.installGuest();
-    g.beginLoad(`Joining ${w.host}`, () => g.ui.banner('Co-op', `Playing with ${w.host}. ${w.char ? 'Your items are as you left them. ' : ''}Stay near them.`));
+    g.beginLoad(`Joining ${w.host}`, () => g.ui.banner('Multiplayer', `Playing with ${w.host}. ${w.char ? 'Your items are as you left them. ' : ''}Stay near them.`));
   }
 
   beginSession() {
