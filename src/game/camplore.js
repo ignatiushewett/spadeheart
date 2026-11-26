@@ -104,7 +104,7 @@ export const LORE = {
       },
       {
         id: 'dutch', name: 'Dutch Vandermeer', role: 'junk', title: 'Salvage Boss', weapon: 'shotgun', wardrobe: 'scrap',
-        greet: { first: 'Dutch. The yacht at North Cove used to belong to a hedge fund guy. Now it is about eleven hundred pounds of useful copper. You bring me scrap, I pay. Simple.', again: ['What did you drag in?', 'Tide brings me things. You bring me things. Everybody wins.'] },
+        greet: { first: 'Dutch. The yacht at the marina used to belong to a hedge fund guy. Now it is about eleven hundred pounds of useful copper. You bring me scrap, I pay. Simple.', again: ['What did you drag in?', 'Tide brings me things. You bring me things. Everybody wins.'] },
         topics: [{ id: 'hedge', ask: 'What happened to the hedge fund guy?', say: 'He offered me two million dollars for a seat on a raft. I took his watch. Lovely watch. It stopped in October, and I still wear it.' }],
       },
       {
@@ -299,7 +299,7 @@ export const LORE = {
       },
       {
         id: 'bella', name: 'Bella Donna', role: 'general', title: 'Kitchen Witch', weapon: 'machete', wardrobe: 'scrap',
-        greet: { first: 'Oh, you are skin and bones, darling. I used to do a show at the Pyramid Club, you know, until it fell over. Now I run the kitchen. Same audience, except these ones occasionally say thank you.', again: ['Have you eaten, darling?', 'Soup is soup. Do not ask.'] },
+        greet: { first: 'Oh, you are skin and bones, darling. I used to do a show at the Starlight in the Old Quarter, you know, until it fell over. Now I run the kitchen. Same audience, except these ones occasionally say thank you.', again: ['Have you eaten, darling?', 'Soup is soup. Do not ask.'] },
         topics: [{ id: 'show', ask: 'You still do a show?', say: 'Saturdays. You had better believe it, sweetheart. Sequins do not rot. The world can end if it wants, but I have still got a closing number, and it needs a full house.', standing: 1 }],
       },
       {
@@ -470,7 +470,7 @@ export const LORE = {
 
 // Anybody without a written part still has a life. These combine into a person.
 export const BEFORE = [
-  'I drove the M15 for twenty-two years. You would be amazed how much of this job is the same. Everybody is screaming, and you keep your eyes on the road.',
+  'I drove the 15 tram for twenty-two years. You would be amazed how much of this job is the same. Everybody is screaming, and you keep your eyes on the road.',
   'I was a paralegal on Exchange Avenue. I had just paid off my loans. I think about that a lot.',
   'I sold hot dogs outside Union Terminal. I know, right? Now I am a very important person.',
   'I taught fourth grade in Northgate. A few of them made it. I keep count.',
@@ -479,22 +479,22 @@ export const BEFORE = [
   'I ran a nail salon on Dayton Avenue. I am still doing nails, in a way, you would not believe how often somebody loses one.',
   'I dug the Weston Tunnel. Eleven years of it. I know what is under that ridge. Do not go through it at night.',
   'Stockbroker. No, really. I know. Nobody will trade me anything for it.',
-  'I delivered for Seamless. I can still tell you the fastest route between any two points in Albion. I was very, very good at it.',
-  'ConEd lineman. Everyone asks if I can get the power back on. I can do that, in about nine years, with a staff of twenty thousand.',
-  'I worked the Macy\'s perfume counter. It is amazing what I can still smell.',
-  'FDNY. Engine 7. I do not want to talk about the first week.',
-  'I was fourteen when this started. I do not know. I was at school. I guess this is what I do now.',
-  'I was a barista on Bedford and I had a podcast. I am so sorry.',
+  'I delivered takeaway on a bike. I can still tell you the fastest route between any two points in Albion. I was very, very good at it.',
+  'Power company lineman. Everyone asks if I can get the power back on. I can do that, in about nine years, with a staff of twenty thousand.',
+  'I worked the perfume counter at Hartley\'s on Exchange Avenue. It is amazing what I can still smell.',
+  'Albion Fire. Engine 7. I do not want to talk about the first week.',
+  'I am fifteen. Seven weeks ago I was worried about a maths test. I guess this is what I do now.',
+  'I was a barista on Quay Street and I had a podcast. I am so sorry.',
   'I was in the city for a conference. A weekend. I am from Omaha. I keep thinking I should call my boss.',
   'I cooked at a starred place in the Old Quarter. I am very happy to tell you what is wrong with what you are eating.',
-  'Pediatric nurse at Mount Sinai. I would rather talk about something else.',
+  'Pediatric nurse at St. Brigid\'s. I would rather talk about something else.',
 ];
 
 export const WEAPON_TALK = {
   pistol: 'A nine. It does not do much, but it has never let me down either, which is more than I can say for my brother.',
   rifle: 'Guard issue, off a kid who did not need it anymore. I clean it every night, and I say his name when I do it.',
   shotgun: 'My uncle\'s. He kept it for burglars. He would be thrilled.',
-  smg: 'Took it out of a wrecked ESU truck. It eats ammo like you would not believe, but I like having it near.',
+  smg: 'Took it out of a wrecked police tactical truck. It eats ammo like you would not believe, but I like having it near.',
   sniper: 'It is a deer rifle. There are a lot of deer up on the wall, if you take my meaning.',
   lmg: 'You carry this all day, and then you tell me about your back.',
   crossbow: 'Quiet, and I can reuse the bolts. Plus I look amazing.',
@@ -554,12 +554,12 @@ export const ACTIVITY_BARKS = {
   teach: ["Eyes up here, please.", "Seven times eight. Anyone?", "Who can tell me what that word means?"],
   class: ["Fifty-six!", "Can we go outside now?", "He's copying me!"],
   mourn: ["Miss you, you old fool.", "I lit one for you.", "Kids are fine. They ask about you."],
-  kid: ["You can't catch me!", "Tag, you're it!", "My dad got a hundred of them.", "I'm not scared. I'm not!", "Is that a real gun?", "Are you from outside? What's it like?", "That's not fair, I wasn't ready!"],
+  kid: ["You can't catch me!", "Tag, you're it!", "My dad got a hundred of them.", "I'm not scared. I'm not!", "Is that a real gun?", "Did you go past my school out there? Is it still there?", "That's not fair, I wasn't ready!"],
 };
 
 export const KID_BEFORE = [
-  'I was in third grade at P.S. 11. My teacher had a turtle. I hope somebody got the turtle.',
-  'I do not remember much about before. There was a lot of TV.',
+  'I was in third grade at Northgate Primary. My teacher had a turtle. I hope somebody got the turtle.',
+  'Before, I had my own room. Now I have a corner. I like the corner, actually.',
   'My mom says we are going home when it is over. I do not think she knows when that is.',
   'I was going to be a marine biologist. I still am. There is a lot of fish now.',
 ];

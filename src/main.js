@@ -3587,7 +3587,26 @@ class Game {
 
 const game = new Game();
 window.ACEZ = game;
-{ const v = document.getElementById('menu-version'); if (v) v.textContent = VERSION; }
+// The version is the commit the game was last pulled or pushed at, read out of the copy's own git folder: the same code GitHub shows.
+// Where there is no git folder (a download of the files on their own), it is the version name instead.
+{
+  const v = document.getElementById('menu-version');
+  if (v) {
+    v.textContent = VERSION;
+    (async () => {
+      const get = async (f) => { const r = await fetch(f, { cache: 'no-store' }); if (!r.ok) throw new Error(f); return (await r.text()).trim(); };
+      try {
+        const head = await get('.git/HEAD');
+        let hash = /^[0-9a-f]{40}$/.test(head) ? head : null;
+        const ref = head.startsWith('ref: ') ? head.slice(5) : null;
+        if (!hash && ref) {
+          try { hash = await get(`.git/${ref}`); } catch { const packed = await get('.git/packed-refs'); hash = (packed.split(/\r?\n/).find((l) => l.endsWith(` ${ref}`)) || '').split(' ')[0]; }
+        }
+        if (/^[0-9a-f]{7,40}$/.test(hash || '')) v.textContent = hash.slice(0, 7);
+      } catch { /* no git folder here: keep the version name */ }
+    })();
+  }
+}
 game.boot().catch((e) => {
   console.error(e);
   const el = document.getElementById('error');

@@ -4,7 +4,7 @@ import { M } from '../shared/materials.js';
 export const ITEMS = {
   // Melee and tools
   crowbar: { name: 'Crowbar', type: 'melee', value: 45, weight: 3, dmg: 42, rate: .78, range: 4.1, cleave: 1, blockDmg: 3, desc: 'Opens barricades, skulls and most arguments.' },
-  axe: { name: 'Fire Axe', type: 'melee', value: 150, weight: 5, dmg: 85, rate: 1.1, range: 4.5, cleave: 3, blockDmg: 5, desc: 'Off the wall of FDNY Engine 7.' },
+  axe: { name: 'Fire Axe', type: 'melee', value: 150, weight: 5, dmg: 85, rate: 1.1, range: 4.5, cleave: 3, blockDmg: 5, desc: 'Off the wall of Albion Fire, Engine 7.' },
   sledge: { name: 'Sledgehammer', type: 'melee', value: 240, weight: 8, dmg: 110, rate: 1.55, range: 4.7, cleave: 5, blockDmg: 16, desc: 'The best tool in town for rearranging walls.' },
   // Guns
   pistol: { name: '9mm Pistol', type: 'gun', ammo: 'ammo_pistol', value: 160, weight: 2, dmg: 30, rate: .17, mag: 15, reload: 1.2, spread: .011, kick: .013, range: 170, pierce: 1, noise: 80, blockDmg: 1, sound: 'pistol', desc: 'Sidearm from a dead cop. Reliable.' },
@@ -45,7 +45,7 @@ export const ITEMS = {
   whiskey: { name: 'Rye Whiskey', type: 'food', heal: 12, food: 5, value: 18, weight: .6, stack: true, desc: 'Cures nothing. +12 health.' },
   // Armour
   jacket: { name: 'Leather Jacket', type: 'armor', armor: .14, value: 90, weight: 3, desc: 'Bites have to work for it. 14% protection.' },
-  riot: { name: 'Riot Gear', type: 'armor', armor: .3, value: 420, weight: 7, desc: 'NYPD surplus. 30% protection.' },
+  riot: { name: 'Riot Gear', type: 'armor', armor: .3, value: 420, weight: 7, desc: 'Albion police surplus. 30% protection.' },
   tactical: { name: 'Plate Carrier', type: 'armor', armor: .45, value: 1200, weight: 10, desc: 'Guard issue with ceramic plates. 45% protection.' },
   // Upgrades
   flashlight: { name: 'Flashlight', type: 'tool', value: 38, weight: .4, desc: 'Press F to switch it on. Batteries are the least of your problems.' },

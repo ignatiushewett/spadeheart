@@ -25,7 +25,7 @@ export const MORE_TALK = {
     ["I counted the stars last night.", "How many?", "Lost count around two hundred.", "You can see more of them now.", "No lights anywhere. Only good thing about any of this."],
     ["Do you think they still feel anything?", "The dead?", "Yeah.", "I try not to think about it.", "I think about it every time I pull the trigger.", "Then stop thinking and keep pulling."],
     ["We should do a birthday thing for Ana.", "When is it?", "Thursday, she thinks.", "We could do a cake.", "Out of what?", "...We could do a card."],
-    ["The kids are calling the wall 'the fence' now.", "So?", "They don't remember there being no wall.", "Give it a year.", "That's what I'm afraid of."],
+    ["The kids are calling this place home now.", "So?", "Seven weeks. That's all it took.", "Give it a year.", "That's what I'm afraid of."],
     ["Don't go in the shed, there's a raccoon.", "A live one?", "Very live. Very angry.", "Can we eat it?", "You want to fight it for dinner, go ahead."],
     ["Long day?", "Every day is long now.", "They used to be short?", "They used to be over at five."],
     ["I found a map of the whole state in an old gas station.", "Anything useful on it?", "Picnic areas. All the picnic areas.", "Well. In case we want a picnic.", "I've marked the good ones."],

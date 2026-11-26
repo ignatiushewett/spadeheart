@@ -1159,6 +1159,8 @@ export function alarmPostCells(x0, z0, x1, z1) {
   return out;
 }
 
+const WALL_EMBLEMS = false;
+
 export function stampCamp(c, ctx) {
   const { box, put, ox, oy, oz, CS, ground, car, letterAt } = ctx;
   const { x0, x1, z0, z1, H, hc, wall } = c;
@@ -1198,7 +1200,8 @@ export function stampCamp(c, ctx) {
         P(t, YB + 3, -4, M.LOG);
       }
       // Faction banners hang off the outside of the wall, large enough to read from down the street.
-      if (c.emblem && clearOfGate && t > a0 + 12 && t < a1 - 12) {
+      // (The settlement's emblem painted along its walls: off. The plain wall reads better.)
+      if (WALL_EMBLEMS && c.emblem && clearOfGate && t > a0 + 12 && t < a1 - 12) {
         const u = ((t % 56) + 56) % 56;
         if (u < 9) {
           const top = YB + H - 1;
