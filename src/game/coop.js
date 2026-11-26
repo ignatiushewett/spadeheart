@@ -33,9 +33,9 @@ const LOADOUTS = [['survival', 'Survival'], ['drifter', 'Hard'], ['regular', 'Me
 const SPAWNS = [['with', 'With a player'], ['away', 'Away from everyone']];
 // Ready-made sets of settings. Changing any one of them after makes it Custom.
 const PRESETS = {
-  survival: { name: 'Survival', note: 'The standard game: the survival kit in Carver Yard, lose what you carry, come back beside a player.', set: { loadout: 'survival', camp: 'garvey', keep: false, ff: true, spawn: 'with', respawn: 12 } },
-  deathmatch: { name: 'Deathmatch', note: 'A full kit in a random settlement, keep what you carry, friendly fire, and come back away from everyone.', set: { loadout: 'veteran', camp: 'random', keep: true, ff: true, spawn: 'away', respawn: 5 } },
-  creative: { name: 'Creative', note: 'Every weapon and endless building blocks, keep what you carry, no friendly fire.', set: { loadout: 'creative', keep: true, ff: false, spawn: 'with', respawn: 5 } },
+  survival: { name: 'Survival', note: 'The standard game: the survival kit in Carver Yard, lose what you carry, come back beside a player.', set: { loadout: 'survival', camp: 'garvey', keep: false, ff: true, spawn: 'with', respawn: 12, range: 72 } },
+  deathmatch: { name: 'Deathmatch', note: 'A full kit in a random settlement, keep what you carry, friendly fire, room to spread out, and come back away from everyone.', set: { loadout: 'veteran', camp: 'random', keep: true, ff: true, spawn: 'away', respawn: 5, range: 104 } },
+  creative: { name: 'Creative', note: 'Every weapon and endless building blocks, keep what you carry, no friendly fire.', set: { loadout: 'creative', keep: true, ff: false, spawn: 'with', respawn: 5, range: 72 } },
 };
 const presetOf = (S) => Object.keys(PRESETS).find((k) => Object.entries(PRESETS[k].set).every(([key, v]) => S[key] === v)) || 'custom';
 const LORE_OK = (c) => !!CAMP_START[c.key];   // a settlement someone can start out in
@@ -523,7 +523,14 @@ export class Coop {
     const hitHuman = H.onHitHuman;
     this.hook(H, 'onHitHuman', (h) => (h.coopPeer ? this.bite(h.coopPeer) : hitHuman(h)));
     this.hostP = G.player;
+    this.hostUI = G.ui;
     this.hookDamage(G.player);
+    const crewRadio = G.ui.crewRadio;
+    this.hook(G.ui, 'crewRadio', function (who, text) {
+      const out = crewRadio.call(this, who, text);
+      if (!who && g.inGame) g.sendAll({ t: 'say', id: g.net.selfId, name: G.player.charName || g.net.selfName, text });
+      return out;
+    });
     // A blast hurts any player near it, not only the host. (One a guest set off is worked out with that guest as the player, so it has
     // already hurt them; the host is hurt here instead.)
     const explode = G.explode;
@@ -532,13 +539,13 @@ export class Coop {
       const hp = g.hostP;
       if (G.player !== hp && hp.alive) {
         const d = Math.hypot(hp.x - x, hp.y + 1.2 - y, hp.z - z);
-        if (d < radius * 2.1 && W.los(x, y, z, hp.x, hp.y + 1.2, hp.z)) hp.damage(dmg * .24 * (1 - d / (radius * 2.1)), x, z, 'blast');
+        if (d < radius * 2.1 && W.los(x, y, z, hp.x, hp.y + 1.2, hp.z)) { g.nextBy = g.shooter ? g.shooter.name : null; hp.damage(dmg * .24 * (1 - d / (radius * 2.1)), x, z, 'blast'); }
       }
       for (const p of g.peers.values()) {
         const q = p.pose;
         if (!p.welcomed || !q || !q.alive || p.player === G.player) continue;
         const d = Math.hypot(q.x - x, q.y + 1.2 - y, q.z - z);
-        if (d < radius * 2.1 && W.los(x, y, z, q.x, q.y + 1.2, q.z)) g.send(p.id, { t: 'hurt', d: dmg * .24 * (1 - d / (radius * 2.1)), x, z, k: 'blast' });
+        if (d < radius * 2.1 && W.los(x, y, z, q.x, q.y + 1.2, q.z)) g.send(p.id, { t: 'hurt', d: dmg * .24 * (1 - d / (radius * 2.1)), x, z, k: 'blast', by: g.shooter ? g.shooter.name : hostile ? null : (G.player.charName || g.net.selfName) });
       }
       return out;
     });
@@ -918,6 +925,7 @@ export class Coop {
     else if (m.t === 'ui-float') { if (g.ui.dlgNpc && g.ui.modal !== 'dialog') g.ui.floatSay(g.ui.dlgNpc, String(m.text || '')); }
     else if (m.t === 'ui-sfx') g.audio.simple(m.k);
     else if (m.t === 'note') this.radioNote(String(m.who || ''), String(m.text || ''));
+    else if (m.t === 'own-line') this.ownLine(g.player.charName || this.net.selfName, String(m.text || '').slice(0, 300));
     else if (m.t === 'ui-radio') g.ui.radio(m.who || null, String(m.text || ''), m.station || null);
   }
 
@@ -969,6 +977,12 @@ export class Coop {
       radio(who, text, station = null) { fwd({ t: 'ui-radio', who, text, station }); if (station) host.radio(who, text, station); },
       typeToast(text) { fwd({ t: 'ui-toast', text }); },
       typeOut(o) { if (o && o.send) o.send(); if (o && o.then) o.then(); },
+      crewRadio(who, text) {
+        if (who) { fwd({ t: 'ui-radio', who, text, station: 'Private Frequency' }); return; }
+        fwd({ t: 'own-line', text });
+        c.heard(p.id, p.name, text);
+        for (const o of c.peers.values()) if (o !== p && o.welcomed) c.send(o.id, { t: 'say', id: p.id, name: p.name, text });
+      },
       floatSay(n, text, secs) { if (n && (n === this.dlgNpc || n === this.tradeNpc)) fwd({ t: 'ui-float', text }); else host.floatSay(n, text, secs); },
       hitMarker() {}, damageIndicator() {},
     });
@@ -1166,13 +1180,17 @@ export class Coop {
     const text = String(raw || '').replace(/\s+/g, ' ').trim().slice(0, 120);
     if (!text || !this.inGame) return;
     const name = this.g.player.charName || this.net.selfName;
-    // On the group's frequency, as what you sent, and in the corner like anyone's, with the sound of it going out.
-    const g = this.g, au = g.audio, simple = au.simple;
-    g.campSim.logNews({ kind: 'crew', who: 'You', mine: true, text });
-    au.simple = function (kind, ...a) { return simple.call(this, kind === 'beep' ? 'sent' : kind, ...a); };
-    try { g.ui.radio(name, text, 'Private Frequency'); } finally { au.simple = simple; }
+    this.ownLine(name, text);
     if (this.host) this.sendAll({ t: 'say', id: this.net.selfId, name, text });
     else this.sendHost({ t: 'say', text });
+  }
+
+  // What you said, on the group's frequency and in the corner like anyone's, with the sound of it going out.
+  ownLine(name, text) {
+    const g = this.g, au = g.audio, simple = au.simple, ui = this.hostUI || g.ui;
+    g.campSim.logNews({ kind: 'crew', who: 'You', mine: true, text });
+    au.simple = function (kind, ...a) { return simple.call(this, kind === 'beep' ? 'sent' : kind, ...a); };
+    try { ui.radio(name, text, 'Private Frequency'); } finally { au.simple = simple; }
   }
 
   // Another player's words: a call on the group's frequency, and over their head for anyone near enough to hear.
@@ -1665,13 +1683,14 @@ export class Coop {
   // In co-op nobody dies for good. Dead, you wait out a short count, the others playing on, and come back: a guest beside the host, the
   // host beside a guest who is still alive, or, if there is none, at their settlement, with the guests brought along.
   onDeath() {
+    if (this.host && (this.g.player !== this.hostP || this.g.ui !== this.hostUI)) { setTimeout(() => this.onDeath(), 0); return; }
     const text = this.killText(this.g.player.charName || this.net.selfName, this.lastHit);
     if (this.host) this.feedAll(text); else this.sendHost({ t: 'died', text });
     const g = this.g, P = g.player, $ = (id) => document.getElementById(id);
     this.deadT = 0;
     if (this.host) this.hostDownAt = g.time;
     document.exitPointerLock();
-    document.querySelector('#death h1').textContent = `${P.charName || 'You'} died`;
+    document.querySelector('#death h1').textContent = 'You died';
     $('death-respawn').style.display = 'none';
     $('death-restart').style.display = 'none';
     $('death-menu').style.display = '';
@@ -1746,17 +1765,11 @@ export class Coop {
     for (const p of this.peers.values()) if (p.welcomed) this.send(p.id, { t: 'feed', text });
   }
 
-  // The kill feed: a line each, top right, gone after a few seconds.
+  // Who died and how: a call on the group's frequency, and in its log.
   killFeed(text) {
-    let box = document.getElementById('killfeed');
-    if (!box) { box = document.createElement('div'); box.id = 'killfeed'; (document.getElementById('hud') || document.body).appendChild(box); }
-    const line = document.createElement('div');
-    line.className = 'kf';
-    line.textContent = text;
-    box.appendChild(line);
-    while (box.children.length > 5) box.firstChild.remove();
-    setTimeout(() => line.classList.add('old'), 6000);
-    setTimeout(() => line.remove(), 7200);
+    if (!text) return;
+    this.g.campSim.logNews({ kind: 'crew', who: 'Group', mine: false, text });
+    (this.hostUI || this.g.ui).radio('Group', text, 'Private Frequency');
   }
 
   // The host and every guest dead at once (with at least one guest in the game).

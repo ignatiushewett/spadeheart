@@ -2512,7 +2512,15 @@ export class UI {
   crewType(text, done) { this.typeOut({ chan: 'crew', text, menu: false, send: () => this.crewRadio(null, text), then: done }); }
 
   // Radio traffic between the camps, heard wherever you are.
+  // Calls that come in together (a settlement shouting its alarm, say) are heard one after another, a moment apart, not all at once.
   radio(who, text, station = null) {
+    const now = performance.now(), at = Math.max(now, this.radioNextAt || 0);
+    this.radioNextAt = at + 1500;
+    if (at - now > 20) { setTimeout(() => this.showRadio(who, text, station), at - now); return; }
+    this.showRadio(who, text, station);
+  }
+
+  showRadio(who, text, station = null) {
     const box = $('toasts');
     const d = document.createElement('div');
     d.className = 'radio';

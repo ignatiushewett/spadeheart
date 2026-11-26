@@ -5807,12 +5807,13 @@ export class Jobs {
   // You tell the group what you have taken on, and a line of what it is.
   took(job) {
     const g = this.g, N = g.npcs, crew = N.followers.filter((f) => !f.dead);
-    if (!job || !crew.length) return;
+    // (In co-op the group is the other players too, so it is said even with no companions to answer.)
+    if (!job || !(crew.length || g.coop)) return;
     const c = job.campId >= 0 ? g.layout.camps[job.campId] : null, name = c ? c.name.replace(/\.$/, '') : '';
     const first = String(job.desc || '').split(/(?<=\.)\s/)[0];
     const brief = first && first.length <= 120 ? ` ${first}` : '';
     N.crewType(`Took on ${job.title}${c && !job.title.includes(c.name) ? ` for ${name}` : ''}.${brief} Over.`,
-      () => N.crewReply(pickOf(crew), N.crewPick(['Copy. Lead the way. Out.', 'Roger. We are with you. Out.', 'Sounds like work. Out.', 'Copy that. Out.'])));
+      () => { if (crew.length) N.crewReply(pickOf(crew), N.crewPick(['Copy. Lead the way. Out.', 'Roger. We are with you. Out.', 'Sounds like work. Out.', 'Copy that. Out.'])); });
   }
 
   abandon(job) {
@@ -5836,7 +5837,7 @@ export class Jobs {
     }
     g.ui.toast(`Abandoned: ${job.title}`);
     const crew = g.npcs.followers.filter((f) => !f.dead);
-    if (crew.length) g.npcs.crewType(`Dropping ${job.title}. We are done with that one. Over.`, () => g.npcs.crewReply(pickOf(crew), g.npcs.crewPick(['Copy. Out.', 'Fair enough. Out.', 'Their loss. Out.', 'Understood. Moving on. Out.'])));
+    if (crew.length || g.coop) g.npcs.crewType(`Dropping ${job.title}. We are done with that one. Over.`, () => { if (crew.length) g.npcs.crewReply(pickOf(crew), g.npcs.crewPick(['Copy. Out.', 'Fair enough. Out.', 'Their loss. Out.', 'Understood. Moving on. Out.'])); });
     // Walking out on a contract breaks it. You still get the same bonus for your kills as anyone who helps.
     if (job.type === 'defend') {
       const s = g.campSim.state[job.campId], c = g.layout.camps[job.campId];
@@ -5943,9 +5944,9 @@ export class Jobs {
     this.active.push(nu);
     // The group hears about it from you.
     const N = this.g.npcs, crew = N.followers.filter((f) => !f.dead);
-    if (tell && crew.length) {
+    if (tell && (crew.length || g.coop)) {
       N.crewType(`Taking commission work at ${c.name.replace(/\.$/, '')}. Operation ${op.name}, a spade a kill if they hold. Over.`,
-        () => N.crewReply(pickOf(crew), pickOf(['Copy. We will make it count. Out.', 'Roger. Point us at them. Out.', 'Better than nothing. Out.', 'Copy that. Eyes on the wall. Out.'])));
+        () => { if (crew.length) N.crewReply(pickOf(crew), pickOf(['Copy. We will make it count. Out.', 'Roger. Point us at them. Out.', 'Better than nothing. Out.', 'Copy that. Eyes on the wall. Out.'])); });
     }
     return nu;
   }
