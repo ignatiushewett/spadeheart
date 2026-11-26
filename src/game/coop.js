@@ -6,7 +6,7 @@
 //
 // None of this runs unless a co-op game is going: the main game and the sandbox never set game.coop, and every hook into them checks it.
 import { CW, CD, WY, WX, WZ } from '../shared/constants.js';
-import { ITEMS, START_CAMP } from './items.js';
+import { ITEMS, START_CAMP, CAMP_START } from './items.js';
 import { WARDROBE, HUMAN_VARIANT_START } from '../engine/actors.js';
 import { CREW_GUN_NAMES } from './npcs.js';
 import { Player } from './player.js';
@@ -14,17 +14,34 @@ import { setUiRoot } from './ui.js';
 import { SteamNet, LocalNet, WebNet } from './net.js';
 
 // A guest's character as the host keeps it: everything but where they are and how they are this moment, which the guest's own game owns.
+// The part of it only the host's game changes: what the city's people think of them.
+const HOST_KEYS = ['grief', 'wanted', 'bail', 'bailExtra', 'bailLock', 'campKills', 'campRep', 'rep', 'dlg', 'perks', 'discovered'];
 const CHAR_KEYS = ['scrip', 'inventory', 'mags', 'weapon', 'armor', 'rep', 'discovered', 'campRep', 'grief', 'wanted', 'bail', 'bailExtra', 'bailLock', 'campKills', 'crewRep', 'dlg', 'perks', 'pendingKit', 'home', 'loadout', 'kills', 'headshots'];
 
-const TETHER = 40;          // how far from the host a guest can go, in voxels: inside the host's full-detail zone, where the dead can reach them
-const TETHER_FAR = 64;      // further than this (the host travelled, or the guest got stuck behind something): put back beside the host
+// How far from the host a guest can go, in voxels, as the host picks it in the lobby. Everything is worked out round the host: the
+// further a guest strays, the more the host's computer and the connection carry, and the thinner the city is round the guest.
+export const RANGES = [
+  { r: 48, name: 'Close', note: 'Lightest on the host and the connection.' },
+  { r: 72, name: 'Normal', note: 'A street or two apart.' },
+  { r: 104, name: 'Far', note: 'Harder on the host\'s computer and the connection.' },
+  { r: 140, name: 'Very far', note: 'Heaviest. The dead round a far-off guest are thinner and less exact, and the host needs a long view distance.' },
+];
+const RANGE_DEFAULT = 72;
+const RESPAWNS = [5, 12, 30];   // the host's choice of how long the dead wait to come back, in seconds
+const LORE_OK = (c) => !!CAMP_START[c.key];   // a settlement someone can start out in
+const PULL_BACK = 24;       // this much past the range (the host travelled, or the guest got stuck behind something): put back beside the host
 const SNAP_HZ = 15;         // snapshots of who is about, to each guest
 const POSE_HZ = 20;         // where each player is and which way they face
 const WORLD_HZ = 2;         // time, weather, the camps and the group
 const SNAP_R = 110;         // how far round a guest the snapshot reaches
 const SNAP_MAX = 640;       // the most bodies in one snapshot, nearest first
-const REVIVE_S = 8;         // seconds down before getting back up beside someone still standing
+const RESPAWN_S = 12;       // seconds dead before coming back
 const TIMEOUT_S = 12;       // silence after which a player is taken to have gone
+// Players on the same map can play together. The commit is compared only when both sides know theirs (a copy may not have found it yet).
+const sameBuild = (a, b) => {
+  const [ma, ca] = String(a || '').split(':'), [mb, cb] = String(b || '').split(':');
+  return ma === mb && (!ca || !cb || ca === cb);
+};
 const COL = CW * CD;
 
 // Packets: the first byte says what follows.
@@ -134,7 +151,7 @@ export class Coop {
       else if (!this.found.length) html += `<div class="coop-note">None found.${n && n.kind === 'steam' ? ' A friend\'s private game shows up as an invite instead: accept it in Steam, or join from your friends list.' : ''}</div>`;
       else {
         for (const l of this.found) {
-          const same = !l.v || l.v === this.version();
+          const same = !l.v || sameBuild(l.v, this.version());
           html += `<div class="coop-row"><div><b>${esc(l.name)}</b><small>${l.n} of ${l.max} players${same ? '' : ', a different version'}</small></div><button class="btn" data-join="${esc(l.id)}"${same && l.n < l.max ? '' : ' disabled'}>Join</button></div>`;
         }
       }
@@ -153,8 +170,16 @@ export class Coop {
         html += `<div class="coop-row"><div><b>${esc(name)}</b>${tag ? `<small>${tag}</small>` : ''}</div></div>`;
       }
       if (this.host) {
-        html += '<div class="coop-note">Everyone starts as a survivor in the same group, waking up in the same settlement. Guests stay within about forty steps of you: the dead are only worked out in full round the host. Guests can join while the game is going, from the lobby list or an invite.</div>';
-        if (this.coopSave) html += `<div class="coop-note">There is a co-op city from before, on day ${this.coopSave.day}.</div>`;
+        const S = this.settings, cur = RANGES.find((q) => q.r === S.range) || RANGES[1];
+        const sel = (id, label, opts, val) => `<div class="coop-set"><label for="${id}">${label}</label><select id="${id}" class="btn">${opts.map(([v, t]) => `<option value="${esc(v)}"${String(v) === String(val) ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select></div>`;
+        html += '<div class="ng-label">Settings</div>';
+        html += sel('coop-range', 'How far guests can go', RANGES.map((q) => [q.r, `${q.name}, ${q.r} m`]), cur.r);
+        html += `<div class="coop-note">${cur.note} Everything is worked out round you, the host: the further a guest can go, the more your computer and the connection carry.</div>`;
+        const camps = this.g.layout.camps.filter((c) => LORE_OK(c)).map((c) => [c.key, c.name]);
+        html += sel('coop-camp', 'Starting settlement', camps, S.camp);
+        html += sel('coop-keep', 'When someone dies', [['keep', 'They keep what they carry'], ['lose', 'They lose what they carry']], S.keep ? 'keep' : 'lose');
+        html += sel('coop-respawn', 'Back after', RESPAWNS.map((s) => [s, `${s} seconds`]), S.respawn);
+        html += `<div class="coop-note">Everyone starts as a survivor in the same group, waking up in ${esc((this.g.layout.camps.find((c) => c.key === S.camp) || {}).name || 'the same settlement')}. Guests can join while the game is going.${this.coopSave ? ` Continuing the co-op city from before (day ${this.coopSave.day}) keeps where it was; the other settings apply either way.` : ''}</div>`;
       } else html += `<div class="coop-note">${this.hostStarted ? 'The host is in the city. Bringing you in...' : 'Waiting for the host to start.'}</div>`;
       if (this.status) html += `<div class="coop-status">${esc(this.status)}</div>`;
       ft = '<button class="btn" id="coop-leave">Leave</button><span style="flex:1"></span>';
@@ -182,6 +207,14 @@ export class Coop {
     }
     on('coop-join-code', () => this.joinLobby(code ? code.value : ''));
     body.querySelectorAll('[data-join]').forEach((el) => el.addEventListener('click', () => this.joinLobby(el.dataset.join)));
+    const setting = (id, fn) => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener('change', () => { fn(el.value); this.saveSettings(); this.render(); });
+    };
+    setting('coop-range', (v) => { this.settings.range = +v; });
+    setting('coop-camp', (v) => { this.settings.camp = v; });
+    setting('coop-keep', (v) => { this.settings.keep = v === 'keep'; });
+    setting('coop-respawn', (v) => { this.settings.respawn = +v; });
     const nm = document.getElementById('coop-name');
     if (nm) nm.addEventListener('change', () => {
       const v = nm.value.trim().slice(0, 20);
@@ -200,11 +233,34 @@ export class Coop {
     this.role = 'host';
     this.names = {};
     this.peers.clear();
+    this.loadSettings();
     this.view = 'lobby';
     this.status = '';
     this.coopSave = await this.g.coopSaveInfo();
     this.render();
   }
+
+  // The host's settings, as last chosen on this computer.
+  loadSettings() {
+    let s = {};
+    try { s = JSON.parse(localStorage.getItem('spadeheart.coopSettings') || '{}') || {}; } catch { /* private mode, or nothing saved */ }
+    const camps = this.g.layout.camps;
+    this.settings = {
+      range: RANGES.some((q) => q.r === s.range) ? s.range : RANGE_DEFAULT,
+      camp: camps.some((c) => c.key === s.camp && LORE_OK(c)) ? s.camp : START_CAMP,
+      keep: s.keep !== false,
+      respawn: RESPAWNS.includes(s.respawn) ? s.respawn : RESPAWN_S,
+    };
+  }
+
+  saveSettings() {
+    try { localStorage.setItem('spadeheart.coopSettings', JSON.stringify(this.settings)); } catch { /* private mode */ }
+  }
+
+  // What the game is playing by, for anyone in it.
+  get range() { return (this.settings && this.settings.range) || RANGE_DEFAULT; }
+  get respawnTime() { return (this.settings && this.settings.respawn) || RESPAWN_S; }
+  get startCampId() { const c = this.settings && this.g.layout.camps.find((k) => k.key === this.settings.camp); return c ? c.id : -1; }
 
   async joinLobby(id) {
     this.status = 'Joining...';
@@ -284,7 +340,7 @@ export class Coop {
     parts.push(cur);
     const spot = this.besideHost();
     this.send(peer.id, {
-      t: 'welcome', v: this.version(), host: this.net.selfName, diff: g.difficulty, tod: g.tod, day: g.day, wx: g.weather.toSave(),
+      t: 'welcome', v: this.version(), host: this.net.selfName, set: { ...this.settings, camp: (g.layout.camps[P.home] || {}).key || this.settings.camp }, diff: g.difficulty, tod: g.tod, day: g.day, wx: g.weather.toSave(),
       spawn: spot, cs: g.campSim.state.map((s) => s.status), lightsGone: [...(g.lightsGone || [])], parts: parts.length,
       char: this.guestBook[peer.key] || null,
     });
@@ -323,7 +379,9 @@ export class Coop {
     g.npcs.camps.forEach((c) => { c.active = false; c.npcs = []; c.guards = []; });
     g.stats = { shots: 0, jobs: 0, placed: 0 };
     P.reset();
-    const c = g.layout.camps.find((k) => k.key === START_CAMP);
+    // The host's rules, for this guest too: how far they can go, what dying costs, how long it takes to come back.
+    this.settings = { range: RANGE_DEFAULT, camp: START_CAMP, keep: true, respawn: RESPAWN_S, ...(w.set || {}) };
+    const c = g.layout.camps.find((k) => k.key === this.settings.camp) || g.layout.camps.find((k) => k.key === START_CAMP);
     if (w.char) {
       // Back in a city they have played in before: the character the host kept for them.
       P.fromSave(JSON.parse(JSON.stringify(w.char)));
@@ -358,7 +416,7 @@ export class Coop {
     this.rx = null;
     this.snapT = 0; this.poseT = 0; this.worldT = 0; this.meT = 0;
     this.seq = 0;
-    this.downT = 0;
+    this.deadT = 0;
     this.roster = [];
     this.crew = [];
     this.hostPose = null;
@@ -407,13 +465,20 @@ export class Coop {
     // The guests are people the dead go for, and a bite on one is sent to them.
     const hitHuman = H.onHitHuman;
     this.hook(H, 'onHitHuman', (h) => (h.coopPeer ? this.bite(h.coopPeer) : hitHuman(h)));
-    // A blast hurts any player near it, not only the host.
+    this.hostP = G.player;
+    // A blast hurts any player near it, not only the host. (One a guest set off is worked out with that guest as the player, so it has
+    // already hurt them; the host is hurt here instead.)
     const explode = G.explode;
     this.hook(G, 'explode', function (x, y, z, radius, strength, dmg, hostile = false, loud = false) {
       const out = explode.call(this, x, y, z, radius, strength, dmg, hostile, loud);
+      const hp = g.hostP;
+      if (G.player !== hp && hp.alive) {
+        const d = Math.hypot(hp.x - x, hp.y + 1.2 - y, hp.z - z);
+        if (d < radius * 2.1 && W.los(x, y, z, hp.x, hp.y + 1.2, hp.z)) hp.damage(dmg * .24 * (1 - d / (radius * 2.1)), x, z, 'blast');
+      }
       for (const p of g.peers.values()) {
         const q = p.pose;
-        if (!p.welcomed || !q || !q.alive) continue;
+        if (!p.welcomed || !q || !q.alive || p.player === G.player) continue;
         const d = Math.hypot(q.x - x, q.y + 1.2 - y, q.z - z);
         if (d < radius * 2.1 && W.los(x, y, z, q.x, q.y + 1.2, q.z)) g.send(p.id, { t: 'hurt', d: dmg * .24 * (1 - d / (radius * 2.1)), x, z, k: 'blast' });
       }
@@ -444,6 +509,56 @@ export class Coop {
       return simple.call(this, kind, x, y, z);
     });
     H.foci = [];
+    // People shot at by a guest go after that guest. What they hold against someone (grudges, bail, being wanted, being barred) is kept
+    // on that player's character, so a guest's shots count against the guest; and each frame anyone with a quarrel with a guest who is
+    // nearer than any quarrel with the host is worked out with that guest as the player: they turn on them, chase them and shoot at them.
+    const N = G.npcs, updateNPC = N.updateNPC, playerHit = N.playerHit;
+    this.hook(N, 'updateNPC', function (n, dt, dp, hostile) {
+      const foe = !hostile && g.foeOf(n);
+      if (!foe) return updateNPC.call(this, n, dt, dp, hostile);
+      const keep = G.player;
+      G.player = foe.player;
+      try { return updateNPC.call(this, n, dt, Math.hypot(n.x - foe.player.x, n.z - foe.player.z), true); } finally { G.player = keep; }
+    });
+    this.hook(N, 'playerHit', function (n, ...a) {
+      const out = playerHit.call(this, n, ...a);
+      // A crew of raiders goes for whoever shot one of them.
+      if (n.kind === 'raider') for (const m of this.list) if (m.kind === 'raider' && (m === n || (m.gang === n.gang && m.provoked))) m.provokedBy = g.shooter || null;
+      return out;
+    });
+  }
+
+  // Someone in the city with a quarrel with a guest, and not with the host: the guest they should go for, if any is near.
+  foeOf(n) {
+    if (n.kind === 'follower' || n.kind === 'wanderer' || n.dead) return null;
+    if (n.kind === 'raider') {
+      const p = n.provokedBy;
+      return p && p.welcomed && p.pose && p.pose.alive && this.peers.get(p.id) === p ? p : null;
+    }
+    let best = null, bd = 160 * 160;
+    for (const p of this.peers.values()) {
+      const q = p.pose;
+      if (!p.welcomed || !q || !q.alive || !p.angry) continue;
+      if (!(n.camp >= 0 ? p.angry.camps[n.camp] : p.angry.road)) continue;
+      const d = (q.x - n.x) ** 2 + (q.z - n.z) ** 2;
+      if (d < bd) { bd = d; best = p; }
+    }
+    return best;
+  }
+
+  // Who each camp is angry with, worked out for a guest the way it is for the host.
+  guestAnger(p, dt) {
+    const g = this.g, N = g.npcs, pl = p.player, keep = g.player;
+    g.player = pl;
+    try {
+      N.coolGrudges(dt);
+      const within = g.horde.campAt(pl.x, pl.z) ? g.horde.inCamp(pl.x, pl.z) : null, camps = [];
+      for (const c of g.layout.camps) {
+        const off = Math.max(c.x0 - pl.x, pl.x - c.x1, c.z0 - pl.z, pl.z - c.z1);
+        camps[c.id] = (!!within && within.id === c.id && N.hostileCamp(c.id)) || (N.banned(c.id) && off < 70);
+      }
+      p.angry = { camps, road: (pl.wanted && pl.wanted[-1]) > 0 };
+    } finally { g.player = keep; }
   }
 
   installGuest() {
@@ -508,7 +623,6 @@ export class Coop {
     this.closeChat(true);
     this.talkingRemote = false;
     this.lookLabel = null;
-    if (this.logEl) this.logEl.innerHTML = '';
     this.unhook();
     this.g.horde.foci = null;
     this.inGame = false;
@@ -574,7 +688,7 @@ export class Coop {
   hostMsg(from, m) {
     const g = this.g;
     if (m.t === 'hello') {
-      if (m.v !== this.version()) { this.send(from, { t: 'refused', why: 'That game is on a different version of Spadeheart.' }); return; }
+      if (!sameBuild(m.v, this.version())) { this.send(from, { t: 'refused', why: 'That game is on a different version of Spadeheart.' }); return; }
       let p = this.peers.get(from);
       if (!p) {
         const name = String(m.name || 'Player').slice(0, 20);
@@ -593,15 +707,25 @@ export class Coop {
     if (!p.welcomed || !this.inGame) return;
     if (m.t === 'me') { p.state = m; p.name = String(m.name || p.name).slice(0, 20); }
     else if (m.t === 'char' && m.save && typeof m.save === 'object') {
-      this.guestBook[p.key] = m.save;
       // Not while they are in the middle of a conversation here: what they have just bought is newer than what they last sent.
-      if (!(p.R && p.R.modal)) { const pl = this.guestPlayer(p); pl.reset(); pl.fromSave(JSON.parse(JSON.stringify(m.save))); }
+      if (!(p.R && p.R.modal)) {
+        const pl = this.guestPlayer(p), kept = {};
+        // What the city thinks of them is the host's to keep: their game does not know about the grudges, bail and standing earned here.
+        for (const k of HOST_KEYS) kept[k] = pl[k];
+        const first = !p.charSeen;
+        p.charSeen = true;
+        pl.reset();
+        pl.fromSave(JSON.parse(JSON.stringify(m.save)));
+        if (!first) Object.assign(pl, kept);
+      }
+      this.guestBook[p.key] = JSON.parse(JSON.stringify(this.guestPlayer(p).toSave()));
     } else if (m.t === 'talk') this.remoteTalk(p, m);
     else if (m.t === 'ui-click' && p.R && p.R.modal) {
       const el = p.root.querySelector(`[data-rid="${m.rid | 0}"]`);
       if (el && !el.disabled) this.asGuest(p, () => el.dispatchEvent(new MouseEvent('click', { shiftKey: !!m.shift, bubbles: true })));
     } else if (m.t === 'ui-back' && p.R && p.R.modal) this.asGuest(p, () => p.R.backToDialog());
     else if (m.t === 'ui-close' && p.R) p.R.closeAll();
+    else if (m.t === 'respawned') { this.forgive(this.guestPlayer(p)); this.calmHunts(); }
     else if (m.t === 'collect') {
       const job = g.jobs.active.find((a) => a.id === m.id);
       if (job) this.asGuest(p, () => g.jobs.collect(job));
@@ -618,7 +742,7 @@ export class Coop {
     } else if (m.t === 'fire') this.remoteFire(p, m);
     else if (m.t === 'melee') this.remoteMelee(p, m);
     else if (m.t === 'boom' && Array.isArray(m.a)) {
-      const got = this.remote(() => g.explode(...m.a));
+      const got = this.remote(() => g.explode(...m.a), p);
       if (got.length) this.send(p.id, { t: 'hit', any: false, kills: 0, salv: got });
     }
   }
@@ -673,9 +797,14 @@ export class Coop {
   // The host's copy of a guest's character: what the people of the city deal with.
   guestPlayer(p) {
     if (!p.player) {
-      p.player = new Player(this.g);
+      const pl = p.player = new Player(this.g);
       const saved = this.guestBook[p.key];
-      if (saved) p.player.fromSave(JSON.parse(JSON.stringify(saved)));
+      if (saved) pl.fromSave(JSON.parse(JSON.stringify(saved)));
+      // Anyone in the city who shoots or blows up this character is hurting the guest: it goes to them, and their game takes it.
+      pl.damage = (amount, sx, sz, type = 'bite') => {
+        if (!p.pose || !p.pose.alive || !(amount > 0)) return;
+        this.send(p.id, { t: 'hurt', d: r2(amount), x: sx ?? null, z: sz ?? null, k: type });
+      };
     }
     return p.player;
   }
@@ -759,6 +888,13 @@ export class Coop {
       opts: q('dlg-opts').innerHTML, jobs: q('dlg-jobs').innerHTML, page: q('dialog').classList.contains('with-page') ? q('contract-page').innerHTML : '',
       title: q('trade-title').textContent, sum: q('trade-sum').textContent, buy: q('trade-buy').innerHTML, sell: q('trade-sell').innerHTML,
     });
+  }
+
+  // The guest in conversation with this person, if any: where they are standing, for the person to face.
+  talkerOf(n) {
+    if (!this.host) return null;
+    for (const p of this.peers.values()) if (p.R && p.R.modal && (p.R.dlgNpc === n || p.R.tradeNpc === n) && p.pose) return p.pose;
+    return null;
   }
 
   // Who a guest is looking at, from where they stand and which way they face.
@@ -848,12 +984,11 @@ export class Coop {
   }
 
   // --- Chat: T to say something --------------------------------------------------------------------------------------------------------
-  // Said out loud, as the people of the city talk: over the speaker's head, a letter at a time, for anyone near enough to hear. A short
-  // log in the corner keeps the last few lines, for when they are out of sight.
+  // Said out loud, as the people of the city talk: over the speaker's head, a letter at a time, for anyone near enough to hear; and on
+  // the group's radio frequency, so it reaches everyone wherever they are.
   setupChat() {
     if (this.chatEl) return;
     this.chatEl = document.getElementById('coop-chat');
-    this.logEl = document.getElementById('coop-log');
     const input = this.chatEl && this.chatEl.querySelector('input');
     if (!input) return;
     this.chatInput = input;
@@ -897,28 +1032,19 @@ export class Coop {
     const text = String(raw || '').replace(/\s+/g, ' ').trim().slice(0, 120);
     if (!text || !this.inGame) return;
     const name = this.g.player.charName || this.net.selfName;
-    this.chatLine(name, text);
+    // On the group's frequency, as what you sent.
+    this.g.campSim.logNews({ kind: 'crew', who: 'You', mine: true, text });
     if (this.host) this.sendAll({ t: 'say', id: this.net.selfId, name, text });
     else this.sendHost({ t: 'say', text });
   }
 
+  // Another player's words: a call on the group's frequency, and over their head for anyone near enough to hear.
   heard(id, name, text) {
     if (!text) return;
-    this.chatLine(name, text);
+    this.g.campSim.logNews({ kind: 'crew', who: name, mine: false, text });
+    this.g.ui.radio(name, text, 'Private Frequency');
     const a = this.anchorFor(id, name);
     if (a) this.g.ui.floatSay(a, text, 4.5);
-  }
-
-  chatLine(name, text) {
-    const log = this.logEl;
-    if (!log) return;
-    const line = document.createElement('div'), b = document.createElement('b');
-    b.textContent = name;
-    line.append(b, document.createTextNode(text));
-    log.appendChild(line);
-    while (log.children.length > 6) log.firstChild.remove();
-    setTimeout(() => line.classList.add('old'), 9000);
-    setTimeout(() => line.remove(), 10500);
   }
 
   // Something for the words to hang over: where that player's body is drawn here.
@@ -961,13 +1087,17 @@ export class Coop {
 
   // --- Host: working out a guest's actions ---------------------------------------------------------------------------------------
   // Runs the host's own code for it, as if a player stood where the guest is: no hit marker, no swing sound or salvage for the host.
-  remote(fn) {
-    const g = this.g, au = g.audio, simple = au.simple, hm = g.ui.hitMarker, sal = g.salvage, got = [];
+  // With the guest as the player, so whoever they hurt holds it against them and not the host.
+  remote(fn, peer) {
+    const g = this.g, au = g.audio, simple = au.simple, hm = g.ui.hitMarker, sal = g.salvage, got = [], keepP = g.player;
     au.simple = function (kind, x, y, z) { if (x === undefined) return; return simple.call(this, kind, x, y, z); };
     g.ui.hitMarker = () => {};
     g.salvage = (id, n) => { got.push([id, n]); };
     this.quiet = true;
-    try { fn(); } catch (e) { console.warn('co-op: remote action failed', e); } finally { au.simple = simple; g.ui.hitMarker = hm; g.salvage = sal; this.quiet = false; }
+    if (peer) { g.player = this.guestPlayer(peer); this.shooter = peer; }
+    try { fn(); } catch (e) { console.warn('co-op: remote action failed', e); } finally {
+      au.simple = simple; g.ui.hitMarker = hm; g.salvage = sal; this.quiet = false; g.player = keepP; this.shooter = null;
+    }
     return got;
   }
 
@@ -988,7 +1118,7 @@ export class Coop {
       for (let k = 0; k + 2 < r.length; k += 3) any = stand.traceBullet(o, r[k], r[k + 1], r[k + 2], it, o[0], o[1], o[2], false) || any;
       g.audio.gun(it.sound, o[0], o[1], o[2], true);
       g.horde.noise(o[0], o[2], it.noise * .55, .9);
-    });
+    }, peer);
     this.send(peer.id, { t: 'hit', any, kills: stand.kills });
   }
 
@@ -996,7 +1126,7 @@ export class Coop {
     const it = ITEMS[m.w];
     if (!it || it.type !== 'melee' || !Array.isArray(m.o) || !Array.isArray(m.f)) return;
     const stand = this.stand(m.o, m.f);
-    const got = this.remote(() => stand.swingMelee(it));
+    const got = this.remote(() => stand.swingMelee(it), peer);
     this.send(peer.id, { t: 'hit', any: stand.hitStop > 0, melee: true, kills: stand.kills, salv: got });
   }
 
@@ -1085,7 +1215,7 @@ export class Coop {
   // In play, once the rest of the frame has run. Called from Game.updatePlay.
   tick(dt) {
     if (this.host) this.hostTick(dt); else this.guestTick(dt);
-    this.downTick(dt);
+    this.deathTick(dt);
   }
 
   hostTick(dt) {
@@ -1110,6 +1240,7 @@ export class Coop {
         const label = this.lookFor(p);
         if (label !== p.lookLabel) { p.lookLabel = label; this.send(p.id, { t: 'look', label }); }
       }
+      if ((p.angerT = (p.angerT || 0) - dt) <= 0) { p.angerT = .5; this.guestAnger(p, .5); }
       // Walked off, or whoever they were talking to is gone: the conversation is over.
       if (p.R && p.R.modal) {
         const n = p.R.tradeNpc || p.R.dlgNpc;
@@ -1343,57 +1474,77 @@ export class Coop {
 
   // A guest goes only so far from the host: held at the edge, or brought back if they get properly separated.
   tether() {
-    const g = this.g, P = g.player, h = this.hostPose;
+    const g = this.g, P = g.player, h = this.hostPose, R = this.range || RANGE_DEFAULT;
     if (!h || !P.alive || g.sleepFx) return;
     const dx = P.x - h.x, dz = P.z - h.z, d = Math.hypot(dx, dz);
-    if (d > TETHER_FAR || Math.abs(P.y - h.y) > 40) {
+    if (d > R + PULL_BACK || Math.abs(P.y - h.y) > 40) {
       const s = this.besideHost(h);
       P.x = s.x; P.y = s.y; P.z = s.z; P.vx = P.vy = P.vz = 0;
       g.world.lastCX = -999;
       g.ui.toast(`Back with ${this.hostName || 'the host'}.`);
       return;
     }
-    if (d <= TETHER) return;
+    if (d <= R) return;
     const ux = dx / d, uz = dz / d, out = P.vx * ux + P.vz * uz;
     if (out > 0) { P.vx -= ux * out; P.vz -= uz * out; }
-    const nx = h.x + ux * TETHER, nz = h.z + uz * TETHER;
+    const nx = h.x + ux * R, nz = h.z + uz * R;
     if (!P.collides(nx, P.y, nz, P.height || 2.6)) { P.x = nx; P.z = nz; }
     if (g.time - (this.tetherSaid ?? -9) > 4) { this.tetherSaid = g.time; g.ui.toast(`Too far from ${this.hostName || 'the host'}.`, 'bad'); }
   }
 
-  // --- Down and back up ------------------------------------------------------------------------------------------------------------
-  // In co-op nobody dies for good: down for a few seconds, then up again beside whoever is still standing. If nobody is, the host
-  // comes round at a settlement, and the guests with them.
+  // --- Death and respawning --------------------------------------------------------------------------------------------------------
+  // In co-op nobody dies for good. Dead, you wait out a short count, the others playing on, and come back: a guest beside the host, the
+  // host beside a guest who is still alive, or, if there is none, at their settlement, with the guests brought along.
   onDeath() {
-    const g = this.g;
-    this.downT = 0;
+    const g = this.g, P = g.player, $ = (id) => document.getElementById(id);
+    this.deadT = 0;
     if (this.host) this.hostDownAt = g.time;
-    g.ui.banner('Down', 'Back on your feet in a few seconds, if anyone is still standing.');
+    document.exitPointerLock();
+    document.querySelector('#death h1').textContent = `${P.charName || 'You'} died`;
+    $('death-respawn').style.display = 'none';
+    $('death-restart').style.display = 'none';
+    $('death-menu').style.display = '';
+    $('death-menu').classList.remove('primary');
+    this.deathCount(this.respawnTime);
+    g.deathShown = true;
+    g.ui.open('death', false);
   }
 
-  downTick(dt) {
+  deathCount(left) {
+    const s = Math.max(0, Math.ceil(left)), el = document.getElementById('death-text');
+    if (!el) return;
+    if (s > 0) el.textContent = `Back in ${s} second${s === 1 ? '' : 's'}.`;
+    else el.textContent = this.guest ? `Waiting for ${this.hostName || 'the host'} to come back.` : 'Coming back...';
+  }
+
+  deathTick(dt) {
     const g = this.g, P = g.player;
     if (P.alive || g.state !== 'play') return;
-    this.downT += dt;
-    if (this.downT < REVIVE_S) return;
+    this.deadT += dt;
+    this.deathCount(this.respawnTime - this.deadT);
+    if (this.deadT >= this.respawnTime) this.respawn();
+  }
+
+  respawn() {
+    const g = this.g, P = g.player;
+    if (P.alive) return;
     if (this.guest) {
       const h = this.hostPose;
-      if (h && h.alive) this.revive(this.besideHost(h));
+      if (h && h.alive) this.backUp(this.besideHost(h));
       return;
     }
     const up = [...this.peers.values()].find((p) => p.welcomed && p.pose && p.pose.alive);
-    if (up) { this.revive(this.besideHost(up.pose)); return; }
-    // Everyone is down.
+    if (up) { this.backUp(this.besideHost(up.pose)); return; }
     const L = g.layout, home = P.home >= 0 ? L.camps[P.home] : null;
     const camp = home && g.campSim.state[home.id].status === 'holding' ? home : g.nearestCamp();
-    this.revive(null);
+    this.backUp(null);
     g.travelTo(camp);
   }
 
-  revive(at) {
+  backUp(at) {
     const g = this.g, P = g.player;
     P.alive = true;
-    P.health = 50;
+    P.health = 60;
     P.deadT = 0;
     P.stamina = 100;
     P.hurtFlash = 0;
@@ -1402,8 +1553,39 @@ export class Coop {
     P.vx = P.vy = P.vz = 0;
     this.hostDownAt = undefined;
     if (at) { P.x = at.x; P.y = at.y; P.z = at.z; }
+    // Dying settles it, as it does in the main game: the hunt for you is over and what you owed is forgotten. Only a settlement you have
+    // been barred from for good still wants you dead. A guest's record is kept by the host, so the host is told.
+    this.forgive(P);
+    if (this.guest) this.sendHost({ t: 'respawned' });
+    else this.calmHunts();
+    // Played by the host's rules: everything carried, guns, armour and spades, stays where you fell.
+    if (this.settings && this.settings.keep === false) {
+      P.inventory = {};
+      P.mags = {};
+      P.weapon = null;
+      P.armor = null;
+      P.scrip = 0;
+      g.ui.toast('You came back with nothing.', 'bad');
+      if (this.guest) this.sendChar();
+    }
     g.audio.deathMusic(false);
-    g.ui.toast('Back on your feet.', 'good');
+    g.deathShown = false;
+    if (at) { g.ui.closeAll(); g.ui.showHUD(true); g.lock(); }
+  }
+
+  forgive(pl) {
+    pl.grief = {};
+    pl.wanted = {};
+    pl.bail = Object.fromEntries(Object.entries(pl.bail || {}).filter(([, v]) => v === 'banned'));
+    pl.bailExtra = {};
+    pl.bailLock = {};
+  }
+
+  // The sirens and the search stop. A settlement that has barred someone still shoots on sight when they come back to its wall.
+  calmHunts() {
+    const g = this.g;
+    g.campSim.state.forEach((s) => { if (s) s.huntT = 0; });
+    for (const p of this.peers.values()) if (p.player) this.guestAnger(p, 0);
   }
 
   // --- Host sleeping: the host decides when the group sleeps -----------------------------------------------------------------------
@@ -1446,7 +1628,7 @@ export class Coop {
       for (const p of this.peers.values()) {
         if (!p.welcomed) continue;
         const c = this.peerCard(p), q = p.pose;
-        out.push({ key: `p:${p.id}`, name: p.name, ...c, where: !c.alive ? 'Down' : q ? where(q.x, q.z) : 'Joining' });
+        out.push({ key: `p:${p.id}`, name: p.name, ...c, where: !c.alive ? 'Dead' : q ? where(q.x, q.z) : 'Joining' });
       }
       return out;
     }
@@ -1454,7 +1636,7 @@ export class Coop {
       if (r.id === this.net.selfId) continue;
       const q = r.host ? this.hostPose : null;
       const at = q || (r.x !== undefined ? r : null);
-      out.push({ key: `p:${r.id}`, name: r.name, health: r.health, alive: r.alive, kills: r.kills, scrip: r.scrip, weapon: r.weapon, armour: r.armour, days: r.days, home: r.home ?? -1, where: !r.alive ? 'Down' : at ? where(at.x, at.z) : 'In the city' });
+      out.push({ key: `p:${r.id}`, name: r.name, health: r.health, alive: r.alive, kills: r.kills, scrip: r.scrip, weapon: r.weapon, armour: r.armour, days: r.days, home: r.home ?? -1, where: !r.alive ? 'Dead' : at ? where(at.x, at.z) : 'In the city' });
     }
     this.crew.forEach((f, i) => out.push({ key: `c:${i}:${f.name}`, name: f.name, health: f.maxHp ? f.hp / f.maxHp * 100 : 100, alive: true, kills: 0, scrip: 0, weapon: f.weapon, armour: false, days: 0, home: -1, tag: f.bond, crew: true, owner: this.hostName, where: f.away ? 'Away' : `With ${this.hostName || 'the group'}` }));
     return out;

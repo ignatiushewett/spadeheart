@@ -63,7 +63,8 @@ const DB_NAME = 'acez';
 const MENU_VIEW = 704;
 const MENU_VEIL_MAX = 45;   // seconds the title screen waits on black for the view to build, at most
 const MENU_SHOT = { angle: -.18, dist: 185, height: 88, turn: -.32, pitch: -.14, fov: 1.05, flight: 125, startHeight: 30, startOff: 44, startPitch: -.1 };
-export const VERSION = 'v0.99';
+// The commit this copy is, once it is known (see the bottom of this file). The menu shows it; co-op players compare it.
+export const BUILD = { commit: '' };
 const SAVE_KEY = 'slot15';  // bumped whenever the map changes: old voxel edits no longer line up
 export const SLOTS = 3;
 // Slot 1 keeps the plain key, so a save from before there were slots simply becomes the first character.
@@ -290,7 +291,7 @@ class Game {
     this.setupInput();
     // Co-op: the lobby is always there behind the menu button; this.coop is set only while a co-op game is being played.
     this.coop = null;
-    this.coopHub = new Coop(this, () => `${SAVE_KEY}:${(document.getElementById('menu-version') || {}).textContent || VERSION}`);
+    this.coopHub = new Coop(this, () => `${SAVE_KEY}:${BUILD.commit}`);
     this.setupAtmosphere();
     this.applySettings(false);
     this.horde.applyDifficulty(DIFFICULTY.hard);
@@ -2183,7 +2184,9 @@ class Game {
     this.stats = { shots: 0, jobs: 0, placed: 0 };
     P.reset();
     // Survival always begins at the same camp. Everyone else picks.
-    const c = kit === 'survival' ? this.layout.camps.find((k) => k.key === START_CAMP) : this.layout.camps[campId];
+    // (A co-op host may pick another settlement for the group to wake up in.)
+    const coopCamp = this.coop && this.coop.host ? this.coop.startCampId : -1;
+    const c = coopCamp >= 0 ? this.layout.camps[coopCamp] : kit === 'survival' ? this.layout.camps.find((k) => k.key === START_CAMP) : this.layout.camps[campId];
     P.holdKit(kit, c.key);
     if (kit === 'regular' || kit === 'survival') P.campRep[c.id] = 10;
     P.home = c.id;
@@ -2701,6 +2704,7 @@ class Game {
   }
 
   respawn() {
+    if (this.coop) { this.coop.respawn(); return; }
     const P = this.player;
     if (P.loadout === 'survival') { this.rollCharacter(); return; }
     let best = null, bd = 1e9;
@@ -3608,12 +3612,13 @@ class Game {
 const game = new Game();
 window.ACEZ = game;
 // The version is the commit the game was last pulled or pushed at, read out of the copy's own git folder: the same code GitHub shows.
-// Where there is no git folder, a build stamped by desktop/stamp-version.js (the Steam upload) shows the commit from its version.txt, and
-// anything else (a download of the files on their own) shows the version name.
+// Where there is no git folder, a build stamped by desktop/stamp-version.js (the Steam upload) shows the commit from its version.txt; on
+// GitHub Pages it is the latest commit on GitHub, which is what the site was published from. Nothing shows until it is known.
 {
   const v = document.getElementById('menu-version');
   if (v) {
-    v.textContent = VERSION;
+    v.textContent = '';
+    const show = (hash) => { BUILD.commit = hash.slice(0, 7); v.textContent = BUILD.commit; };
     (async () => {
       const get = async (f) => { const r = await fetch(f, { cache: 'no-store' }); if (!r.ok) throw new Error(f); return (await r.text()).trim(); };
       try {
@@ -3623,10 +3628,19 @@ window.ACEZ = game;
         if (!hash && ref) {
           try { hash = await get(`.git/${ref}`); } catch { const packed = await get('.git/packed-refs'); hash = (packed.split(/\r?\n/).find((l) => l.endsWith(` ${ref}`)) || '').split(' ')[0]; }
         }
-        if (/^[0-9a-f]{7,40}$/.test(hash || '')) v.textContent = hash.slice(0, 7);
+        if (/^[0-9a-f]{7,40}$/.test(hash || '')) show(hash);
       } catch {
-        // No git folder here: the stamped commit if there is one, else keep the version name.
-        try { const s = await get('version.txt'); if (/^[0-9a-f]{7,40}$/.test(s)) v.textContent = s.slice(0, 7); } catch { /* not stamped */ }
+        // No git folder here: the stamped commit if there is one.
+        try { const s = await get('version.txt'); if (/^[0-9a-f]{7,40}$/.test(s)) show(s); } catch { /* not stamped */ }
+        // GitHub Pages: owner.github.io/repo, published from that repository's main branch.
+        if (!BUILD.commit && /\.github\.io$/.test(location.hostname)) {
+          try {
+            const owner = location.hostname.split('.')[0], repo = location.pathname.split('/').filter(Boolean)[0] || `${owner}.github.io`;
+            const r = await fetch(`https://api.github.com/repos/${owner}/${repo}/commits/HEAD`, { headers: { Accept: 'application/vnd.github.sha' } });
+            const s = r.ok ? (await r.text()).trim() : '';
+            if (/^[0-9a-f]{7,40}$/.test(s)) show(s);
+          } catch { /* offline, or GitHub said no: no version shown */ }
+        }
       }
     })();
   }

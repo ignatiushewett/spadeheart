@@ -1399,7 +1399,7 @@ export class UI {
     const me = {
       key: 'p:self', self: true, name: P.charName || 'You', alive: P.alive, health: P.alive ? P.health : 0, armour: !!P.armor,
       weapon: it && (it.type === 'gun' || it.type === 'melee') ? it.name : 'Unarmed', kills: P.kills || 0, scrip: P.scrip || 0,
-      days: Math.max(1, g.day - (P.bornDay || g.day) + 1), home: P.home, where: P.alive ? 'You' : 'Down',
+      days: Math.max(1, g.day - (P.bornDay || g.day) + 1), home: P.home, where: P.alive ? '' : 'Dead',
     };
     return [me, ...(g.coop ? g.coop.crewPlayers() : [])];
   }
@@ -1442,7 +1442,7 @@ export class UI {
       const hp = Math.max(0, Math.min(1, p.health / 100));
       const b = document.createElement('button');
       b.className = `crew-card${p.crew ? '' : ' player'}${this.crewSel === p.key ? ' sel' : ''}${p.alive && p.where !== 'Away' ? '' : ' away'}`;
-      b.innerHTML = `${figureSvg(hp, p.armour)}<span class="nm">${esc(p.name)}</span>${p.tag || p.self ? `<small class="bond">${esc(p.tag || 'You')}</small>` : ''}<small>${esc(p.weapon)}</small><small>${p.where}</small><div class="hpbar${hp < .35 ? ' low' : ''}"><i style="width:${(hp * 100).toFixed(1)}%"></i></div>`;
+      b.innerHTML = `${figureSvg(hp, p.armour)}<span class="nm">${esc(p.name)}</span>${p.tag || p.self ? `<small class="bond">${esc(p.tag || 'You')}</small>` : ''}<small>${esc(p.weapon)}</small>${p.where ? `<small>${p.where}</small>` : ''}<div class="hpbar${hp < .35 ? ' low' : ''}"><i style="width:${(hp * 100).toFixed(1)}%"></i></div>`;
       b.addEventListener('click', () => { this.crewSel = p.key; g.audio.simple('ui'); this.renderCrew(); });
       cards.appendChild(b);
     }

@@ -3395,7 +3395,7 @@ export class NPCs {
     // Conversations already running: the next person speaks when the last has had time to be read.
     for (let i = this.convos.length - 1; i >= 0; i--) {
       const c = this.convos[i];
-      const broken = c.people.some((n) => n.dead || (!c.urgent && (n.alarmed || n.threat || (n.kind === 'resident' && !n.arrived))) || g.ui.dlgNpc === n);
+      const broken = c.people.some((n) => n.dead || (!c.urgent && (n.alarmed || n.threat || (n.kind === 'resident' && !n.arrived))) || g.ui.dlgNpc === n || (g.coop && g.coop.talkerOf(n)));
       const far = Math.hypot(c.people[0].x - P.x, c.people[0].z - P.z) > 44;
       if (broken || far) { for (const n of c.people) n.inConvo = false; this.convos.splice(i, 1); continue; }
       for (const n of c.people) if (n.task && n.task.t < 4) n.task.t = 4;   // nobody walks off mid-sentence
@@ -4480,7 +4480,7 @@ export class NPCs {
     }
     if (n.kind === 'raider') { if (n.raidCamp !== undefined) this.updateRaidRaider(n, dt, dp); else this.updateRaider(n, dt, dp); return; }
     n.aim = Math.max(0, n.aim - dt);
-    const talking = g.ui.dlgNpc === n && g.ui.modal === 'dialog';
+    const talker = this.talkerOf(n), talking = !!talker;
 
     // Ambient chatter when you walk past.
     n.barkT -= dt;
@@ -4495,7 +4495,7 @@ export class NPCs {
     if (talking) {
       // Someone sitting down turns in their seat to talk to you, and remembers which way the seat faces.
       if (seated && n.seatYaw === undefined) n.seatYaw = n.yaw;
-      n.yaw = Math.atan2(P.x - n.x, P.z - n.z);
+      n.yaw = Math.atan2(talker.x - n.x, talker.z - n.z);
       n.state = seated ? 5 : 4;
       return;
     }
@@ -5599,6 +5599,13 @@ export class NPCs {
     if (S.locked) p = Math.max(p, .45);
     if (S.op && (S.op.mag || 1) >= 6) p = Math.max(p, .35 + ((S.op.mag || 1) - 6) * .1);
     return Math.min(1, p);
+  }
+
+  // Whoever this person is in the middle of a conversation with: you, or in co-op another player. They stop and face them.
+  talkerOf(n) {
+    const g = this.g;
+    if (g.ui.dlgNpc === n && g.ui.modal === 'dialog') return g.player;
+    return g.coop ? g.coop.talkerOf(n) : null;
   }
 
   bark(n, text, range) {
