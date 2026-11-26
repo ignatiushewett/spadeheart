@@ -5,7 +5,7 @@
 // the one group, with the host's crew.
 //
 // None of this runs unless a co-op game is going: the main game and the sandbox never set game.coop, and every hook into them checks it.
-import { CW, CD, WY, WX, WZ } from '../shared/constants.js';
+import { CW, CD, WY, WX, WZ, STREET_Y } from '../shared/constants.js';
 import { ITEMS, START_CAMP, CAMP_START } from './items.js';
 import { WARDROBE, HUMAN_VARIANT_START } from '../engine/actors.js';
 import { CREW_GUN_NAMES } from './npcs.js';
@@ -28,6 +28,16 @@ export const RANGES = [
 ];
 const RANGE_DEFAULT = 72;
 const RESPAWNS = [5, 12, 30];
+// What everyone starts with (the kits of the main game), and where the dead come back.
+const LOADOUTS = [['survival', 'Survival'], ['drifter', 'Hard'], ['regular', 'Medium'], ['veteran', 'Easy'], ['creative', 'Creative']];
+const SPAWNS = [['with', 'With a player'], ['away', 'Away from everyone']];
+// Ready-made sets of settings. Changing any one of them after makes it Custom.
+const PRESETS = {
+  survival: { name: 'Survival', note: 'The standard game: the survival kit in Carver Yard, lose what you carry, come back beside a player.', set: { loadout: 'survival', camp: 'garvey', keep: false, ff: true, spawn: 'with', respawn: 12 } },
+  deathmatch: { name: 'Deathmatch', note: 'A full kit, keep what you carry, friendly fire, and come back away from everyone.', set: { loadout: 'veteran', keep: true, ff: true, spawn: 'away', respawn: 5 } },
+  creative: { name: 'Creative', note: 'Every weapon and endless building blocks, keep what you carry, no friendly fire.', set: { loadout: 'creative', keep: true, ff: false, spawn: 'with', respawn: 5 } },
+};
+const presetOf = (S) => Object.keys(PRESETS).find((k) => Object.entries(PRESETS[k].set).every(([key, v]) => S[key] === v)) || 'custom';
 const DOWN_LINES = ["I'm down!", 'They got me.', "I'm hit. I'm down.", "Man down. It's me."];
 const pickLine = (a) => a[Math.floor(Math.random() * a.length)];   // the host's choice of how long the dead wait to come back, in seconds
 const LORE_OK = (c) => !!CAMP_START[c.key];   // a settlement someone can start out in
@@ -162,29 +172,45 @@ export class Coop {
       if (n && n.kind === 'steam') ft += '<select id="coop-vis" class="btn"><option value="friends">Friends only</option><option value="public">Public</option></select>';
       ft += '<button class="btn primary" id="coop-host">Host a game</button>';
     } else {
-      const L = n.lobby, ids = L ? L.members : [];
-      if (L && L.code) html += `<div class="coop-code"><span>Room code</span><b>${esc(L.code)}</b>${this.host ? '<button class="btn" id="coop-copy">Copy</button>' : ''}</div>`;
-      if (L && L.code && this.host) html += `<div class="coop-note">${n.roomOpen ? 'Room open. Keep this screen open while friends join.' : 'Reconnecting to the server. Friends cannot join until it is back.'}</div>`;
-      html += `<div class="ng-label" style="margin-top:0">${this.host ? 'Your game' : 'Players'}</div>`;
-      for (const id of ids) {
+      // The lobby, the way a console game lays it out: who is in on the left, the game and its settings on the right.
+      const L = n.lobby, ids = L ? L.members : [], max = 4;
+      let left = '<div class="ng-label" style="margin-top:0">Players</div>';
+      for (let i = 0; i < max; i++) {
+        const id = ids[i];
+        if (!id) { left += `<div class="coop-slot empty"><span class="idx">${i + 1}</span>Open</div>`; continue; }
         const me = id === n.selfId, isHost = L && id === L.owner;
         const name = me ? n.selfName : (this.names && this.names[id]) || (isHost ? (L.data && L.data.name) : '') || 'Joining...';
-        const tag = [isHost ? 'Host' : '', me ? 'You' : ''].filter(Boolean).join(', ');
-        html += `<div class="coop-row"><div><b>${esc(name)}</b>${tag ? `<small>${tag}</small>` : ''}</div></div>`;
+        left += `<div class="coop-slot${me ? ' me' : ''}"><span class="idx">${i + 1}</span><b>${esc(name)}</b>${isHost ? '<span class="host">(Host)</span>' : ''}</div>`;
       }
-      if (this.host) {
-        const S = this.settings, cur = RANGES.find((q) => q.r === S.range) || RANGES[1];
-        const sel = (id, label, opts, val) => `<div class="coop-set"><label for="${id}">${label}</label><select id="${id}" class="btn">${opts.map(([v, t]) => `<option value="${esc(v)}"${String(v) === String(val) ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select></div>`;
-        html += '<div class="ng-label">Settings</div>';
-        html += sel('coop-range', 'Guest range', RANGES.map((q) => [q.r, `${q.name}, ${q.r} m`]), cur.r);
-        html += `<div class="coop-note">How far guests can go from you. ${cur.note}</div>`;
-        const camps = this.g.layout.camps.filter((c) => LORE_OK(c)).map((c) => [c.key, c.name]);
-        html += sel('coop-camp', 'Start at', camps, S.camp);
-        html += sel('coop-keep', 'On death', [['keep', 'Keep items'], ['lose', 'Lose items']], S.keep ? 'keep' : 'lose');
-        html += sel('coop-ff', 'Friendly fire', [['on', 'On'], ['off', 'Off']], S.ff ? 'on' : 'off');
-        html += sel('coop-respawn', 'Respawn time', RESPAWNS.map((s) => [s, `${s} seconds`]), S.respawn);
-        html += `<div class="coop-note">Everyone starts together as survivors. Friends can join any time.${this.coopSave ? ` Continue picks up your last co-op game (day ${this.coopSave.day}).` : ''}</div>`;
-      } else html += `<div class="coop-note">${this.hostStarted ? 'Joining...' : 'Waiting for the host to start.'}</div>`;
+      let right = '<div class="ng-label" style="margin-top:0">Game</div>';
+      if (L && L.code) right += `<div class="coop-code"><span>Room code</span><b>${esc(L.code)}</b>${this.host ? '<button class="btn" id="coop-copy">Copy</button>' : ''}</div>`;
+      const commit = String(this.version()).split(':')[1] || '';
+      const state = this.host ? (n.usesCodes ? (n.roomOpen ? 'Open' : 'Reconnecting...') : 'Open') : this.hostStarted ? 'In game. Joining...' : 'Waiting for the host';
+      right += `<div class="coop-kv"><span>Status</span><b>${state}</b></div><div class="coop-kv"><span>Players</span><b>${ids.length} / ${max}</b></div><div class="coop-kv"><span>Connection</span><b>${esc(n.label)}</b></div>${commit ? `<div class="coop-kv"><span>Version</span><b>${esc(commit)}</b></div>` : ''}`;
+      right += '<div class="ng-label">Settings</div>';
+      const S = this.host ? this.settings : this.lobbySettings(L);
+      if (S) {
+        const camp = (this.g.layout.camps.find((c) => c.key === S.camp) || {}).name || '';
+        const cur = RANGES.find((q) => q.r === S.range) || RANGES[1], preset = presetOf(S);
+        const rows = [
+          ['coop-preset', 'Mode', [...Object.entries(PRESETS).map(([k, p]) => [k, p.name]), ['custom', 'Custom']], preset],
+          ['coop-loadout', 'Starting kit', LOADOUTS, S.loadout],
+          ['coop-camp', 'Start at', this.g.layout.camps.filter((c) => LORE_OK(c)).map((c) => [c.key, c.name]), S.camp],
+          ['coop-spawn', 'Respawn', SPAWNS, S.spawn],
+          ['coop-respawn', 'Respawn time', RESPAWNS.map((s) => [s, `${s} seconds`]), S.respawn],
+          ['coop-keep', 'On death', [['keep', 'Keep items'], ['lose', 'Lose items']], S.keep ? 'keep' : 'lose'],
+          ['coop-ff', 'Friendly fire', [['on', 'On'], ['off', 'Off']], S.ff ? 'on' : 'off'],
+          ['coop-range', 'Guest range', RANGES.map((q) => [q.r, `${q.name}, ${q.r} m`]), cur.r],
+        ];
+        for (const [id, label, opts, val] of rows) {
+          if (this.host) right += `<div class="coop-set"><label for="${id}">${label}</label><select id="${id}" class="btn">${opts.map(([v, t]) => `<option value="${esc(v)}"${String(v) === String(val) ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select></div>`;
+          else right += `<div class="coop-kv"><span>${label}</span><b>${esc((opts.find(([v]) => String(v) === String(val)) || [, val])[1])}</b></div>`;
+        }
+        const note = preset !== 'custom' ? PRESETS[preset].note : 'Custom settings.';
+        right += `<div class="coop-note">${note} Guest range: ${cur.note.toLowerCase()}${this.host && this.coopSave ? ` Continue picks up your last co-op game (day ${this.coopSave.day}).` : ''}</div>`;
+        void camp;
+      } else right += '<div class="coop-note">The host\'s settings show here.</div>';
+      html += `<div class="coop-lobby"><div>${left}</div><div>${right}</div></div>`;
       if (this.status) html += `<div class="coop-status">${esc(this.status)}</div>`;
       ft = '<button class="btn" id="coop-leave">Leave</button><span style="flex:1"></span>';
       if (n.canInvite) ft += '<button class="btn" id="coop-invite">Invite friends</button>';
@@ -193,6 +219,8 @@ export class Coop {
         ft += '<button class="btn primary" id="coop-start">New game</button>';
       }
     }
+    const panel = document.getElementById('coop-panel');
+    if (panel) panel.classList.toggle('coop-wide', this.view === 'lobby');
     body.innerHTML = html;
     foot.innerHTML = ft;
     const on = (id, fn) => { const el = document.getElementById(id); if (el) el.addEventListener('click', () => { this.g.audio.simple('ui'); fn(); }); };
@@ -213,8 +241,11 @@ export class Coop {
     body.querySelectorAll('[data-join]').forEach((el) => el.addEventListener('click', () => this.joinLobby(el.dataset.join)));
     const setting = (id, fn) => {
       const el = document.getElementById(id);
-      if (el) el.addEventListener('change', () => { fn(el.value); this.saveSettings(); this.render(); });
+      if (el) el.addEventListener('change', () => { fn(el.value); this.saveSettings(); this.shareSettings(); this.render(); });
     };
+    setting('coop-preset', (v) => { if (PRESETS[v]) Object.assign(this.settings, PRESETS[v].set); });
+    setting('coop-loadout', (v) => { this.settings.loadout = v; });
+    setting('coop-spawn', (v) => { this.settings.spawn = v; });
     setting('coop-range', (v) => { this.settings.range = +v; });
     setting('coop-camp', (v) => { this.settings.camp = v; });
     setting('coop-keep', (v) => { this.settings.keep = v === 'keep'; });
@@ -239,6 +270,7 @@ export class Coop {
     this.names = {};
     this.peers.clear();
     this.loadSettings();
+    this.shareSettings();
     this.view = 'lobby';
     this.status = '';
     this.coopSave = await this.g.coopSaveInfo();
@@ -256,7 +288,16 @@ export class Coop {
       keep: s.keep === true,
       ff: s.ff !== false,
       respawn: RESPAWNS.includes(s.respawn) ? s.respawn : RESPAWN_S,
+      loadout: LOADOUTS.some(([k]) => k === s.loadout) ? s.loadout : 'survival',
+      spawn: SPAWNS.some(([k]) => k === s.spawn) ? s.spawn : 'with',
     };
+  }
+
+  // The host's settings go with the lobby, so the guests can see what they are joining.
+  shareSettings() { if (this.host && this.net) this.net.setData({ set: JSON.stringify(this.settings) }).catch(() => {}); }
+
+  lobbySettings(L) {
+    try { const s = L && L.data && L.data.set; return s ? JSON.parse(s) : null; } catch { return null; }
   }
 
   saveSettings() {
@@ -313,7 +354,7 @@ export class Coop {
 
   // Guests say hello until the host answers; the host answers with the lobby, or with the world if the game is going.
   hello() {
-    if (!this.guest || this.inGame || this.welcomeAt) return;
+    if (!this.guest || (this.inGame && !this.restarting) || this.welcomeAt) return;
     this.send(this.hostId, { t: 'hello', name: this.net.selfName, v: this.version() });
     clearTimeout(this.helloTimer);
     this.helloTimer = setTimeout(() => this.hello(), 1500);
@@ -328,7 +369,7 @@ export class Coop {
     this.installHost();
     g.slot = 'coop';
     this.guestBook = {};
-    if (fresh || !this.coopSave) g.newGame(g.ui.readDifficulty(), 0, 'survival');
+    if (fresh || !this.coopSave) g.newGame(g.ui.readDifficulty(), 0, this.settings.loadout || 'survival');
     else await g.continueGame('coop', true);
     g.player.charName = this.net.selfName;
     this.net.setData({ started: '1' }).catch(() => {});
@@ -361,6 +402,9 @@ export class Coop {
   // deal with the host), standing beside the host.
   startGuest() {
     const g = this.g, P = g.player, w = this.welcomeMsg;
+    // Starting over (everyone died): what the last game put in is taken out first.
+    if (this.restore.length) this.unhook();
+    this.restarting = false;
     this.inGame = true;
     g.coop = this;
     this.beginSession();
@@ -394,9 +438,11 @@ export class Coop {
       P.fromSave(JSON.parse(JSON.stringify(w.char)));
       if (!(P.health > 0)) P.health = 60;
     } else {
-      P.holdKit('survival', c.key);
+      const kit = this.settings.loadout || 'survival';
+      P.holdKit(kit, c.key);
       P.takeKit();
-      P.campRep[c.id] = 10;
+      if (kit === 'survival' || kit === 'regular') P.campRep[c.id] = 10;
+      P.dlg.flags.introDone = true;
       P.home = c.id;
       P.discovered[c.id] = true;
     }
@@ -498,11 +544,12 @@ export class Coop {
       if (x === undefined || !this.nearPeer(x, z)) return;
       const e = [k];
       for (let i = 0; i < n; i++) e.push(typeof args[i] === 'number' ? r2(args[i]) : args[i]);
+      if (this.fxSkip) e.skip = this.fxSkip;   // a guest's own shot: they drew it themself
       this.fxOut.push(e);
     };
     const wrap = (obj, key, k, n) => { const f = obj[key]; this.hook(obj, key, function (...a) { rec(k, a, n); return f.apply(this, a); }); };
     wrap(fx, 'blood', 'b', 8); wrap(fx, 'gore', 'g', 4); wrap(fx, 'explosion', 'x', 4); wrap(fx, 'debris', 'd', 6);
-    wrap(fx, 'tracer', 't', 6); wrap(fx, 'spark', 'k', 7);
+    wrap(fx, 'tracer', 't', 6); wrap(fx, 'spark', 'k', 7); wrap(fx, 'muzzle', 'M', 7);
     wrap(au, 'explosion', 'X', 5); wrap(au, 'moan', 'm', 4); wrap(au, 'bodyFall', 'f', 4);
     const gun = au.gun, simple = au.simple;
     this.hook(au, 'gun', function (kind, x, y, z, npc = false) {
@@ -516,6 +563,13 @@ export class Coop {
       return simple.call(this, kind, x, y, z);
     });
     H.foci = [];
+    // The host's shots: a flash at the muzzle, for the guests (the host sees their own in their hands).
+    const fireGun = G.player.fireGun;
+    this.hook(G.player, 'fireGun', function (it, id) {
+      const out = fireGun.call(this, it, id);
+      if (it && it.type === 'gun' && !it.projectile) { const e = this.eyePos(), f = this.forward(); rec('M', [e[0] + f[0] * 1.1, e[1] - .25 + f[1] * 1.1, e[2] + f[2] * 1.1, f[0], f[1], f[2], 1], 7); }
+      return out;
+    });
     const trace = G.player.traceBullet;
     this.hook(G.player, 'traceBullet', function (o, dx, dy, dz, it, ...rest) {
       const out = trace.call(this, o, dx, dy, dz, it, ...rest);
@@ -804,13 +858,13 @@ export class Coop {
     } else if (m.t === 'refused') this.lost(m.why);
     else if (m.t === 'bye') this.lost('The host left the game.');
     else if (m.t === 'welcome') {
-      if (this.inGame) return;
+      if (this.inGame && !this.restarting) return;
       this.welcomeAt = performance.now();
       this.welcomeMsg = m;
       this.baseParts = new Array(m.parts).fill(null);
       clearTimeout(this.helloTimer);
     } else if (m.t === 'base') {
-      if (!this.baseParts || this.inGame) return;
+      if (!this.baseParts || (this.inGame && !this.restarting)) return;
       this.baseParts[m.k] = m.list;
       if (this.baseParts.every((q) => q)) this.startGuest();
     }
@@ -828,6 +882,7 @@ export class Coop {
       g.ui.sleepVeil(true);
       g.audio.duck(true);
     } else if (m.t === 'woke') this.wokeWithHost(m);
+    else if (m.t === 'restart') this.restartGuest();
     else if (m.t === 'say') this.heard(m.id, String(m.name || '').slice(0, 20), String(m.text || '').slice(0, 120));
     else if (m.t === 'look') this.lookLabel = m.label || null;
     else if (m.t === 'ui') { this.applyMe(m.me); this.showScreen(m); }
@@ -1174,6 +1229,16 @@ export class Coop {
     }, peer);
     for (let k = 0; k + 2 < r.length; k += 3) this.friendlyFire(peer, o, [r[k], r[k + 1], r[k + 2]], it);
     this.send(peer.id, { t: 'hit', any, kills: stand.kills });
+    if (r.length >= 3) {
+      const d = [r[0], r[1], r[2]], m = [o[0] + d[0] * 1.1, o[1] - .25 + d[1] * 1.1, o[2] + d[2] * 1.1];
+      const hit = g.world.raycast(o[0], o[1], o[2], d[0], d[1], d[2], it.range || 100, true), end = hit ? hit.dist : it.range || 100;
+      this.fxSkip = peer.id;
+      try {
+        g.particles.muzzle(m[0], m[1], m[2], d[0], d[1], d[2], 1);
+        g.particles.tracer(m[0], m[1], m[2], o[0] + d[0] * end, o[1] + d[1] * end, o[2] + d[2] * end);
+      } finally { this.fxSkip = null; }
+      g.tempLights.push({ x: m[0], y: m[1], z: m[2], r: 16, cr: 7, cg: 4.2, cb: 1.6, t: .07, max: .07 });
+    }
   }
 
   remoteMelee(peer, m) {
@@ -1232,7 +1297,7 @@ export class Coop {
   pushBody(A, id, d, q) {
     const st = !q.alive ? 10 + Math.min(60, this.g.time - (d.downAt ?? this.g.time)) : q.moving ? .7 : 0;
     const aim = q.ready ? Math.max(0, Math.min(63, Math.round((q.pitch + .8) / 1.2 * 63))) : 42;
-    const extra = q.w * 2 + aim * 32768 + (q.ready ? 2097152 : 0);
+    const extra = q.w * 2 + aim * 32768 + (q.ready ? 2097152 : 0) + Math.min(7, Math.round((d.wet || 0) * 8)) * 4096;
     if (A.add) A.push(0, d.x, d.y, d.z, Math.PI - d.yaw, d.phase, st, bodyVariant(id), extra);
     else {
       const cam = this.g.renderer.camPos, dx = d.x - cam[0], dz = d.z - cam[2];
@@ -1249,6 +1314,13 @@ export class Coop {
     d.phase += sp * dt * 2.1;
     if (!q.alive && d.downAt === undefined) d.downAt = this.g.time;
     if (q.alive) d.downAt = undefined;
+    this.soak(d, dt);
+  }
+
+  // Rain soaks a player out under the sky the way it does anyone in the city, and they dry off under a roof.
+  soak(d, dt) {
+    const g = this.g, map = g.rainMap, top = map ? map.at(d.x, d.z) : -1, open = top < 0 || top < d.y + 2.2, want = open ? g.weather.rain : 0;
+    d.wet = d.wet === undefined ? want : d.wet + (want - d.wet) * Math.min(1, dt / (want > d.wet ? 18 : open ? 160 : 35));
   }
 
   // --- Every frame -----------------------------------------------------------------------------------------------------------------
@@ -1304,6 +1376,9 @@ export class Coop {
       }
     }
     this.hostPhase += Math.min(9, Math.hypot(P.vx, P.vz)) * dt * 2.1;
+    const hb = this.hostBody || (this.hostBody = {});
+    hb.x = P.x; hb.y = P.y; hb.z = P.z;
+    this.soak(hb, dt);
     if ((this.poseT -= dt) <= 0) {
       this.poseT = 1 / POSE_HZ;
       const b = this.writePose(this.poseOf(P));
@@ -1313,7 +1388,14 @@ export class Coop {
       this.snapT = 1 / SNAP_HZ;
       for (const p of this.peers.values()) if (p.welcomed && p.pose) this.sendSnapshot(p);
       if (this.editsOut.length) { this.sendAll({ t: 'e', e: this.editsOut }); this.editsOut = []; }
-      if (this.fxOut.length) { this.sendAll({ t: 'fx', l: this.fxOut }); this.fxOut = []; }
+      if (this.fxOut.length) {
+        for (const p of this.peers.values()) {
+          if (!p.welcomed) continue;
+          const l = this.fxOut.filter((e) => e.skip !== p.id);
+          if (l.length) this.send(p.id, { t: 'fx', l });
+        }
+        this.fxOut = [];
+      }
     }
     if ((this.worldT -= dt) <= 0) {
       this.worldT = 1 / WORLD_HZ;
@@ -1348,7 +1430,7 @@ export class Coop {
     } finally { H.actors = keepA; g.actors = keepG; R.camPos = keepPos; R.camForward = keepF; H.visibleCount = keepVis; }
     // The host, and any other guest.
     const P = g.player;
-    this.pushBody(rec, this.net.selfId, { x: P.x, y: P.y, z: P.z, yaw: P.yaw, phase: this.hostPhase, downAt: this.hostDownAt }, this.poseOf(P));
+    this.pushBody(rec, this.net.selfId, { x: P.x, y: P.y, z: P.z, yaw: P.yaw, phase: this.hostPhase, downAt: this.hostDownAt, wet: this.hostBody ? this.hostBody.wet : 0 }, this.poseOf(P));
     for (const o of this.peers.values()) if (o !== peer && o.welcomed && o.pose && o.draw) this.pushBody(rec, o.id, o.draw, o.pose);
     // Nearest first, if there are more than a snapshot carries.
     let order = null, n = rec.n;
@@ -1458,6 +1540,7 @@ export class Coop {
       switch (k) {
         case 'b': fx.blood(x, y, z, a, b, c, d, f); break;
         case 'g': fx.gore(x, y, z, a); break;
+        case 'M': fx.muzzle(x, y, z, a, b, c, d || 1); g.tempLights.push({ x, y, z, r: 16, cr: 7, cg: 4.2, cb: 1.6, t: .07, max: .07 }); break;
         case 'x': fx.explosion(x, y, z, a); g.tempLights.push({ x, y: y + 1, z, r: a * 10, cr: 22, cg: 12, cb: 4, t: .55, max: .55 }); break;
         case 'd': fx.debris(x, y, z, a, b, c); break;
         case 't': fx.tracer(x, y, z, a, b, c); break;
@@ -1577,8 +1660,16 @@ export class Coop {
 
   deathTick(dt) {
     const g = this.g, P = g.player;
-    if (P.alive || g.state !== 'play') return;
+    if (P.alive || g.state !== 'play' || this.restarting) return;
     this.deadT += dt;
+    // Nobody left standing: a new game, for everyone.
+    if (this.host && this.allDead()) {
+      const el = document.getElementById('death-text');
+      if (el) el.textContent = 'Everyone died. Starting a new game...';
+      if ((this.wipeT = (this.wipeT || 0) + dt) > 3) this.restartGame();
+      return;
+    }
+    this.wipeT = 0;
     this.deathCount(this.respawnTime - this.deadT);
     if (this.deadT >= this.respawnTime) this.respawn();
   }
@@ -1586,17 +1677,68 @@ export class Coop {
   respawn() {
     const g = this.g, P = g.player;
     if (P.alive) return;
+    const away = this.settings && this.settings.spawn === 'away';
     if (this.guest) {
       const h = this.hostPose;
-      if (h && h.alive) this.backUp(this.besideHost(h));
+      if (h && h.alive) this.backUp(away ? this.awaySpot(h, 30, Math.max(34, this.range - 8)) : this.besideHost(h));
       return;
     }
+    if (away) { this.backUp(this.awaySpot(P, 30, 60)); return; }
     const up = [...this.peers.values()].find((p) => p.welcomed && p.pose && p.pose.alive);
     if (up) { this.backUp(this.besideHost(up.pose)); return; }
     const L = g.layout, home = P.home >= 0 ? L.camps[P.home] : null;
     const camp = home && g.campSim.state[home.id].status === 'holding' ? home : g.nearestCamp();
     this.backUp(null);
     g.travelTo(camp);
+  }
+
+  // The host and every guest dead at once (with at least one guest in the game).
+  allDead() {
+    const ps = [...this.peers.values()].filter((p) => p.welcomed);
+    return ps.length > 0 && ps.every((p) => p.pose && !p.pose.alive);
+  }
+
+  // Everyone died: a new city from the start, with the same players and settings.
+  restartGame() {
+    const g = this.g;
+    this.wipeT = 0;
+    this.groupNote('Group', 'Everyone died. Starting a new game.');
+    for (const p of this.peers.values()) {
+      if (!p.welcomed) continue;
+      this.send(p.id, { t: 'restart' });
+      Object.assign(p, { welcomed: false, pose: null, draw: null, player: null, R: null, root: null, human: null, charSeen: false, lookLabel: null, angry: null });
+    }
+    this.guestBook = {};
+    g.ui.closeAll();
+    g.deathShown = false;
+    this.hostDownAt = undefined;
+    g.newGame(g.ui.readDifficulty(), 0, this.settings.loadout || 'survival');
+    g.player.charName = this.net.selfName;
+  }
+
+  // A guest, told the game is starting over: wait for the new world (the host sends it when it is ready).
+  restartGuest() {
+    this.restarting = true;
+    this.welcomeAt = 0;
+    this.welcomeMsg = null;
+    this.baseParts = null;
+    this.puppets = [];
+    const el = document.getElementById('death-text');
+    if (el) el.textContent = 'Everyone died. Starting a new game...';
+    this.hello();
+  }
+
+  // Somewhere out on the street a fair way from a point: where someone comes back when the host has them respawn away.
+  awaySpot(from, rmin, rmax) {
+    const g = this.g, W = g.world, L = g.layout;
+    for (let t = 0; t < 80; t++) {
+      const a = Math.random() * 6.2832, r = rmin + Math.random() * (rmax - rmin);
+      const x = Math.floor(from.x + Math.cos(a) * r), z = Math.floor(from.z + Math.sin(a) * r);
+      if (x < 2 || z < 2 || x >= WX - 2 || z >= WZ - 2) continue;
+      if (!W.walk[(x >> 1) + (z >> 1) * W.walkW] || L.lot[z * WX + x]) continue;
+      return { x: x + .5, y: STREET_Y, z: z + .5, yaw: Math.random() * 6.2832 };
+    }
+    return this.besideHost(from);
   }
 
   backUp(at) {

@@ -224,6 +224,8 @@ class Game {
     const q = QUALITY[key];
     const s = this.settings;
     s.quality = key; s.view = q.view; s.scale = q.scale; s.motion = q.motion; s.dof = q.dof;
+    if (q.cap) s.cap = q.cap;
+    for (const k of ['sway', 'drips', 'grassWave']) if (k in q) s[k] = q[k];
     this.saveSettings();
     this.applySettings(true);
   }
@@ -2209,6 +2211,16 @@ class Game {
     this.spawnPending = true;
     this.beginLoad('Entering Ballarat', () => {
       const leader = LORE[c.key].cast.find((m) => m.role === 'leader');
+      // Co-op: everyone carries their kit from the first moment, and nobody is sent to see the leader for it (one of you would come away
+      // with the kit and the others with nothing). A survivor still wakes up in bed.
+      if (this.coop) {
+        P.takeKit();
+        P.dlg.flags.introDone = true;
+        this.saveGame();
+        if (kit === 'survival') { this.wakeUp(c, bed, () => {}); return; }
+        this.ui.banner(c.name, 'Co-op. Your kit is on you.');
+        return;
+      }
       // The sandbox skips the introductions: you walk in already carrying your kit, and nobody sends you to see anyone.
       if (this.slot === 'sandbox' && kit !== 'survival') {
         P.takeKit();

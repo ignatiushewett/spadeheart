@@ -425,9 +425,22 @@ body.waking #hud > * { visibility: hidden; }
 .coop-name label { color: var(--faint); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; }
 .coop-name input { flex: 1; max-width: 260px; padding: 6px 10px; background: var(--panel-2); border: 1px solid var(--line); color: var(--ink); font: inherit; }
 #coop-vis { padding: 6px 8px; }
-.coop-set { display: grid; grid-template-columns: 190px 1fr; align-items: center; gap: 12px; margin: 4px 0; }
+/* The lobby: players on the left, the game on the right. */
+#coop-panel.coop-wide { width: min(1000px, 96vw) !important; }
+.coop-lobby { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 22px; align-items: start; }
+@media (max-width: 760px) { .coop-lobby { grid-template-columns: 1fr; } }
+.coop-slot { display: flex; align-items: center; gap: 12px; min-height: 46px; padding: 0 14px; margin-bottom: 6px; background: var(--panel-2); border: 1px solid var(--line); font-size: 15px; }
+.coop-slot b { color: var(--ink); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.coop-slot .idx { width: 16px; color: var(--faint); font: 12px var(--mono); }
+.coop-slot .host { color: #c8453a; font-weight: 600; flex: none; }
+.coop-slot.me { border-color: rgba(233,228,216,.4); }
+.coop-slot.empty { color: var(--faint); border-style: dashed; background: transparent; }
+.coop-kv { display: flex; justify-content: space-between; gap: 12px; padding: 7px 2px; border-bottom: 1px solid var(--line); font-size: 13px; }
+.coop-kv span { color: var(--faint); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; align-self: center; }
+.coop-kv b { color: var(--ink); font-weight: 600; text-align: right; }
+.coop-set { display: grid; grid-template-columns: 150px 1fr; align-items: center; gap: 12px; margin: 4px 0; }
 .coop-set label { color: var(--faint); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; }
-.coop-set select { justify-self: start; min-width: 240px; padding: 6px 8px; }
+.coop-set select { justify-self: stretch; min-width: 0; padding: 6px 8px; }
 .coop-code { display: flex; align-items: center; gap: 14px; padding: 12px 14px; margin-bottom: 6px; background: var(--panel-2); border: 1px solid var(--amber); }
 .coop-code span { color: var(--faint); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; }
 .coop-code b { flex: 1; color: var(--ink); font: 700 24px var(--mono); letter-spacing: .25em; }
@@ -748,7 +761,7 @@ body.talking #hud > *:not(#caption) { visibility: hidden; }
 <div id="coop-chat"><input maxlength="120" autocomplete="off" spellcheck="false" placeholder="Say something. Enter to send, Esc to cancel."></div>
 
 <div id="coop" class="screen center">
-  <div class="panel" style="width:min(620px,94vw);max-height:96vh;overflow:auto">
+  <div class="panel" id="coop-panel" style="width:min(620px,94vw);max-height:96vh;overflow:auto">
     <div class="panel-head"><h2>Co-op</h2><span id="coop-via" class="mono" style="color:var(--dim);font-size:12px"></span></div>
     <div class="panel-body" id="coop-body"></div>
     <div class="panel-foot" id="coop-foot"></div>
@@ -785,9 +798,9 @@ body.talking #hud > *:not(#caption) { visibility: hidden; }
         <div class="row" data-hint="A fine noise over the picture, like old film."><label>Film grain</label><input type="range" id="s-grain" data-k="grain" min="0" max="1" step="0.05"><output id="s-grain-o"></output></div>
       </div>
       <div class="s-page" data-page="graphics">
-        <div class="row" data-hint="Sets view distance, render scale, motion blur and depth of field together."><label>Preset</label><select id="s-quality"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="ultra">Ultra</option></select><span></span></div>
+        <div class="row" data-hint="Sets view distance, render scale, motion blur and depth of field together."><label>Preset</label><select id="s-quality"><option value="potato">Potato</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="ultra">Ultra</option></select><span></span></div>
         <div class="row" data-hint="How far out the city is drawn, in blocks. The biggest cost on the graphics card."><label>View distance</label><input type="range" id="s-view" data-k="view" min="128" max="512" step="32"><output id="s-view-o"></output></div>
-        <div class="row" data-hint="Draws the world at a fraction of your screen resolution, then scales it up. Lower is faster and softer."><label>Render scale</label><input type="range" id="s-scale" data-k="scale" min="0.5" max="1" step="0.05"><output id="s-scale-o"></output></div>
+        <div class="row" data-hint="Draws the world at a fraction of your screen resolution, then scales it up. Lower is faster and softer."><label>Render scale</label><input type="range" id="s-scale" data-k="scale" min="0.35" max="1" step="0.05"><output id="s-scale-o"></output></div>
         <div class="row" data-hint="How many of the dead are simulated around you at once. Mostly a cost on the processor."><label>Max active zombies</label><input type="range" id="s-cap" data-k="cap" min="2000" max="60000" step="1000"><output id="s-cap-o"></output></div>
         <div class="row" data-hint="Blurs what is far from where you are looking."><label>Depth of field</label><input type="checkbox" id="s-dof" data-k="dof"><span></span></div>
         <div class="row" data-hint="How much leaves, crops, tents, awnings and flags move in the wind. Off holds them all still."><label>Swaying</label><input type="range" id="s-sway" data-k="sway" min="0" max="2" step="0.05"><output id="s-sway-o"></output></div>

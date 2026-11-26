@@ -132,7 +132,11 @@ export class WebNet {
         if (typeof e.data === 'string') {
           let m;
           try { m = JSON.parse(e.data); } catch { return; }
-          if (m.k === 'ready') finish(resolve, ws);
+          if (m.k === 'ready') {
+            // A word every 45 seconds, so the free server never takes a quiet lobby for nobody being there and goes to sleep.
+            const ka = setInterval(() => { if (ws.readyState === 1) ws.send('ka'); else clearInterval(ka); }, 45000);
+            finish(resolve, ws);
+          }
           else if (m.k === 'error') { const err = new Error(m.why); err.why = m.why; finish(reject, err); }
           else if (m.k === 'gone') { const s = this.conns.get(m.id); if (s && s.relay) this.drop(m.id); }
           return;
