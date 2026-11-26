@@ -143,7 +143,7 @@ export class Player {
     if (kit !== 'survival') this.add('flashlight', 1);
     this.scrip = gear.scrip;
     for (const id of ['tactical', 'riot', 'jacket']) if (this.count(id)) { this.armor = id; break; }
-    this.weapon = ['rifle', 'shotgun', 'pistol', 'revolver', 'axe', 'crowbar'].find((id) => this.count(id));
+    this.weapon = ['lmg', 'hunting', 'deer', 'rifle', 'shotgun', 'smg', 'pistol', 'revolver', 'axe', 'sledge', 'crowbar'].find((id) => this.count(id));
     for (const [id] of gear.items) if (ITEMS[id] && ITEMS[id].type === 'gun') this.mags[id] = Math.min(ITEMS[id].mag, this.count(ITEMS[id].ammo));
     for (const [id] of gear.items) if (ITEMS[id] && ITEMS[id].type === 'gun') this.remove(ITEMS[id].ammo, this.mags[id]);
   }

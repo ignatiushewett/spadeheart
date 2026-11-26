@@ -2514,7 +2514,7 @@ export class UI {
 
   // Radio traffic between the camps, heard wherever you are.
   // Calls that come in together (a settlement shouting its alarm, say) are heard one after another, a moment apart, not all at once.
-  radio(who, text, station = null) { this.inTurn(() => this.showRadio(who, text, station)); }
+  radio(who, text, station = null, sound = 'beep') { this.inTurn(() => this.showRadio(who, text, station, sound)); }
 
   inTurn(fn) {
     const now = performance.now(), at = Math.max(now, this.radioNextAt || 0);
@@ -2534,7 +2534,7 @@ export class UI {
     });
   }
 
-  showRadio(who, text, station = null) {
+  showRadio(who, text, station = null, sound = 'beep') {
     const box = $('toasts');
     const d = document.createElement('div');
     d.className = 'radio';
@@ -2567,7 +2567,7 @@ export class UI {
     box.appendChild(d);
     while (box.children.length > 7) box.removeChild(box.firstChild);
     setTimeout(() => d.remove(), 9000);
-    this.g.audio.simple('beep');
+    if (sound) this.g.audio.simple(sound);
   }
 
   // Once a settlement is going under, what it was saying on the radio a few seconds ago (man down, fill the gap) is no longer true.

@@ -29,13 +29,16 @@ export const RANGES = [
 const RANGE_DEFAULT = 72;
 const RESPAWNS = [5, 12, 30];
 // What everyone starts with (the kits of the main game), and where the dead come back.
-const LOADOUTS = [['survival', 'Standard'], ['drifter', 'Hard'], ['regular', 'Medium'], ['veteran', 'Easy'], ['creative', 'Creative']];
+const LOADOUTS = [['survival', 'Standard'], ['drifter', 'Hard'], ['regular', 'Medium'], ['veteran', 'Easy'], ['random', 'Random'], ['creative', 'Creative']];
+// What dying costs: nothing, everything carried, or everything carried, swapped for a fresh starting kit.
+const DEATHS = [['keep', 'Keep items'], ['lose', 'Lose items'], ['kit', 'New loadout']];
+const deathOf = (S) => S.death || (S.keep ? 'keep' : 'lose');
 const SPAWNS = [['with', 'With a player'], ['away', 'Away from everyone']];
 // Ready-made sets of settings. Changing any one of them after makes it Custom.
 const PRESETS = {
-  survival: { name: 'Survival', note: 'The standard game: the standard kit in Carver Yard, lose what you carry, come back beside a player.', set: { loadout: 'survival', camp: 'garvey', keep: false, ff: true, spawn: 'with', respawn: 12, range: 72 } },
-  deathmatch: { name: 'Deathmatch', note: 'A full kit in a random settlement, keep what you carry, friendly fire, room to spread out, and come back away from everyone.', set: { loadout: 'veteran', camp: 'random', keep: true, ff: true, spawn: 'away', respawn: 5, range: 104 } },
-  creative: { name: 'Creative', note: 'Every weapon and endless building blocks, keep what you carry, no friendly fire.', set: { loadout: 'creative', keep: true, ff: false, spawn: 'with', respawn: 5, range: 72 } },
+  survival: { name: 'Survival', note: 'The standard game: the standard kit in Carver Yard, lose what you carry, come back beside a player.', set: { loadout: 'survival', camp: 'garvey', keep: false, death: 'lose', ff: true, spawn: 'with', respawn: 12, range: 72 } },
+  deathmatch: { name: 'Deathmatch', note: 'A full kit in a random settlement, keep what you carry, friendly fire, room to spread out, and come back away from everyone.', set: { loadout: 'veteran', camp: 'random', keep: true, death: 'keep', ff: true, spawn: 'away', respawn: 5, range: 104 } },
+  creative: { name: 'Creative', note: 'Every weapon and endless building blocks, keep what you carry, no friendly fire.', set: { loadout: 'creative', keep: true, death: 'keep', ff: false, spawn: 'with', respawn: 5, range: 72 } },
 };
 const presetOf = (S) => Object.keys(PRESETS).find((k) => Object.entries(PRESETS[k].set).every(([key, v]) => S[key] === v)) || 'custom';
 const LORE_OK = (c) => !!CAMP_START[c.key];   // a settlement someone can start out in
@@ -198,7 +201,7 @@ export class Coop {
           ['coop-camp', 'Start at', [['random', 'Random'], ...this.g.layout.camps.filter((c) => LORE_OK(c)).map((c) => [c.key, c.name])], S.camp],
           ['coop-spawn', 'Respawn', SPAWNS, S.spawn],
           ['coop-respawn', 'Respawn time', RESPAWNS.map((s) => [s, `${s} seconds`]), S.respawn],
-          ['coop-keep', 'On death', [['keep', 'Keep items'], ['lose', 'Lose items']], S.keep ? 'keep' : 'lose'],
+          ['coop-keep', 'On death', DEATHS, deathOf(S)],
           ['coop-ff', 'Friendly fire', [['on', 'On'], ['off', 'Off']], S.ff ? 'on' : 'off'],
           ['coop-range', 'Guest range', RANGES.map((q) => [q.r, `${q.name}, ${q.r} m`]), cur.r],
         ];
@@ -248,7 +251,7 @@ export class Coop {
     setting('coop-spawn', (v) => { this.settings.spawn = v; });
     setting('coop-range', (v) => { this.settings.range = +v; });
     setting('coop-camp', (v) => { this.settings.camp = v; });
-    setting('coop-keep', (v) => { this.settings.keep = v === 'keep'; });
+    setting('coop-keep', (v) => { this.settings.death = v; this.settings.keep = v === 'keep'; });
     setting('coop-respawn', (v) => { this.settings.respawn = +v; });
     setting('coop-ff', (v) => { this.settings.ff = v === 'on'; });
     const nm = document.getElementById('coop-name');
@@ -288,6 +291,7 @@ export class Coop {
       ff: s.ff !== false,
       respawn: RESPAWNS.includes(s.respawn) ? s.respawn : RESPAWN_S,
       loadout: LOADOUTS.some(([k]) => k === s.loadout) ? s.loadout : 'survival',
+      death: DEATHS.some(([k]) => k === s.death) ? s.death : (s.keep === true ? 'keep' : 'lose'),
       spawn: SPAWNS.some(([k]) => k === s.spawn) ? s.spawn : 'with',
     };
   }
@@ -885,6 +889,12 @@ export class Coop {
       p.saidAt = g.time;
       this.heard(p.id, p.name, text);
       for (const o of this.peers.values()) if (o !== p && o.welcomed) this.send(o.id, { t: 'say', id: p.id, name: p.name, text });
+    } else if (m.t === 'line') {
+      // A guest's group line, typed out on their radio and sent: heard here, and passed on.
+      const text = String(m.text || '').slice(0, 300);
+      if (!text) return;
+      this.heard(p.id, p.name, text);
+      for (const o of this.peers.values()) if (o !== p && o.welcomed) this.send(o.id, { t: 'say', id: p.id, name: p.name, text });
     } else if (m.t === 'fire') this.remoteFire(p, m);
     else if (m.t === 'melee') this.remoteMelee(p, m);
     else if (m.t === 'boom' && Array.isArray(m.a)) {
@@ -936,6 +946,10 @@ export class Coop {
     else if (m.t === 'ui-sfx') g.audio.simple(m.k);
     else if (m.t === 'note') this.radioNote(String(m.who || ''), String(m.text || ''));
     else if (m.t === 'own-line') this.ownLine(g.player.charName || this.net.selfName, String(m.text || '').slice(0, 300));
+    else if (m.t === 'type-out') {
+      const text = String(m.text || '').slice(0, 300);
+      g.ui.typeOut({ chan: 'crew', text, menu: false, send: () => { g.campSim.logNews({ kind: 'crew', who: 'You', mine: true, text }); this.sendHost({ t: 'line', text }); } });
+    }
     else if (m.t === 'ui-radio') g.ui.radio(m.who || null, String(m.text || ''), m.station || null);
   }
 
@@ -989,9 +1003,7 @@ export class Coop {
       typeOut(o) { if (o && o.send) o.send(); if (o && o.then) o.then(); },
       crewRadio(who, text) {
         if (who) { fwd({ t: 'ui-radio', who, text, station: 'Private Frequency' }); return; }
-        fwd({ t: 'own-line', text });
-        c.heard(p.id, p.name, text);
-        for (const o of c.peers.values()) if (o !== p && o.welcomed) c.send(o.id, { t: 'say', id: p.id, name: p.name, text });
+        fwd({ t: 'type-out', text });
       },
       floatSay(n, text, secs) { if (n && (n === this.dlgNpc || n === this.tradeNpc)) fwd({ t: 'ui-float', text }); else host.floatSay(n, text, secs); },
       hitMarker() {}, damageIndicator() {},
@@ -1197,10 +1209,9 @@ export class Coop {
 
   // What you said, on the group's frequency and in the corner like anyone's, with the sound of it going out.
   ownLine(name, text) {
-    const g = this.g, au = g.audio, simple = au.simple, ui = this.hostUI || g.ui;
+    const g = this.g, ui = this.hostUI || g.ui;
     g.campSim.logNews({ kind: 'crew', who: 'You', mine: true, text });
-    au.simple = function (kind, ...a) { return simple.call(this, kind === 'beep' ? 'sent' : kind, ...a); };
-    try { ui.radio(name, text, 'Private Frequency'); } finally { au.simple = simple; }
+    ui.radio(name, text, 'Private Frequency', 'sent');
   }
 
   // Another player's words: a call on the group's frequency, and over their head for anyone near enough to hear.
@@ -1850,14 +1861,21 @@ export class Coop {
     this.forgive(P);
     if (this.guest) this.sendHost({ t: 'respawned' });
     else this.calmHunts();
-    // Played by the host's rules: everything carried, guns, armour and spades, stays where you fell.
-    if (this.settings && this.settings.keep === false) {
+    // Played by the host's rules: everything carried, guns, armour and spades, stays where you fell; or that, and a fresh starting kit
+    // in its place.
+    const death = this.settings ? deathOf(this.settings) : 'keep';
+    if (death !== 'keep') {
       P.inventory = {};
       P.mags = {};
       P.weapon = null;
       P.armor = null;
       P.scrip = 0;
-      g.ui.toast('You came back with nothing.', 'bad');
+      if (death === 'kit') {
+        const camp = (g.layout.camps[P.home] || {}).key || START_CAMP;
+        P.holdKit(this.settings.loadout || 'survival', camp);
+        P.takeKit();
+        g.ui.toast('A fresh kit.', 'good');
+      } else g.ui.toast('You came back with nothing.', 'bad');
       if (this.guest) this.sendChar();
     }
     g.audio.deathMusic(false);

@@ -171,6 +171,7 @@ export const KITS = {
   regular: { name: 'Medium', desc: 'Basic gear from your faction.' },
   drifter: { name: 'Hard', desc: 'A crowbar and nothing else.' },
   creative: { name: 'Creative', desc: 'Every weapon, plenty of ammo, and building blocks that never run out.' },
+  random: { name: 'Random', desc: 'A full kit, different every time, and now and then something very good.' },
   survival: { name: 'Survival', desc: 'Carver Yard, basic gear. No natural healing, and you need to eat. One life.' },
 };
 export const SURVIVAL_TIERS = ['Poor', 'Middling'];
@@ -200,6 +201,7 @@ export function startingGear(kit, campKey) {
   }
   if (kit === 'regular') { const c = CAMP_START[campKey]; return { items: c.items, scrip: c.scrip, standing: 10 }; }
   if (kit === 'drifter') return { items: [['crowbar', 1], ['bandage', 2], ['water', 1]], scrip: 25, standing: 0 };
+  if (kit === 'random') return randomGear();
   // Everything in the armoury, and enough to shoot with. The building materials do not need handing over: in Creative they never run out.
   if (kit === 'creative') return {
     items: [['crowbar', 1], ['axe', 1], ['sledge', 1], ['pistol', 1], ['revolver', 1], ['smg', 1], ['shotgun', 1], ['rifle', 1], ['deer', 1], ['hunting', 1], ['lmg', 1], ['rocket', 1],
@@ -212,6 +214,32 @@ export function startingGear(kit, campKey) {
     scrip: 300, standing: 0,
   };
 }
+// A kit as full as Easy's, rolled fresh each time: a blade, a sidearm and a long gun with rounds for them, armour, something to throw, and
+// the rest. Mostly the everyday guns; about one in four a hunting rifle, and about one in eight something heavy.
+function randomGear() {
+  const pick = (a) => a[Math.floor(Math.random() * a.length)], between = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
+  const melee = pick(['crowbar', 'axe', 'axe', 'sledge']);
+  const side = pick(['pistol', 'pistol', 'revolver', 'smg']);
+  const r = Math.random();
+  let long = r < .12 ? pick(['lmg', 'rocket']) : r < .38 ? pick(['hunting', 'deer']) : pick(['rifle', 'rifle', 'shotgun', 'smg']);
+  if (long === side) long = 'rifle';
+  const items = [[melee, 1], [side, 1], [long, 1]];
+  // Rounds for both guns, a little more than Easy gives when it is the everyday kind.
+  const AMMO = { ammo_pistol: [80, 140], ammo_rifle: [150, 260], ammo_shell: [28, 56], ammo_rocket: [4, 8] }, ammo = {};
+  for (const id of [side, long]) { const a = ITEMS[id] && ITEMS[id].ammo; if (a && AMMO[a]) ammo[a] = (ammo[a] || 0) + between(...AMMO[a]); }
+  for (const [a, n] of Object.entries(ammo)) items.push([a, n]);
+  const armour = Math.random() < .15 ? 'tactical' : Math.random() < .7 ? 'riot' : 'jacket';
+  items.push([armour, 1]);
+  if (Math.random() < .75) items.push(['backpack', 1]);
+  const grenades = between(1, 5), dynamite = between(0, 3);
+  if (grenades) items.push(['grenade', grenades]);
+  if (dynamite) items.push(['dynamite', dynamite]);
+  items.push(['medkit', between(1, 4)], ['bandage', between(3, 8)], ['antibiotic', between(1, 3)], ['water', between(2, 4)], ['beans', between(2, 4)]);
+  if (Math.random() < .5) items.push(['stim', between(1, 2)]);
+  items.push(['block_wood', between(96, 192)], ['block_conc', between(32, 96)], ['block_steel', between(8, 32)]);
+  return { items, scrip: between(150, 600), standing: 0 };
+}
+
 // Standing needed before a camp's traders will part with their best kit.
 export const TRUST_LOCK = { bike_keys: 10, smg: 5, shotgun: 5, revolver: 5, rifle: 10, deer: 5, hunting: 10, riot: 10, dynamite: 10, grenade: 5, lmg: 25, rocket: 25, ammo_rocket: 25, tactical: 25 };
 
