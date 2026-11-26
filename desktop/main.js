@@ -143,7 +143,8 @@ app.whenReady().then(() => {
   gameWin = win;
   setupSteamIpc();
   // Quit on the title screen, and Exit to desktop when paused.
-  ipcMain.on('app:quit', () => app.quit());
+  // If anything (the Steam library, say) holds the app open after quitting, it is made to exit, so the console it ran from closes too.
+  ipcMain.on('app:quit', () => { app.quit(); setTimeout(() => app.exit(0), 2000).unref(); });
   if (launchLobby) win.webContents.once('did-finish-load', () => setTimeout(() => toWin('invite', { lobby: launchLobby }), 1500));
   win.once('ready-to-show', () => { win.maximize(); win.show(); });
   win.loadURL('app://spadeheart/index.html');

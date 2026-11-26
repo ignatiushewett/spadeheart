@@ -2218,7 +2218,8 @@ class Game {
       }
       this.jobs.startVisit(c);
       this.saveGame();
-      if (kit === 'survival') { this.npcs.startFor = c.id; this.wakeUp(c, bed, () => {}); return; }
+      // (In co-op the group is the players: nobody from the settlement comes along at the start.)
+      if (kit === 'survival') { if (!this.coop) this.npcs.startFor = c.id; this.wakeUp(c, bed, () => {}); return; }
       this.ui.banner(c.name, `You came in with nothing. Find ${leader.name}, who runs this place: they will get you set up.`);
     });
   }

@@ -180,6 +180,7 @@ export class Coop {
         const camps = this.g.layout.camps.filter((c) => LORE_OK(c)).map((c) => [c.key, c.name]);
         html += sel('coop-camp', 'Start at', camps, S.camp);
         html += sel('coop-keep', 'On death', [['keep', 'Keep items'], ['lose', 'Lose items']], S.keep ? 'keep' : 'lose');
+        html += sel('coop-ff', 'Friendly fire', [['on', 'On'], ['off', 'Off']], S.ff ? 'on' : 'off');
         html += sel('coop-respawn', 'Respawn time', RESPAWNS.map((s) => [s, `${s} seconds`]), S.respawn);
         html += `<div class="coop-note">Everyone starts together as survivors. Friends can join any time.${this.coopSave ? ` Continue picks up your last co-op game (day ${this.coopSave.day}).` : ''}</div>`;
       } else html += `<div class="coop-note">${this.hostStarted ? 'Joining...' : 'Waiting for the host to start.'}</div>`;
@@ -217,6 +218,7 @@ export class Coop {
     setting('coop-camp', (v) => { this.settings.camp = v; });
     setting('coop-keep', (v) => { this.settings.keep = v === 'keep'; });
     setting('coop-respawn', (v) => { this.settings.respawn = +v; });
+    setting('coop-ff', (v) => { this.settings.ff = v === 'on'; });
     const nm = document.getElementById('coop-name');
     if (nm) nm.addEventListener('change', () => {
       const v = nm.value.trim().slice(0, 20);
@@ -245,18 +247,19 @@ export class Coop {
   // The host's settings, as last chosen on this computer.
   loadSettings() {
     let s = {};
-    try { s = JSON.parse(localStorage.getItem('spadeheart.coopSettings') || '{}') || {}; } catch { /* private mode, or nothing saved */ }
+    try { s = JSON.parse(localStorage.getItem('spadeheart.coopSettings2') || '{}') || {}; } catch { /* private mode, or nothing saved */ }
     const camps = this.g.layout.camps;
     this.settings = {
       range: RANGES.some((q) => q.r === s.range) ? s.range : RANGE_DEFAULT,
       camp: camps.some((c) => c.key === s.camp && LORE_OK(c)) ? s.camp : START_CAMP,
-      keep: s.keep !== false,
+      keep: s.keep === true,
+      ff: s.ff !== false,
       respawn: RESPAWNS.includes(s.respawn) ? s.respawn : RESPAWN_S,
     };
   }
 
   saveSettings() {
-    try { localStorage.setItem('spadeheart.coopSettings', JSON.stringify(this.settings)); } catch { /* private mode */ }
+    try { localStorage.setItem('spadeheart.coopSettings2', JSON.stringify(this.settings)); } catch { /* private mode */ }
   }
 
   // What the game is playing by, for anyone in it.
@@ -511,6 +514,12 @@ export class Coop {
       return simple.call(this, kind, x, y, z);
     });
     H.foci = [];
+    const trace = G.player.traceBullet;
+    this.hook(G.player, 'traceBullet', function (o, dx, dy, dz, it, ...rest) {
+      const out = trace.call(this, o, dx, dy, dz, it, ...rest);
+      g.friendlyFire(null, o, [dx, dy, dz], it);
+      return out;
+    });
     // People shot at by a guest go after that guest. What they hold against someone (grudges, bail, being wanted, being barred) is kept
     // on that player's character, so a guest's shots count against the guest; and each frame anyone with a quarrel with a guest who is
     // nearer than any quarrel with the host is worked out with that guest as the player: they turn on them, chase them and shoot at them.
@@ -528,6 +537,41 @@ export class Coop {
       if (n.kind === 'raider') for (const m of this.list) if (m.kind === 'raider' && (m === n || (m.gang === n.gang && m.provoked))) m.provokedBy = g.shooter || null;
       return out;
     });
+  }
+
+  // The player nearest a point, by the character the city knows them by: the host, or a guest's character kept here.
+  nearestPlayer(x, z) {
+    let best = this.g.player, bd = (best.x - x) ** 2 + (best.z - z) ** 2;
+    if (!this.host) return best;
+    for (const p of this.peers.values()) {
+      if (!p.welcomed || !p.pose || !p.pose.alive || !p.player) continue;
+      const d = (p.pose.x - x) ** 2 + (p.pose.z - z) ** 2;
+      if (d < bd) { bd = d; best = p.player; }
+    }
+    return best;
+  }
+
+  // Friendly fire, if the host has it on: a round that passes through another player before it hits anything hurts them.
+  friendlyFire(shooter, o, d, it) {
+    if (!this.host || !this.settings || !this.settings.ff || !it) return;
+    const g = this.g, hit = g.world.raycast(o[0], o[1], o[2], d[0], d[1], d[2], it.range || 100, true), maxT = hit ? hit.dist : it.range || 100;
+    const a = d[0] * d[0] + d[2] * d[2];
+    if (a < 1e-5) return;
+    let best = null, bt = maxT;   // who the round goes through first: 'host', a guest, or nobody
+    const test = (x, y, z, who) => {
+      const t = ((x - o[0]) * d[0] + (z - o[2]) * d[2]) / a;
+      if (t <= .5 || t >= bt) return;
+      const hx = o[0] + d[0] * t - x, hz = o[2] + d[2] * t - z, hy = o[1] + d[1] * t;
+      if (hx * hx + hz * hz > .2 || hy < y || hy > y + 2.7) return;
+      bt = t; best = who;
+    };
+    const hp = this.hostP;
+    if (shooter && hp.alive) test(hp.x, hp.y, hp.z, 'host');
+    for (const p of this.peers.values()) if (p !== shooter && p.welcomed && p.pose && p.pose.alive) test(p.pose.x, p.pose.y, p.pose.z, p);
+    if (!best) return;
+    const dmg = it.dmg || 20;
+    if (best === 'host') hp.damage(dmg, o[0], o[2], 'shot');
+    else this.send(best.id, { t: 'hurt', d: r2(dmg), x: r2(o[0]), z: r2(o[2]), k: 'shot' });
   }
 
   // Someone in the city with a quarrel with a guest, and not with the host: the guest they should go for, if any is near.
@@ -1126,6 +1170,7 @@ export class Coop {
       g.audio.gun(it.sound, o[0], o[1], o[2], true);
       g.horde.noise(o[0], o[2], it.noise * .55, .9);
     }, peer);
+    for (let k = 0; k + 2 < r.length; k += 3) this.friendlyFire(peer, o, [r[k], r[k + 1], r[k + 2]], it);
     this.send(peer.id, { t: 'hit', any, kills: stand.kills });
   }
 

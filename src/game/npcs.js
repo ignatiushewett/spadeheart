@@ -4040,14 +4040,17 @@ export class NPCs {
         if (gate.ruinOpen && gate.open >= 1 && W.get(d.cx, d.y0, d.cz) !== 0) gate.open = 0;
         if (gate.ruinOpen && gate.open < 1) { gate.target = 1; } else { if (gate.ruinOpen) openGates++; continue; }
       } else {
-        const dist = Math.hypot(P.x - d.cx, P.z - d.cz);
-        const near = dist < 11 && Math.abs(P.y - STREET_Y) < 5;
+        // In co-op, whichever player is nearest this gate, by their own papers and bail.
+        const Q = g.coop ? g.coop.nearestPlayer(d.cx, d.cz) : P;
+        const dist = Math.hypot(Q.x - d.cx, Q.z - d.cz);
+        const near = dist < 11 && Math.abs(Q.y - STREET_Y) < 5;
         // Anyone caught inside gets shown the way out. Nobody gets shown the way in without papers.
-        const insideNow = P.x > c.x0 && P.x < c.x1 && P.z > c.z0 && P.z < c.z1;
+        const insideNow = Q.x > c.x0 && Q.x < c.x1 && Q.z > c.z0 && Q.z < c.z1;
         // Owe them bail and the gate stays shut to you until it is paid. Someone already inside is still let out.
-        const owes = this.owesBail(c.id);
-        const lets = insideNow || (this.admitted(c.id) && !owes);
-        if (near && !lets && dist < 9 && g.time - (this.gateSaid || -99) > 18) {
+        g.player = Q;
+        let owes, lets;
+        try { owes = this.owesBail(c.id); lets = insideNow || (this.admitted(c.id) && !owes); } finally { g.player = P; }
+        if (near && !lets && dist < 9 && Q === P && g.time - (this.gateSaid || -99) > 18) {
           this.gateSaid = g.time;
           const watch = st.npcs.find((n) => n.kind === 'sentry');
           if (owes) {
