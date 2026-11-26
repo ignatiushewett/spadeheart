@@ -135,6 +135,7 @@ export class Horde {
     this.blowZ = 0;
     this.onHitPlayer = null;
     this.onHitHuman = null;
+    this.foci = null;   // co-op only: where the other players are
     this.onKilled = null;
     this.onGnaw = null;
     this.chasers = 0;
@@ -1204,7 +1205,7 @@ export class Horde {
       // Only the detailed update has gravity. Anyone up off the street with nothing under them gets it, wherever they are.
       const unheld = py[i] > this.gy(px[i], pz[i]) + 1 && ((i + f) & 7) === 0 && w.isLoaded(Math.floor(px[i]), Math.floor(py[i]), Math.floor(pz[i])) && !w.solid(Math.floor(px[i]), Math.floor(py[i] - .05), Math.floor(pz[i]));
       if (unheld) this.droppers[i] = 1;
-      if (this.droppers[i] || (d2 < NEAR2 && Math.abs(py[i] - P.y) < 30) || (st !== S_IDLE && d2 < 8100 && py[i] > this.gy(px[i], pz[i]) + 2.5)) {
+      if (this.droppers[i] || (d2 < NEAR2 && Math.abs(py[i] - P.y) < 30) || (this.foci && this.foci.length && this.nearFoci(px[i], py[i], pz[i])) || (st !== S_IDLE && d2 < 8100 && py[i] > this.gy(px[i], pz[i]) + 2.5)) {
         if (this.droppers[i] && w.solid(Math.floor(px[i]), Math.floor(py[i] - .05), Math.floor(pz[i]))) this.droppers[i] = 0;
         nearCount++;
         this.updateNear(i, dt, d2, speedK);
@@ -1242,6 +1243,15 @@ export class Horde {
     this.spawnStep(P);
     this.spawnStragglers(P, dt);
     this.updateCorpses(dt);
+  }
+
+  // Co-op: the other players keep the bodies round them in full detail too, so those can reach them, bite them and be fought.
+  nearFoci(x, y, z) {
+    for (const f of this.foci) {
+      const dx = x - f.x, dz = z - f.z;
+      if (dx * dx + dz * dz < 1600 && Math.abs(y - f.y) < 30) return true;
+    }
+    return false;
   }
 
   removeAt(i, n) {

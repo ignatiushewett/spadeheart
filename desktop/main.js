@@ -1,7 +1,7 @@
 // Spadeheart as a desktop app: its own window, no browser around it. No tabs, no address bar, no right-click menu, no shortcuts that
 // close or reload the page by accident, and no "press Esc to show your cursor" bubble. It runs the very same files the web version
 // does, straight from the folder above this one, so GitHub Pages and `node server.js` carry on exactly as before.
-const { app, BrowserWindow, protocol, net, Menu, shell, powerSaveBlocker } = require('electron');
+const { app, BrowserWindow, protocol, net, Menu, shell, powerSaveBlocker, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { pathToFileURL } = require('url');
@@ -42,6 +42,75 @@ if (STEAM) {
   }
 }
 
+// --- Co-op over Steam ----------------------------------------------------------------------------------------------------------------
+// A lobby is how players find each other and how invites travel. Once in one, they talk peer to peer through Steam's relays, so nobody
+// has to open a port. The game page reaches all of this through preload.js. The numbers are steamworks.js's enums, written out because
+// they are TypeScript const enums and are not there at run time: lobby types (1 friends only, 2 public), send types (0 unreliable,
+// 2 reliable) and callbacks (4 lobby data, 5 lobby members, 6 P2P session request, 8 join requested from the friends list or an invite).
+const LOBBY_GAME = 'spadeheart-coop';
+let lobby = null, gameWin = null;
+const sid = (p) => (p && p.steamId64 !== undefined ? p.steamId64.toString() : '');
+const toWin = (type, payload) => { if (gameWin && !gameWin.isDestroyed()) gameWin.webContents.send('steam:event', type, payload); };
+const lobbyInfo = (l) => ({ id: l.id.toString(), owner: sid(l.getOwner()), members: l.getMembers().map(sid), data: l.getFullData() });
+const inLobby = (id) => !!lobby && lobby.getMembers().some((m) => sid(m) === id);
+
+function setupSteamIpc() {
+  ipcMain.handle('steam:info', () => {
+    if (!steamClient) return { available: false };
+    try { return { available: true, id: sid(steamClient.localplayer.getSteamId()), name: steamClient.localplayer.getName() }; } catch (e) { return { available: false, error: e.message }; }
+  });
+  if (!steamClient) {
+    for (const k of ['host', 'setData', 'lobbies', 'join', 'leave', 'invite', 'members']) ipcMain.handle(`steam:${k}`, () => null);
+    ipcMain.on('steam:send', () => {});
+    return;
+  }
+  const S = steamClient;
+  ipcMain.handle('steam:host', async (e, visibility, max) => {
+    if (lobby) { try { lobby.leave(); } catch {} lobby = null; }
+    lobby = await S.matchmaking.createLobby(visibility === 'public' ? 2 : 1, Math.max(2, Math.min(4, max || 4)));
+    lobby.mergeFullData({ game: LOBBY_GAME, name: S.localplayer.getName() });
+    return lobbyInfo(lobby);
+  });
+  ipcMain.handle('steam:setData', (e, data) => (lobby ? lobby.mergeFullData(data) : false));
+  ipcMain.handle('steam:lobbies', async () => {
+    const list = await S.matchmaking.getLobbies();
+    return list.filter((l) => l.getData('game') === LOBBY_GAME).map((l) => ({ id: l.id.toString(), n: Number(l.getMemberCount()), max: Number(l.getMemberLimit() || 4), data: l.getFullData() }));
+  });
+  ipcMain.handle('steam:join', async (e, id) => {
+    if (lobby) { try { lobby.leave(); } catch {} lobby = null; }
+    lobby = await S.matchmaking.joinLobby(BigInt(id));
+    return lobbyInfo(lobby);
+  });
+  ipcMain.handle('steam:leave', () => { if (lobby) { try { lobby.leave(); } catch {} } lobby = null; return true; });
+  ipcMain.handle('steam:invite', () => { if (lobby) lobby.openInviteDialog(); return !!lobby; });
+  ipcMain.handle('steam:members', () => (lobby ? lobbyInfo(lobby) : null));
+  // Small packets that can be lost (where everyone is) go unreliable; anything bigger than one datagram, or that must arrive, reliable.
+  ipcMain.on('steam:send', (e, to, data, reliable) => {
+    try {
+      const buf = Buffer.from(data.buffer, data.byteOffset, data.byteLength);
+      S.networking.sendP2PPacket(BigInt(to), reliable || buf.length > 1200 ? 2 : 0, buf);
+    } catch (err) { console.warn('Steam: send failed', err && err.message); }
+  });
+  // Only someone in the same lobby gets a connection.
+  S.callback.register(6, ({ remote }) => { if (inLobby(remote.toString())) S.networking.acceptP2PSession(remote); });
+  S.callback.register(5, ({ lobby: id }) => { if (lobby && lobby.id === id) toWin('lobby', lobbyInfo(lobby)); });
+  S.callback.register(4, ({ lobby: id }) => { if (lobby && lobby.id === id) toWin('lobby', lobbyInfo(lobby)); });
+  S.callback.register(8, ({ lobby_steam_id: id }) => toWin('invite', { lobby: id.toString() }));
+  // Packets in, as fast as they come.
+  setInterval(() => {
+    for (let guard = 0; guard < 256; guard++) {
+      const size = S.networking.isP2PPacketAvailable();
+      if (!size) break;
+      const p = S.networking.readP2PPacket(size);
+      toWin('packet', { from: sid(p.steamId), data: new Uint8Array(p.data) });
+    }
+  }, 5);
+  app.on('before-quit', () => { if (lobby) { try { lobby.leave(); } catch {} lobby = null; } });
+}
+
+// Started from a friend's invite with the game closed: Steam passes the lobby on the command line.
+const launchLobby = (() => { const i = process.argv.indexOf('+connect_lobby'); return i >= 0 ? process.argv[i + 1] : null; })();
+
 // Its own name and icon on the taskbar, not Electron's. (icon.ico and icon.png are drawn from the web page's favicon by make-icon.js.)
 app.setAppUserModelId('com.spadeheart.game');
 
@@ -69,8 +138,11 @@ app.whenReady().then(() => {
     width: 1600, height: 900, minWidth: 960, minHeight: 600,
     backgroundColor: '#000000', title: 'Spadeheart', autoHideMenuBar: true, show: false,
     icon: path.join(__dirname, process.platform === 'win32' ? 'icon.ico' : 'icon.png'),
-    webPreferences: { contextIsolation: true, sandbox: true, backgroundThrottling: false, spellcheck: false },
+    webPreferences: { contextIsolation: true, sandbox: true, backgroundThrottling: false, spellcheck: false, preload: path.join(__dirname, 'preload.js') },
   });
+  gameWin = win;
+  setupSteamIpc();
+  if (launchLobby) win.webContents.once('did-finish-load', () => setTimeout(() => toWin('invite', { lobby: launchLobby }), 1500));
   win.once('ready-to-show', () => { win.maximize(); win.show(); });
   win.loadURL('app://spadeheart/index.html');
   // Launching it again brings this window back instead of opening a second one.

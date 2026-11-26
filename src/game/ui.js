@@ -18,6 +18,8 @@ const RADIO_OPS_RANGE = 1400;   // blocks from a settlement's wall its operation
 const RADIO_CIV_RANGE = 380;    // and its civilian station
 const SHOW_WORLD_MARKERS = false;    // quest markers floating in the 3D view (the compass and the map carry them instead)
 const fmt = (n) => Math.round(n).toLocaleString('en-US');
+// Text that came from somewhere else (another player's name) goes into the page as text, never as markup.
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 // A camp with nothing happening at it, as the player reads it.
 // A day's patrol that is done has nothing left to point at until tomorrow, and a night shift never has one spot to point at.
 // An operation is fought all round the settlement you are standing in: a marker in the middle of it points nowhere useful.
@@ -1387,10 +1389,36 @@ export class UI {
 
   // Your crew as cards, the one picked laid out under them: what they have, what they are doing, and what you can get them. The radio
   // is alongside.
+  // The players in the group: you first, then anyone playing alongside you in co-op. They are in the group but take up none of its room.
+  crewPlayers() {
+    const g = this.g, P = g.player, it = P.weapon && ITEMS[P.weapon];
+    const me = {
+      key: 'p:self', self: true, name: P.charName || 'You', alive: P.alive, health: P.alive ? P.health : 0, armour: !!P.armor,
+      weapon: it && (it.type === 'gun' || it.type === 'melee') ? it.name : 'Unarmed', kills: P.kills || 0, scrip: P.scrip || 0,
+      days: Math.max(1, g.day - (P.bornDay || g.day) + 1), home: P.home, where: P.alive ? 'You' : 'Down',
+    };
+    return [me, ...(g.coop ? g.coop.crewPlayers() : [])];
+  }
+
+  // A player picked in the group: who they are and how they are doing. Nothing to order or buy: they make their own way.
+  renderPlayerCard(p) {
+    const g = this.g, c = p.home >= 0 ? g.layout.camps[p.home] : null;
+    const facDot = c && c.faction ? `<i style="background:rgb(${c.faction.map((v) => Math.round(v * 255)).join(',')})"></i>` : '';
+    const tag = p.tag || (p.self ? 'You' : '');
+    let html = `<div class="cd-head"><div><div class="dt">${esc(p.name)}</div><div class="fac">${tag ? `<span class="bond">${esc(tag)}</span>` : ''}${facDot}${c ? c.name : p.crew ? 'Crew' : 'No settlement'}</div></div></div>`;
+    html += `<div class="cd-stats"><span><b>${Math.ceil(Math.max(0, p.health))}</b>Health</span><span><b>${fmt(p.kills)}</b>Kills</span><span><b>${SP} ${fmt(p.scrip)}</b>Spades</span><span><b>${p.days}</b>Days</span></div>`;
+    const note = p.self ? (g.coop ? 'You and the other players share this group and its reputation.' : 'You lead the group. Everyone else in it goes where you send them.')
+      : p.crew ? `In ${p.owner ? `${esc(p.owner)}'s` : 'the'} crew. ${p.where}. Their orders and kit go through ${p.owner ? esc(p.owner) : 'them'}.` : `Playing alongside you. ${p.where}.`;
+    html += `<div class="shop-why">${note}</div>`;
+    $('crew-detail').innerHTML = html;
+  }
+
   renderCrew() {
     const g = this.g, P = g.player, N = g.npcs, crew = N.followers.filter((f) => !f.dead);
-    if (!crew.includes(this.crewSel)) this.crewSel = crew[0] || null;
-    const n = this.crewSel, rep = P.crewRep || 0;
+    const players = this.crewPlayers();
+    const pickedPlayer = typeof this.crewSel === 'string' ? players.find((p) => p.key === this.crewSel) : null;
+    if (!pickedPlayer && !crew.includes(this.crewSel)) this.crewSel = crew[0] || players[0].key;
+    const n = typeof this.crewSel === 'string' ? null : this.crewSel, rep = P.crewRep || 0;
     const standing = rep < 0 ? 'Doubted' : rep < 20 ? 'Unproven' : rep < 40 ? 'Known' : rep < 60 ? 'Respected' : rep < 80 ? 'Trusted' : 'Legend';
     $('crew-sum').textContent = `${crew.length} of ${N.crewRoom()}`;
     // What people think of the group, and how far off the next place in it is.
@@ -1406,6 +1434,14 @@ export class UI {
     };
     const cards = $('crew-cards');
     cards.innerHTML = '';
+    for (const p of players) {
+      const hp = Math.max(0, Math.min(1, p.health / 100));
+      const b = document.createElement('button');
+      b.className = `crew-card${p.crew ? '' : ' player'}${this.crewSel === p.key ? ' sel' : ''}${p.alive && p.where !== 'Away' ? '' : ' away'}`;
+      b.innerHTML = `${figureSvg(hp, p.armour)}<span class="nm">${esc(p.name)}</span>${p.tag || p.self ? `<small class="bond">${esc(p.tag || 'You')}</small>` : ''}<small>${esc(p.weapon)}</small><small>${p.where}</small><div class="hpbar${hp < .35 ? ' low' : ''}"><i style="width:${(hp * 100).toFixed(1)}%"></i></div>`;
+      b.addEventListener('click', () => { this.crewSel = p.key; g.audio.simple('ui'); this.renderCrew(); });
+      cards.appendChild(b);
+    }
     for (const f of crew) {
       const hp = Math.max(0, Math.min(1, f.hp / f.maxHp)), tier = crewArmourTier(f);
       const b = document.createElement('button');
@@ -1417,7 +1453,12 @@ export class UI {
     const shop = N.crewShop(null);
     $('crew-where').textContent = crew.length && shop.camp ? `Kit for sale in ${shop.camp.name}.` : '';
     const box = $('crew-detail');
-    if (!n) { box.innerHTML = ''; this.renderRadio(); return; }
+    if (!n) {
+      const p = players.find((q) => q.key === this.crewSel);
+      if (p) this.renderPlayerCard(p); else box.innerHTML = '';
+      this.renderRadio();
+      return;
+    }
     const first = n.name.split(' ')[0], fac = this.crewFaction(n), tier = crewArmourTier(n), days = g.day - (n.joined ?? g.day);
     // The person: name and who they are to you on the left, whether they are with you on the right; then their numbers in a strip.
     const withMe = !n.order || n.order === 'call' || n.order === 'gate';

@@ -29,6 +29,7 @@ import { Bikes } from './game/bike.js';
 import { Director } from './game/director.js';
 import { LORE } from './game/camplore.js';
 import { damp } from './engine/math.js';
+import { Coop } from './game/coop.js';
 const pickBusy = (a) => a[Math.floor(Math.random() * a.length)];
 
 const rand = Math.random;
@@ -287,6 +288,9 @@ class Game {
     this.director = new Director(this);
     this.setupCallbacks();
     this.setupInput();
+    // Co-op: the lobby is always there behind the menu button; this.coop is set only while a co-op game is being played.
+    this.coop = null;
+    this.coopHub = new Coop(this, () => `${SAVE_KEY}:${(document.getElementById('menu-version') || {}).textContent || VERSION}`);
     this.setupAtmosphere();
     this.applySettings(false);
     this.horde.applyDifficulty(DIFFICULTY.hard);
@@ -761,7 +765,7 @@ class Game {
     document.addEventListener('pointerlockchange', () => {
       const was = this.locked;
       this.locked = document.pointerLockElement === canvas;
-      if (was && !this.locked && this.state === 'play' && !this.ui.modal && this.player.alive && !this.devOpen) this.pause();
+      if (was && !this.locked && this.state === 'play' && !this.ui.modal && this.player.alive && !this.devOpen && !this.chatting) this.pause();
     });
     canvas.addEventListener('click', () => { if (this.state === 'play' && !this.ui.modal) this.lock(); });
     window.addEventListener('blur', () => { I.keys = {}; I.mouse = [false, false, false]; });
@@ -912,6 +916,7 @@ class Game {
     // Both hands on the bars: nothing to be got out, swapped or used until you are off it.
     else if (this.bikes.ride) return;
     else if (e.code === 'KeyH') P.quickHeal();
+    else if (e.code === 'KeyT' && this.coop) { e.preventDefault(); this.coop.openChat(); }
     else if (e.code === 'KeyB') P.selectBlocks();
     else if (e.code === 'KeyG') { if (P.count('grenade')) P.selectWeapon('grenade'); else ui.toast('No grenades'); }
     else if (e.code.startsWith('Digit')) {
@@ -1178,6 +1183,8 @@ class Game {
   // Whatever was going to happen elsewhere happens while you are out. If it happens here, the siren wakes you.
   sleepHere() {
     const P = this.player, c = this.horde.inCamp(P.x, P.z);
+    // In co-op the host's bed is the group's: everyone sleeps when the host does.
+    if (this.coop && this.coop.guest) { this.ui.toast(`${this.coop.hostName || 'Whoever started the game'} decides when the group sleeps.`, 'bad'); return; }
     const no = this.noSleep();
     if (no) { this.ui.toast(no, 'bad'); return; }
     if (this.sleepFx) return;
@@ -1185,6 +1192,7 @@ class Game {
     this.sleepFx = true;
     this.ui.sleepVeil(true);
     this.audio.duck(true);
+    if (this.coop) { this.coopSlept = null; this.coop.onSleep(); }
     setTimeout(() => this.drift(c), 1100);
   }
 
@@ -1203,6 +1211,7 @@ class Game {
     const slept = this.campSim.pass(span, c ? c.id : -1, deep);
     const woken = !!this.campSim.wakeReason;
     const share = slept / Math.max(1, span);
+    if (this.coop) this.coopSlept = { share, slept };
     this.tod += slept / DAY_SECONDS;
     if (this.tod >= 1) { this.tod -= 1; this.day++; this.horde.regrow(1); this.campSim.newDay(); }
     this.lastWake = this.campSim.now();
@@ -1231,6 +1240,7 @@ class Game {
     this.sleepFx = false;
     this.ui.sleepVeil(false);
     this.audio.duck(false);
+    if (this.coop && this.coop.host) { const s = this.coopSlept || {}; this.coopSlept = null; this.coop.onWake(s.share || 0, s.slept || 0); }
   }
 
   searchContainer(hit) {
@@ -2257,9 +2267,16 @@ class Game {
   async deleteAllSaves() {
     if (this.state === 'play') return false;
     await this.savePending;
-    for (const n of [1, 2, 3, 'sandbox']) await dbDelete(slotKey(n)).catch((e) => console.warn('delete failed', e));
+    for (const n of [1, 2, 3, 'sandbox', 'coop']) await dbDelete(slotKey(n)).catch((e) => console.warn('delete failed', e));
     await this.refreshContinue();
     return true;
+  }
+
+  // The co-op city from before, if there is one to go back to: only the host's copy is kept.
+  async coopSaveInfo() {
+    await this.savePending;
+    const s = await dbGet(slotKey('coop')).catch(() => null);
+    return s ? { day: s.day } : null;
   }
 
   async deleteSlot(n) {
@@ -2373,10 +2390,12 @@ class Game {
 
   saveGame() {
     if (this.state !== 'play' && this.state !== 'loading') return;
+    // A co-op guest's world is the host's, saved there. The host's co-op game has its own slot.
+    if (this.coop && (this.coop.guest || this.slot !== 'coop')) return;
     const data = {
       version: 1, garvey: GARVEY_V, west: WEST_V, mapV: MAP_V, campsV: CAMPS_V, player: this.player.toSave(), followers: this.npcs.followersToSave(), jobs: this.jobs.toSave(), edits: this.world.exportEdits(), horde: this.horde.exportState(),
       tod: this.tod, day: this.day, difficulty: this.difficulty, stats: this.stats, lightsGone: [...(this.lightsGone || [])], lotHurt: [...(this.lotHurt || new Map())].map(([k, e]) => [k, e.lost, e.base, e.down ? 1 : 0]), camps: this.campSim.toSave(), bikes: this.bikes.toSave(), director: this.director.toSave(), weather: this.weather.toSave(), savedAt: Date.now(),
-      permaDead: this.player.loadout === 'survival' && !this.player.alive,
+      permaDead: this.player.loadout === 'survival' && !this.player.alive && !this.coop,
     };
     this.savePending = dbPut(slotKey(this.slot || 1), data).catch((e) => console.warn('save failed', e));
     this.world.editsDirty = false;
@@ -2387,6 +2406,7 @@ class Game {
     this.audio.deathMusic(false);
     this.player.fly = false;
     this.saveGame();
+    if (this.coop) { this.coop.endSession(); this.slot = null; }
     this.horde.bankAll();
     this.clearLoadedWorld();
     this.horde.applyDifficulty(DIFFICULTY.hard);
@@ -2455,6 +2475,8 @@ class Game {
   onPlayerDeath() {
     const P = this.player;
     this.deathShown = false;
+    // In co-op you go down and come back up beside whoever is still standing.
+    if (this.coop) { this.coop.onDeath(); return; }
     document.exitPointerLock();
     const survival = P.loadout === 'survival';
     document.querySelector('#death h1').textContent = survival ? `${P.charName} is dead` : 'Overrun';
@@ -2745,7 +2767,7 @@ class Game {
   schedule() {
     if (this.rafPending) return;
     this.rafPending = true;
-    requestAnimationFrame((t) => { this.rafPending = false; this.loop(t); });
+    requestAnimationFrame((t) => { this.rafPending = false; this.rafAt = performance.now(); this.loop(t); });
   }
 
   loop(now) {
@@ -2815,9 +2837,11 @@ class Game {
   step(dt) {
     const r = this.renderer;
     this.time += dt;
+    if (this.coopHub) this.coopHub.frame();
     // Sirens belong to the game being played. Nothing else tells them to stop, so a menu, a pause or a loading screen has to.
     // (The map, the inventory, the group and a conversation are looked at with the game still going on around you: those do not stop it.)
-    const live = !this.ui.modal || LIVE_MODALS.has(this.ui.modal);
+    // In co-op nothing stops it: the others are still playing.
+    const live = !this.ui.modal || LIVE_MODALS.has(this.ui.modal) || (!!this.coop && this.state === 'play');
     if (this.state !== 'play' || !live) this.audio.setAlarm(null, 0, true);
     if (this.state === 'loading') {
       this.updateLoading();
@@ -3087,8 +3111,10 @@ class Game {
 
   updatePlay(dt) {
     const P = this.player, H = this.horde, W = this.world, r = this.renderer;
+    // A co-op guest walks the host's world: the dead, the people, the camps and the days are all the host's, and come over the wire.
+    const guest = !!(this.coop && this.coop.guest);
     this.tod += dt / DAY_SECONDS;
-    if (this.tod >= 1) { this.tod -= 1; this.day++; H.regrow(1); this.campSim.newDay(); }
+    if (this.tod >= 1) { this.tod -= 1; if (!guest) { this.day++; H.regrow(1); this.campSim.newDay(); } }
     const night = r.sky.night;
     this.isNight = night > .5;
     H.nightK = night;
@@ -3119,15 +3145,15 @@ class Game {
     P.sanctuary = !!shelter && this.campSim.state[shelter.id].status !== 'overrun';
     // Each part of the world runs on its own: one going wrong must not stop the rest. Before this, one bad frame in the people code left
     // everybody frozen mid-step and unkillable for the rest of the session.
-    this.guard('horde', () => H.update(dt, { x: P.x, y: P.y, z: P.z, stealth, alive: P.alive, sanctuary: P.sanctuary, campId: shelter ? shelter.id : -1 }));
+    if (!guest) this.guard('horde', () => H.update(dt, { x: P.x, y: P.y, z: P.z, stealth, alive: P.alive, sanctuary: P.sanctuary, campId: shelter ? shelter.id : -1 }));
     this.frameDt = dt;
-    if (P.interact && P.interact.kind === 'breach' && this.input.keys.KeyE && this.locked && !this.sleepFx && P.alive) this.campSim.handRepair(P.interact.breach, dt);
-    this.guard('director', () => this.director.update(dt));
-    this.guard('camps', () => this.campSim.update(dt));
+    if (!guest && P.interact && P.interact.kind === 'breach' && this.input.keys.KeyE && this.locked && !this.sleepFx && P.alive) this.campSim.handRepair(P.interact.breach, dt);
+    if (!guest) this.guard('director', () => this.director.update(dt));
+    if (!guest) this.guard('camps', () => this.campSim.update(dt));
     if (this.cheats && this.cheats.spades && P.scrip < 999999) P.scrip = 999999;
-    this.guard('people', () => this.npcs.update(dt));
-    this.guard('dogs', () => this.dogs.update(dt));
-    this.guard('buildings', () => {
+    if (!guest) this.guard('people', () => this.npcs.update(dt));
+    if (!guest) this.guard('dogs', () => this.dogs.update(dt));
+    if (!guest) this.guard('buildings', () => {
       if ((this.structT = (this.structT || 0) - dt) <= 0) { this.structT = .5; this.checkStructures(); }
       this.fellTrees();
       this.checkTrees();
@@ -3137,16 +3163,18 @@ class Game {
       // One a frame at most: a big one is a fair bit of work.
       if (fs && fs.length) for (let i = fs.length - 1; i >= 0; i--) if ((fs[i].t -= dt) <= 0 && !(this.dropsAfter && this.dropsAfter.length) && !(this.drops && this.drops.length)) { this.sweepFloating(fs.splice(i, 1)[0]); break; }
     });
-    this.guard('jobs', () => this.jobs.update(dt));
+    if (!guest) this.guard('jobs', () => this.jobs.update(dt));
     this.guard('effects', () => { this.particles.update(dt); this.updateDrops(dt); this.updateDustSites(dt); this.updateRubbleFires(dt); this.updateBlood(dt); });
     this.updatePickups(dt);
     this.tickAtmosphere(dt, P.x, P.z);
     this.flareSun();
+    if (this.coop) this.guard('co-op', () => this.coop.tick(dt));
 
     if ((this.autoSave = (this.autoSave || 0) - dt) <= 0) { this.autoSave = 60; if (P.alive) this.saveGame(); }
 
     // Audio
     const sampleMoan = () => {
+      if (guest) return this.coop.sampleMoan(P);
       if (!H.n) return null;
       for (let t = 0; t < 6; t++) {
         const i = Math.floor(rand() * H.n);
@@ -3507,6 +3535,7 @@ class Game {
     const asp = r.width / r.height;
     this.horde.fillInstances(r.camPos, r.camForward, asp, cam.fov);
     if (this.state === 'play' || this.state === 'menu') { this.npcs.draw(); this.dogs.draw(this.actors); }
+    if (this.coop && this.state === 'play') this.coop.draw();
     this.actors.upload(gl);
 
     // Focus pulls to whatever is under the crosshair.
