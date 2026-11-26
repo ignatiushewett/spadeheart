@@ -92,7 +92,8 @@ export class WebNet {
   // A peer on the introducing server, under the given name (or one it makes up).
   openPeer(id) {
     return new Promise((resolve, reject) => {
-      const opts = { debug: 0, config: { iceServers: ICE } };
+      // Introduced through Spadeheart's own server (the free public one loses rooms between players on different connections).
+      const opts = { debug: 0, host: 'spadeheart-peer.onrender.com', port: 443, secure: true, path: '/', config: { iceServers: ICE } };
       const peer = id ? new this.Peer(id, opts) : new this.Peer(opts);
       const fail = (e) => { peer.destroy(); reject(new Error(e && e.type === 'unavailable-id' ? 'That room code is taken.' : e && e.type === 'peer-unavailable' ? 'No game with that code.' : (e && e.message) || 'Could not reach the server.')); };
       peer.once('open', (pid) => { peer.off('error', fail); resolve(peer); void pid; });
