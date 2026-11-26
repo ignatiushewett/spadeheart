@@ -2,6 +2,11 @@
 // Everything here is for co-op (lobbies, invites and the packets between players); with no Steam, info() says so and the rest do nothing.
 const { contextBridge, ipcRenderer } = require('electron');
 
+// The desktop app itself: the game can close it (Quit on the title screen, Exit to desktop when paused).
+contextBridge.exposeInMainWorld('desktop', {
+  quit: () => ipcRenderer.send('app:quit'),
+});
+
 contextBridge.exposeInMainWorld('steam', {
   info: () => ipcRenderer.invoke('steam:info'),
   host: (visibility, max) => ipcRenderer.invoke('steam:host', visibility, max),

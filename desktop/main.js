@@ -142,6 +142,8 @@ app.whenReady().then(() => {
   });
   gameWin = win;
   setupSteamIpc();
+  // Quit on the title screen, and Exit to desktop when paused.
+  ipcMain.on('app:quit', () => app.quit());
   if (launchLobby) win.webContents.once('did-finish-load', () => setTimeout(() => toWin('invite', { lobby: launchLobby }), 1500));
   win.once('ready-to-show', () => { win.maximize(); win.show(); });
   win.loadURL('app://spadeheart/index.html');

@@ -27,8 +27,9 @@ set STEAMRUN=
 if defined SteamGameId set STEAMRUN=1
 if defined SteamAppId set STEAMRUN=1
 for %%a in (%*) do if /i "%%~a"=="--steam" set STEAMRUN=1
+rem Anything Steam adds goes on to the game too: an invite accepted with the game closed comes as +connect_lobby and the lobby.
 if defined STEAMRUN (
-  "node_modules\electron\dist\electron.exe" . --steam
+  "node_modules\electron\dist\electron.exe" . --steam %*
   exit /b 0
 )
 start "" "node_modules\electron\dist\electron.exe" . %*

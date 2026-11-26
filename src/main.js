@@ -63,6 +63,8 @@ const DB_NAME = 'acez';
 const MENU_VIEW = 704;
 const MENU_VEIL_MAX = 45;   // seconds the title screen waits on black for the view to build, at most
 const MENU_SHOT = { angle: -.18, dist: 185, height: 88, turn: -.32, pitch: -.14, fov: 1.05, flight: 125, startHeight: 30, startOff: 44, startPitch: -.1 };
+// The version name, shown only where the commit cannot be found (a copy of the files with no git folder and no stamp).
+export const VERSION = 'v1';
 // The commit this copy is, once it is known (see the bottom of this file). The menu shows it; co-op players compare it.
 export const BUILD = { commit: '' };
 const SAVE_KEY = 'slot15';  // bumped whenever the map changes: old voxel edits no longer line up
@@ -2408,6 +2410,13 @@ class Game {
     this.world.editsDirty = false;
   }
 
+  // Desktop app only: save, leave any co-op game properly, then close the window.
+  async exitToDesktop() {
+    this.quitToMenu();
+    await this.savePending;
+    if (window.desktop) window.desktop.quit();
+  }
+
   quitToMenu() {
     if (this.devOpen) this.toggleDev(false);
     this.audio.deathMusic(false);
@@ -3613,11 +3622,12 @@ const game = new Game();
 window.ACEZ = game;
 // The version is the commit the game was last pulled or pushed at, read out of the copy's own git folder: the same code GitHub shows.
 // Where there is no git folder, a build stamped by desktop/stamp-version.js (the Steam upload) shows the commit from its version.txt; on
-// GitHub Pages it is the latest commit on GitHub, which is what the site was published from. Nothing shows until it is known.
+// GitHub Pages it is the latest commit on GitHub, which is what the site was published from. Until then, and failing all of those, the
+// version name.
 {
   const v = document.getElementById('menu-version');
   if (v) {
-    v.textContent = '';
+    v.textContent = VERSION;
     const show = (hash) => { BUILD.commit = hash.slice(0, 7); v.textContent = BUILD.commit; };
     (async () => {
       const get = async (f) => { const r = await fetch(f, { cache: 'no-store' }); if (!r.ok) throw new Error(f); return (await r.text()).trim(); };
@@ -3639,7 +3649,7 @@ window.ACEZ = game;
             const r = await fetch(`https://api.github.com/repos/${owner}/${repo}/commits/HEAD`, { headers: { Accept: 'application/vnd.github.sha' } });
             const s = r.ok ? (await r.text()).trim() : '';
             if (/^[0-9a-f]{7,40}$/.test(s)) show(s);
-          } catch { /* offline, or GitHub said no: no version shown */ }
+          } catch { /* offline, or GitHub said no: the version name stays */ }
         }
       }
     })();

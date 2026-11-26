@@ -255,6 +255,13 @@ export class UI {
     click('p-settings', () => { this.fillSettings?.(); this.open('settings'); });
     click('p-controls', () => this.open('controls'));
     click('p-menu', () => g.quitToMenu());
+    // Only in the desktop app: a browser tab is closed the browser's own way.
+    if (window.desktop) {
+      $('m-quit').style.display = '';
+      $('p-exit').style.display = '';
+      click('m-quit', () => window.desktop.quit());
+      click('p-exit', () => g.exitToDesktop());
+    }
     click('death-respawn', () => g.respawn());
     document.querySelectorAll('#devmenu [data-dev]').forEach((b) => b.addEventListener('click', () => g.devAction(b.dataset.dev)));
     click('death-menu', () => g.quitToMenu());
