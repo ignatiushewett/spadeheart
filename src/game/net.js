@@ -52,6 +52,13 @@ export class SteamNet {
 // (A few strict networks need a relay server to pass the traffic through, and there is none here: those players cannot connect.)
 const PEERJS = 'https://cdn.jsdelivr.net/npm/peerjs@1.5.4/+esm';
 const ROOM_PREFIX = 'spadeheart-coop-';
+// How the two browsers reach each other: STUN to find a way through each router, and when there is none (a phone hotspot, a strict
+// router, some school and work networks), TURN relays that pass the traffic between them. These are free public ones.
+const ICE = [
+  { urls: 'stun:stun.l.google.com:19302' },
+  { urls: ['turn:openrelay.metered.ca:80', 'turn:openrelay.metered.ca:443', 'turn:openrelay.metered.ca:443?transport=tcp'], username: 'openrelayproject', credential: 'openrelayproject' },
+  { urls: ['turn:eu-0.turn.peerjs.com:3478', 'turn:us-0.turn.peerjs.com:3478'], username: 'peerjs', credential: 'peerjsp' },
+];
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const CTRL = 0, FRAG = 240, FRAG_SIZE = 48000;
 const txt = new TextEncoder(), untxt = new TextDecoder();
@@ -85,7 +92,8 @@ export class WebNet {
   // A peer on the introducing server, under the given name (or one it makes up).
   openPeer(id) {
     return new Promise((resolve, reject) => {
-      const peer = id ? new this.Peer(id, { debug: 0 }) : new this.Peer({ debug: 0 });
+      const opts = { debug: 0, config: { iceServers: ICE } };
+      const peer = id ? new this.Peer(id, opts) : new this.Peer(opts);
       const fail = (e) => { peer.destroy(); reject(new Error(e && e.type === 'unavailable-id' ? 'That room code is taken.' : e && e.type === 'peer-unavailable' ? 'No game with that code.' : (e && e.message) || 'Could not reach the server.')); };
       peer.once('open', (pid) => { peer.off('error', fail); resolve(peer); void pid; });
       peer.once('error', fail);
