@@ -21,13 +21,15 @@ const CHAR_KEYS = ['scrip', 'inventory', 'mags', 'weapon', 'armor', 'rep', 'disc
 // How far from the host a guest can go, in voxels, as the host picks it in the lobby. Everything is worked out round the host: the
 // further a guest strays, the more the host's computer and the connection carry, and the thinner the city is round the guest.
 export const RANGES = [
-  { r: 48, name: 'Close', note: 'Lightest on the host and the connection.' },
-  { r: 72, name: 'Normal', note: 'A street or two apart.' },
-  { r: 104, name: 'Far', note: 'Harder on the host\'s computer and the connection.' },
-  { r: 140, name: 'Very far', note: 'Heaviest. The dead round a far-off guest are thinner and less exact, and the host needs a long view distance.' },
+  { r: 48, name: 'Close', note: 'Smoothest.' },
+  { r: 72, name: 'Normal', note: 'Recommended.' },
+  { r: 104, name: 'Far', note: 'Harder on your computer and connection.' },
+  { r: 140, name: 'Very far', note: 'Hardest on your computer and connection. Far-off guests see fewer zombies.' },
 ];
 const RANGE_DEFAULT = 72;
-const RESPAWNS = [5, 12, 30];   // the host's choice of how long the dead wait to come back, in seconds
+const RESPAWNS = [5, 12, 30];
+const DOWN_LINES = ["I'm down!", 'They got me.', "I'm hit. I'm down.", "Man down. It's me."];
+const pickLine = (a) => a[Math.floor(Math.random() * a.length)];   // the host's choice of how long the dead wait to come back, in seconds
 const LORE_OK = (c) => !!CAMP_START[c.key];   // a settlement someone can start out in
 const PULL_BACK = 24;       // this much past the range (the host travelled, or the guest got stuck behind something): put back beside the host
 const SNAP_HZ = 15;         // snapshots of who is about, to each guest
@@ -136,19 +138,19 @@ export class Coop {
     via.textContent = n ? `${n.label}: ${n.selfName}` : '';
     let html = '', ft = '';
     if (this.view === 'browse' && n && n.usesCodes) {
-      html += '<div class="coop-note">Host a game and you get a room code. Anyone you give it to can join from their own browser, wherever they are.</div>';
+      html += '<div class="coop-note">Host to get a room code. Friends join with it.</div>';
       html += `<div class="coop-name"><label for="coop-name">Your name</label><input id="coop-name" maxlength="20" value="${esc(n.selfName)}"></div>`;
       html += `<div class="coop-name"><label for="coop-code">Room code</label><input id="coop-code" maxlength="8" autocomplete="off" spellcheck="false" style="text-transform:uppercase;letter-spacing:.2em" value="${esc(this.codeTyped || '')}"><button class="btn" id="coop-join-code">Join</button></div>`;
       if (this.status) html += `<div class="coop-status">${esc(this.status)}</div>`;
       ft = '<button class="btn" id="coop-back">Back</button><span style="flex:1"></span><button class="btn primary" id="coop-host">Host a game</button>';
     } else if (this.view === 'browse') {
       if (n && n.kind === 'local') {
-        html += `<div class="coop-note">Online play could not be reached, so co-op works between copies of the game open on this computer, at this same address. Open it in another tab or window to join.</div>`;
+        html += '<div class="coop-note">Can\'t reach the internet. You can still play with another tab on this computer.</div>';
         html += `<div class="coop-name"><label for="coop-name">Your name</label><input id="coop-name" maxlength="20" value="${esc(n.selfName)}"></div>`;
       }
       html += '<div class="ng-label">Open games</div>';
       if (this.found === null) html += '<div class="coop-note">Looking...</div>';
-      else if (!this.found.length) html += `<div class="coop-note">None found.${n && n.kind === 'steam' ? ' A friend\'s private game shows up as an invite instead: accept it in Steam, or join from your friends list.' : ''}</div>`;
+      else if (!this.found.length) html += `<div class="coop-note">None found.${n && n.kind === 'steam' ? ' Friends-only games come as Steam invites.' : ''}</div>`;
       else {
         for (const l of this.found) {
           const same = !l.v || sameBuild(l.v, this.version());
@@ -173,20 +175,20 @@ export class Coop {
         const S = this.settings, cur = RANGES.find((q) => q.r === S.range) || RANGES[1];
         const sel = (id, label, opts, val) => `<div class="coop-set"><label for="${id}">${label}</label><select id="${id}" class="btn">${opts.map(([v, t]) => `<option value="${esc(v)}"${String(v) === String(val) ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select></div>`;
         html += '<div class="ng-label">Settings</div>';
-        html += sel('coop-range', 'How far guests can go', RANGES.map((q) => [q.r, `${q.name}, ${q.r} m`]), cur.r);
-        html += `<div class="coop-note">${cur.note} Everything is worked out round you, the host: the further a guest can go, the more your computer and the connection carry.</div>`;
+        html += sel('coop-range', 'Guest range', RANGES.map((q) => [q.r, `${q.name}, ${q.r} m`]), cur.r);
+        html += `<div class="coop-note">How far guests can go from you. ${cur.note}</div>`;
         const camps = this.g.layout.camps.filter((c) => LORE_OK(c)).map((c) => [c.key, c.name]);
-        html += sel('coop-camp', 'Starting settlement', camps, S.camp);
-        html += sel('coop-keep', 'When someone dies', [['keep', 'They keep what they carry'], ['lose', 'They lose what they carry']], S.keep ? 'keep' : 'lose');
-        html += sel('coop-respawn', 'Back after', RESPAWNS.map((s) => [s, `${s} seconds`]), S.respawn);
-        html += `<div class="coop-note">Everyone starts as a survivor in the same group, waking up in ${esc((this.g.layout.camps.find((c) => c.key === S.camp) || {}).name || 'the same settlement')}. Guests can join while the game is going.${this.coopSave ? ` Continuing the co-op city from before (day ${this.coopSave.day}) keeps where it was; the other settings apply either way.` : ''}</div>`;
-      } else html += `<div class="coop-note">${this.hostStarted ? 'The host is in the city. Bringing you in...' : 'Waiting for the host to start.'}</div>`;
+        html += sel('coop-camp', 'Start at', camps, S.camp);
+        html += sel('coop-keep', 'On death', [['keep', 'Keep items'], ['lose', 'Lose items']], S.keep ? 'keep' : 'lose');
+        html += sel('coop-respawn', 'Respawn time', RESPAWNS.map((s) => [s, `${s} seconds`]), S.respawn);
+        html += `<div class="coop-note">Everyone starts together as survivors. Friends can join any time.${this.coopSave ? ` Continue picks up your last co-op game (day ${this.coopSave.day}).` : ''}</div>`;
+      } else html += `<div class="coop-note">${this.hostStarted ? 'Joining...' : 'Waiting for the host to start.'}</div>`;
       if (this.status) html += `<div class="coop-status">${esc(this.status)}</div>`;
       ft = '<button class="btn" id="coop-leave">Leave</button><span style="flex:1"></span>';
       if (n.canInvite) ft += '<button class="btn" id="coop-invite">Invite friends</button>';
       if (this.host) {
-        if (this.coopSave) ft += '<button class="btn" id="coop-continue">Continue that city</button>';
-        ft += '<button class="btn primary" id="coop-start">Start a new city</button>';
+        if (this.coopSave) ft += '<button class="btn" id="coop-continue">Continue</button>';
+        ft += '<button class="btn primary" id="coop-start">New game</button>';
       }
     }
     body.innerHTML = html;
@@ -347,7 +349,7 @@ export class Coop {
     parts.forEach((list, k) => this.send(peer.id, { t: 'base', k, list }));
     peer.welcomed = true;
     peer.lastHeard = performance.now();
-    g.ui.toast(`${peer.name} joined the game.`, 'good');
+    this.groupNote(peer.name, 'Joined the group.', peer.id);
   }
 
   // A guest arriving: the same city, a survivor of their own with the survival kit already on them (the settlement's people only
@@ -404,7 +406,7 @@ export class Coop {
     g.pickups = [];
     g.spawnPending = false;
     this.installGuest();
-    g.beginLoad(`Joining ${w.host}`, () => g.ui.banner('Co-op', `With ${w.host}. ${w.char ? 'Your things are as you left them. ' : ''}Stay close: you cannot go far from them.`));
+    g.beginLoad(`Joining ${w.host}`, () => g.ui.banner('Co-op', `Playing with ${w.host}. ${w.char ? 'Your items are as you left them. ' : ''}Stay near them.`));
   }
 
   beginSession() {
@@ -658,7 +660,7 @@ export class Coop {
     const p = this.peers.get(id);
     if (!p) return;
     this.peers.delete(id);
-    if (this.inGame && p.welcomed) this.g.ui.toast(`${p.name} ${why === 'timeout' ? 'lost connection' : 'left the game'}.`, 'bad');
+    if (this.inGame && p.welcomed) this.groupNote(p.name, why === 'timeout' ? 'Lost contact.' : 'Left the group.');
     if (this.view === 'lobby') this.render();
   }
 
@@ -726,6 +728,7 @@ export class Coop {
     } else if (m.t === 'ui-back' && p.R && p.R.modal) this.asGuest(p, () => p.R.backToDialog());
     else if (m.t === 'ui-close' && p.R) p.R.closeAll();
     else if (m.t === 'respawned') { this.forgive(this.guestPlayer(p)); this.calmHunts(); }
+    else if (m.t === 'died') this.groupNote(p.name, pickLine(DOWN_LINES), p.id);
     else if (m.t === 'collect') {
       const job = g.jobs.active.find((a) => a.id === m.id);
       if (job) this.asGuest(p, () => g.jobs.collect(job));
@@ -786,6 +789,8 @@ export class Coop {
     else if (m.t === 'ui-banner') g.ui.banner(String(m.title || ''), String(m.text || ''));
     else if (m.t === 'ui-float') { if (g.ui.dlgNpc && g.ui.modal !== 'dialog') g.ui.floatSay(g.ui.dlgNpc, String(m.text || '')); }
     else if (m.t === 'ui-sfx') g.audio.simple(m.k);
+    else if (m.t === 'note') this.radioNote(String(m.who || ''), String(m.text || ''));
+    else if (m.t === 'ui-radio') g.ui.radio(m.who || null, String(m.text || ''), m.station || null);
   }
 
   // --- Guests and the people of the city --------------------------------------------------------------------------------------------
@@ -832,10 +837,11 @@ export class Coop {
       hideContractPage() { const had = document.body.classList.contains('reading-contract'); host.hideContractPage.call(this); if (had) document.body.classList.add('reading-contract'); },
       toast(text, kind = '') { fwd({ t: 'ui-toast', text: String(text), kind }); },
       banner(title, text) { fwd({ t: 'ui-banner', title, text }); },
-      radio(who, text) { fwd({ t: 'ui-toast', text: who ? `${who}: ${text}` : text }); },
+      // A settlement's radio is heard by everyone; what is said to you alone (a banner, a line in the corner) only by the guest.
+      radio(who, text, station = null) { fwd({ t: 'ui-radio', who, text, station }); if (station) host.radio(who, text, station); },
       typeToast(text) { fwd({ t: 'ui-toast', text }); },
       typeOut(o) { if (o && o.send) o.send(); if (o && o.then) o.then(); },
-      floatSay(n, text) { if (n && (n === this.dlgNpc || n === this.tradeNpc)) fwd({ t: 'ui-float', text }); },
+      floatSay(n, text, secs) { if (n && (n === this.dlgNpc || n === this.tradeNpc)) fwd({ t: 'ui-float', text }); else host.floatSay(n, text, secs); },
       hitMarker() {}, damageIndicator() {},
     });
     p.R = R;
@@ -1094,9 +1100,10 @@ export class Coop {
     g.ui.hitMarker = () => {};
     g.salvage = (id, n) => { got.push([id, n]); };
     this.quiet = true;
-    if (peer) { g.player = this.guestPlayer(peer); this.shooter = peer; }
+    const keepUI = g.ui;
+    if (peer) { g.player = this.guestPlayer(peer); this.shooter = peer; g.ui = this.remoteUI(peer); }
     try { fn(); } catch (e) { console.warn('co-op: remote action failed', e); } finally {
-      au.simple = simple; g.ui.hitMarker = hm; g.salvage = sal; this.quiet = false; g.player = keepP; this.shooter = null;
+      g.ui = keepUI; au.simple = simple; g.ui.hitMarker = hm; g.salvage = sal; this.quiet = false; g.player = keepP; this.shooter = null;
     }
     return got;
   }
@@ -1496,6 +1503,8 @@ export class Coop {
   // In co-op nobody dies for good. Dead, you wait out a short count, the others playing on, and come back: a guest beside the host, the
   // host beside a guest who is still alive, or, if there is none, at their settlement, with the guests brought along.
   onDeath() {
+    if (this.host) this.groupNote(this.g.player.charName || this.net.selfName, pickLine(DOWN_LINES), this.net.selfId);
+    else this.sendHost({ t: 'died' });
     const g = this.g, P = g.player, $ = (id) => document.getElementById(id);
     this.deadT = 0;
     if (this.host) this.hostDownAt = g.time;
@@ -1574,11 +1583,28 @@ export class Coop {
   }
 
   forgive(pl) {
+    const banned = pl.bail || {};
+    pl.rep = Math.max(0, pl.rep || 0);
+    for (const k of Object.keys(pl.campRep || {})) if (banned[k] !== 'banned') pl.campRep[k] = Math.max(0, pl.campRep[k] || 0);
+    if (pl === this.g.player && this.g.npcs) { this.g.npcs.trespassing = -1; this.g.npcs.trespassT = 0; }
     pl.grief = {};
     pl.wanted = {};
     pl.bail = Object.fromEntries(Object.entries(pl.bail || {}).filter(([, v]) => v === 'banned'));
     pl.bailExtra = {};
     pl.bailLock = {};
+  }
+
+  // Something the whole group should hear, on its frequency: who joined or left, who is down. Not to the one it is about.
+  groupNote(who, text, except = null) {
+    if (!this.host) return;
+    if (except !== this.net.selfId) this.radioNote(who, text);
+    for (const p of this.peers.values()) if (p.welcomed && p.id !== except) this.send(p.id, { t: 'note', who, text });
+  }
+
+  radioNote(who, text) {
+    if (!text) return;
+    this.g.campSim.logNews({ kind: 'crew', who, mine: false, text });
+    this.g.ui.radio(who, text, 'Private Frequency');
   }
 
   // The sirens and the search stop. A settlement that has barred someone still shoots on sight when they come back to its wall.
@@ -1607,6 +1633,25 @@ export class Coop {
       if (p.state >= 10 && lod > 1) lod = 1;
       A.push(lod, p.x, p.y, p.z, p.yaw, p.phase, p.state, p.variant, p.extra);
     }
+  }
+
+  // The other players, for the compass and the maps, the way companions are shown: where they are and which way they face.
+  markers() {
+    const out = [], mark = (name, x, z, yaw, dead) => out.push({ name, x, z, ys: Math.PI - (yaw || 0), dead: !!dead });
+    if (this.host) {
+      for (const p of this.peers.values()) if (p.welcomed && p.pose && p.draw) mark(p.name, p.draw.x, p.draw.z, p.draw.yaw, !p.pose.alive);
+      return out;
+    }
+    const h = this.hostPose;
+    for (const r of this.roster) {
+      if (r.id === this.net.selfId) continue;
+      if (r.host && h) mark(r.name, h.x, h.z, h.yaw, !h.alive);
+      else if (r.x !== undefined) {
+        const a = this.anchors && this.anchors.get(r.id);
+        mark(r.name, a ? a.x : r.x, a ? a.z : r.z, 0, !r.alive);
+      }
+    }
+    return out;
   }
 
   // A moan for the sound beds, from one of the dead near a guest.

@@ -1006,15 +1006,21 @@ export class UI {
     return `${fmt(j.kills)} kills, ${SP} ${fmt(g.jobs.opPay(j))} if it succeeds`;
   }
 
+  // Everyone travelling with you, for the compass and the maps: your companions, and in co-op the other players.
+  companions() {
+    const g = this.g, list = g.npcs.followers;
+    return g.coop ? list.concat(g.coop.markers()) : list;
+  }
+
   // Who is travelling with you: a first name each. Greyed when they are out of sight of you, so you know to look for them.
   updateCrew() {
-    const g = this.g, P = g.player, el = $('crew');
+    const g = this.g, P = g.player, el = $('crew'), crew = this.companions();
     let key = '';
-    for (const f of g.npcs.followers) key += `${f.name}|${Math.hypot(f.x - P.x, f.z - P.z) > CREW_AWAY ? 1 : 0};`;
+    for (const f of crew) key += `${f.name}|${Math.hypot(f.x - P.x, f.z - P.z) > CREW_AWAY ? 1 : 0};`;
     if (key === this.crewKey) return;
     this.crewKey = key;
     el.textContent = '';
-    for (const f of g.npcs.followers) {
+    for (const f of crew) {
       const s = document.createElement('span');
       s.textContent = f.name ? f.name.split(' ')[0] : 'Companion';
       if (Math.hypot(f.x - P.x, f.z - P.z) > CREW_AWAY) s.className = 'away';
@@ -1106,7 +1112,7 @@ export class UI {
       }
     }
     // Your companions: a green circle each, always, with their name, and how far once they are more than a few steps off.
-    for (const f of g.npcs.followers) {
+    for (const f of this.companions()) {
       if (!f || f.dead) continue;
       const dist = Math.round(Math.hypot(f.x - P.x, f.z - P.z));
       let r = Math.atan2(f.x - P.x, -(f.z - P.z)) - yaw;
@@ -1281,7 +1287,8 @@ export class UI {
     // Your companions, the same arrow as yours in green, pointing the way they face.
     {
       const cY = Math.cos(-P.yaw), sY = Math.sin(-P.yaw);
-      for (const f of g.npcs.followers) {
+      for (const f of this.companions()) {
+        if (f.dead) continue;
         const dx = (f.x - P.x) * scale, dz = (f.z - P.z) * scale;
         if (dx * dx + dz * dz > (cx - 14) * (cx - 14)) continue;
         const fx = Math.sin(f.ys), fz = Math.cos(f.ys);
@@ -2847,7 +2854,7 @@ export class UI {
       x.fillStyle = '#9fd4ff'; x.font = '700 11px Quantico, Bahnschrift, Segoe UI, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
       x.fillText('B', bx, bz + .5);
     }
-    for (const f of g.npcs.followers) if (!f.dead) companionArrow(x, tx(f.x), tz(f.z), Math.atan2(Math.sin(f.ys), -Math.cos(f.ys)), .85);
+    for (const f of this.companions()) if (!f.dead) companionArrow(x, tx(f.x), tz(f.z), Math.atan2(Math.sin(f.ys), -Math.cos(f.ys)), .85);
     const ax = tx(P.x), az = tz(P.z);
     if (!this.mapPhoto) {
       x.save();
