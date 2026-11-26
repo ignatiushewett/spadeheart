@@ -425,6 +425,9 @@ body.waking #hud > * { visibility: hidden; }
 .coop-name label { color: var(--faint); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; }
 .coop-name input { flex: 1; max-width: 260px; padding: 6px 10px; background: var(--panel-2); border: 1px solid var(--line); color: var(--ink); font: inherit; }
 #coop-vis { padding: 6px 8px; }
+.coop-code { display: flex; align-items: center; gap: 14px; padding: 12px 14px; margin-bottom: 6px; background: var(--panel-2); border: 1px solid var(--amber); }
+.coop-code span { color: var(--faint); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; }
+.coop-code b { flex: 1; color: var(--ink); font: 700 24px var(--mono); letter-spacing: .25em; }
 /* Co-op chat: T to say something. It comes up over your head for the others, the way the people of the city talk. */
 #coop-chat { position: fixed; left: 50%; bottom: 128px; transform: translateX(-50%); z-index: 40; display: none; }
 #coop-chat.on { display: block; }

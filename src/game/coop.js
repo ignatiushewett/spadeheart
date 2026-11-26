@@ -10,7 +10,11 @@ import { ITEMS, START_CAMP } from './items.js';
 import { WARDROBE, HUMAN_VARIANT_START } from '../engine/actors.js';
 import { CREW_GUN_NAMES } from './npcs.js';
 import { Player } from './player.js';
-import { SteamNet, LocalNet } from './net.js';
+import { setUiRoot } from './ui.js';
+import { SteamNet, LocalNet, WebNet } from './net.js';
+
+// A guest's character as the host keeps it: everything but where they are and how they are this moment, which the guest's own game owns.
+const CHAR_KEYS = ['scrip', 'inventory', 'mags', 'weapon', 'armor', 'rep', 'discovered', 'campRep', 'grief', 'wanted', 'bail', 'bailExtra', 'bailLock', 'campKills', 'crewRep', 'dlg', 'perks', 'pendingKit', 'home', 'loadout', 'kills', 'headshots'];
 
 const TETHER = 40;          // how far from the host a guest can go, in voxels: inside the host's full-detail zone, where the dead can reach them
 const TETHER_FAR = 64;      // further than this (the host travelled, or the guest got stuck behind something): put back beside the host
@@ -60,6 +64,7 @@ export class Coop {
     this.role = null;         // 'host' or 'guest' while in a lobby or a game
     this.inGame = false;
     this.peers = new Map();   // the host's view of the guests: id -> peer
+    this.guestBook = {};      // the host's: each guest's character, kept with the co-op save
     this.restore = [];
     this.view = 'closed';
     this.status = '';
@@ -82,7 +87,9 @@ export class Coop {
     if (!this.net) {
       let name = '';
       try { name = localStorage.getItem('spadeheart.coopName') || ''; } catch { /* private mode */ }
-      this.net = new LocalNet(name || `Player ${1 + Math.floor(Math.random() * 90)}`);
+      name = name || `Player ${1 + Math.floor(Math.random() * 90)}`;
+      // Online with a room code; failing that (no internet, or the library would not load), this computer only.
+      this.net = (await WebNet.open(name)) || new LocalNet(name);
     }
     this.net.onPacket = (from, data) => this.onPacket(from, data);
     this.net.onLobby = (l) => this.onLobby(l);
@@ -111,9 +118,15 @@ export class Coop {
     const n = this.net, esc = (s) => String(s).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
     via.textContent = n ? `${n.label}: ${n.selfName}` : '';
     let html = '', ft = '';
-    if (this.view === 'browse') {
+    if (this.view === 'browse' && n && n.usesCodes) {
+      html += '<div class="coop-note">Host a game and you get a room code. Anyone you give it to can join from their own browser, wherever they are.</div>';
+      html += `<div class="coop-name"><label for="coop-name">Your name</label><input id="coop-name" maxlength="20" value="${esc(n.selfName)}"></div>`;
+      html += `<div class="coop-name"><label for="coop-code">Room code</label><input id="coop-code" maxlength="8" autocomplete="off" spellcheck="false" style="text-transform:uppercase;letter-spacing:.2em" value="${esc(this.codeTyped || '')}"><button class="btn" id="coop-join-code">Join</button></div>`;
+      if (this.status) html += `<div class="coop-status">${esc(this.status)}</div>`;
+      ft = '<button class="btn" id="coop-back">Back</button><span style="flex:1"></span><button class="btn primary" id="coop-host">Host a game</button>';
+    } else if (this.view === 'browse') {
       if (n && n.kind === 'local') {
-        html += `<div class="coop-note">Steam is not running, so co-op works between copies of the game open on this computer, at this same address. Open it in another tab or window to join. For co-op over the internet, play from the desktop app with Steam open.</div>`;
+        html += `<div class="coop-note">Online play could not be reached, so co-op works between copies of the game open on this computer, at this same address. Open it in another tab or window to join.</div>`;
         html += `<div class="coop-name"><label for="coop-name">Your name</label><input id="coop-name" maxlength="20" value="${esc(n.selfName)}"></div>`;
       }
       html += '<div class="ng-label">Open games</div>';
@@ -131,6 +144,7 @@ export class Coop {
       ft += '<button class="btn primary" id="coop-host">Host a game</button>';
     } else {
       const L = n.lobby, ids = L ? L.members : [];
+      if (L && L.code) html += `<div class="coop-code"><span>Room code</span><b>${esc(L.code)}</b>${this.host ? '<button class="btn" id="coop-copy">Copy</button>' : ''}</div>`;
       html += `<div class="ng-label" style="margin-top:0">${this.host ? 'Your game' : 'Players'}</div>`;
       for (const id of ids) {
         const me = id === n.selfId, isHost = L && id === L.owner;
@@ -160,6 +174,13 @@ export class Coop {
     on('coop-invite', () => n.invite());
     on('coop-start', () => this.startHost(true));
     on('coop-continue', () => this.startHost(false));
+    on('coop-copy', () => { try { navigator.clipboard.writeText(n.lobby.code); this.status = 'Copied.'; } catch { this.status = ''; } this.render(); });
+    const code = document.getElementById('coop-code');
+    if (code) {
+      code.addEventListener('input', () => { this.codeTyped = code.value.toUpperCase(); });
+      code.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.code === 'Enter') this.joinLobby(code.value); });
+    }
+    on('coop-join-code', () => this.joinLobby(code ? code.value : ''));
     body.querySelectorAll('[data-join]').forEach((el) => el.addEventListener('click', () => this.joinLobby(el.dataset.join)));
     const nm = document.getElementById('coop-name');
     if (nm) nm.addEventListener('change', () => {
@@ -243,6 +264,7 @@ export class Coop {
     this.beginSession();
     this.installHost();
     g.slot = 'coop';
+    this.guestBook = {};
     if (fresh || !this.coopSave) g.newGame(g.ui.readDifficulty(), 0, 'survival');
     else await g.continueGame('coop', true);
     g.player.charName = this.net.selfName;
@@ -264,6 +286,7 @@ export class Coop {
     this.send(peer.id, {
       t: 'welcome', v: this.version(), host: this.net.selfName, diff: g.difficulty, tod: g.tod, day: g.day, wx: g.weather.toSave(),
       spawn: spot, cs: g.campSim.state.map((s) => s.status), lightsGone: [...(g.lightsGone || [])], parts: parts.length,
+      char: this.guestBook[peer.key] || null,
     });
     parts.forEach((list, k) => this.send(peer.id, { t: 'base', k, list }));
     peer.welcomed = true;
@@ -301,11 +324,17 @@ export class Coop {
     g.stats = { shots: 0, jobs: 0, placed: 0 };
     P.reset();
     const c = g.layout.camps.find((k) => k.key === START_CAMP);
-    P.holdKit('survival', c.key);
-    P.takeKit();
-    P.campRep[c.id] = 10;
-    P.home = c.id;
-    P.discovered[c.id] = true;
+    if (w.char) {
+      // Back in a city they have played in before: the character the host kept for them.
+      P.fromSave(JSON.parse(JSON.stringify(w.char)));
+      if (!(P.health > 0)) P.health = 60;
+    } else {
+      P.holdKit('survival', c.key);
+      P.takeKit();
+      P.campRep[c.id] = 10;
+      P.home = c.id;
+      P.discovered[c.id] = true;
+    }
     P.charName = this.net.selfName;
     P.x = w.spawn.x; P.y = w.spawn.y; P.z = w.spawn.z; P.yaw = w.spawn.yaw || 0;
     g.freshStart();
@@ -317,7 +346,7 @@ export class Coop {
     g.pickups = [];
     g.spawnPending = false;
     this.installGuest();
-    g.beginLoad(`Joining ${w.host}`, () => g.ui.banner('Co-op', `With ${w.host}. Stay close: you cannot go far from them.`));
+    g.beginLoad(`Joining ${w.host}`, () => g.ui.banner('Co-op', `With ${w.host}. ${w.char ? 'Your things are as you left them. ' : ''}Stay close: you cannot go far from them.`));
   }
 
   beginSession() {
@@ -451,6 +480,23 @@ export class Coop {
     this.hook(G, 'explode', (x, y, z, radius, strength, dmg, hostile = false, loud = false) => {
       c.sendHost({ t: 'boom', a: [r2(x), r2(y), r2(z), radius, strength, dmg, hostile, loud] });
     });
+    // The people of the city: the host says who is in front of you, and talking to them happens over there.
+    const updateInteract = P.updateInteract;
+    this.hook(P, 'updateInteract', function () {
+      updateInteract.call(this);
+      if (c.lookLabel && this.alive && !(this.interact && this.interact.kind === 'bikeoff')) this.interact = { kind: 'remote-npc', label: c.lookLabel };
+    });
+    const resume = G.resume;
+    this.realResume = () => resume.call(G);
+    this.hook(G, 'resume', function () {
+      if (c.talkingRemote) { c.talkingRemote = false; c.sendHost({ t: 'ui-close' }); document.body.classList.remove('reading-contract'); }
+      return resume.call(this);
+    });
+    const back = G.ui.backToDialog;
+    this.hook(G.ui, 'backToDialog', function () { if (c.talkingRemote) { c.sendHost({ t: 'ui-back' }); return; } back.call(this); });
+    // The group's jobs are the host's: a cache picked up here is picked up there.
+    this.hook(G.jobs, 'collect', (job) => { if (job) c.sendHost({ t: 'collect', id: job.id }); });
+    this.charT = 1;
   }
 
   // --- Ending ----------------------------------------------------------------------------------------------------------------------
@@ -458,8 +504,10 @@ export class Coop {
   endSession() {
     if (!this.inGame) return;
     if (this.host) for (const p of this.peers.values()) this.send(p.id, { t: 'bye' });
-    else if (this.hostId) this.send(this.hostId, { t: 'bye' });
+    else if (this.hostId) { if (this.g.player) this.sendChar(); this.send(this.hostId, { t: 'bye' }); }
     this.closeChat(true);
+    this.talkingRemote = false;
+    this.lookLabel = null;
     if (this.logEl) this.logEl.innerHTML = '';
     this.unhook();
     this.g.horde.foci = null;
@@ -528,7 +576,12 @@ export class Coop {
     if (m.t === 'hello') {
       if (m.v !== this.version()) { this.send(from, { t: 'refused', why: 'That game is on a different version of Spadeheart.' }); return; }
       let p = this.peers.get(from);
-      if (!p) { p = { id: from, name: String(m.name || 'Player').slice(0, 20), welcomed: false, lastHeard: performance.now(), state: {} }; this.peers.set(from, p); }
+      if (!p) {
+        const name = String(m.name || 'Player').slice(0, 20);
+        // Who they are from one game to the next: their Steam account, or failing that the name they play under.
+        p = { id: from, name, key: this.net.kind === 'steam' ? `s:${from}` : `n:${name.toLowerCase()}`, welcomed: false, lastHeard: performance.now(), state: {} };
+        this.peers.set(from, p);
+      }
       this.names[from] = p.name;
       if (this.inGame && g.state === 'play') { if (!p.welcomed) this.welcome(p); } else this.send(from, { t: 'lobby', started: this.inGame });
       if (this.view === 'lobby') this.render();
@@ -539,6 +592,20 @@ export class Coop {
     if (m.t === 'bye') { this.dropPeer(from, 'left'); return; }
     if (!p.welcomed || !this.inGame) return;
     if (m.t === 'me') { p.state = m; p.name = String(m.name || p.name).slice(0, 20); }
+    else if (m.t === 'char' && m.save && typeof m.save === 'object') {
+      this.guestBook[p.key] = m.save;
+      // Not while they are in the middle of a conversation here: what they have just bought is newer than what they last sent.
+      if (!(p.R && p.R.modal)) { const pl = this.guestPlayer(p); pl.reset(); pl.fromSave(JSON.parse(JSON.stringify(m.save))); }
+    } else if (m.t === 'talk') this.remoteTalk(p, m);
+    else if (m.t === 'ui-click' && p.R && p.R.modal) {
+      const el = p.root.querySelector(`[data-rid="${m.rid | 0}"]`);
+      if (el && !el.disabled) this.asGuest(p, () => el.dispatchEvent(new MouseEvent('click', { shiftKey: !!m.shift, bubbles: true })));
+    } else if (m.t === 'ui-back' && p.R && p.R.modal) this.asGuest(p, () => p.R.backToDialog());
+    else if (m.t === 'ui-close' && p.R) p.R.closeAll();
+    else if (m.t === 'collect') {
+      const job = g.jobs.active.find((a) => a.id === m.id);
+      if (job) this.asGuest(p, () => g.jobs.collect(job));
+    }
     else if (m.t === 'edits') {
       const e = m.e || [];
       for (let k = 0; k + 3 < e.length; k += 4) g.world.set(e[k] | 0, e[k + 1] | 0, e[k + 2] | 0, e[k + 3] | 0);
@@ -589,6 +656,195 @@ export class Coop {
       g.audio.duck(true);
     } else if (m.t === 'woke') this.wokeWithHost(m);
     else if (m.t === 'say') this.heard(m.id, String(m.name || '').slice(0, 20), String(m.text || '').slice(0, 120));
+    else if (m.t === 'look') this.lookLabel = m.label || null;
+    else if (m.t === 'ui') { this.applyMe(m.me); this.showScreen(m); }
+    else if (m.t === 'ui-toast') g.ui.toast(String(m.text || ''), m.kind || '');
+    else if (m.t === 'ui-banner') g.ui.banner(String(m.title || ''), String(m.text || ''));
+    else if (m.t === 'ui-float') { if (g.ui.dlgNpc && g.ui.modal !== 'dialog') g.ui.floatSay(g.ui.dlgNpc, String(m.text || '')); }
+    else if (m.t === 'ui-sfx') g.audio.simple(m.k);
+  }
+
+  // --- Guests and the people of the city --------------------------------------------------------------------------------------------
+  // The people, their jobs, their shops and the camps all live in the host's game. A guest who talks to someone has the conversation
+  // worked out there, by the host's own dialogue and trade code, with the guest's character standing in for the host's. What it puts on
+  // the screen is sent to the guest to show; what they pick is sent back. So everything there is to say or buy works for a guest the
+  // same as for the host, and the jobs they take are the group's, on the host's list.
+
+  // The host's copy of a guest's character: what the people of the city deal with.
+  guestPlayer(p) {
+    if (!p.player) {
+      p.player = new Player(this.g);
+      const saved = this.guestBook[p.key];
+      if (saved) p.player.fromSave(JSON.parse(JSON.stringify(saved)));
+    }
+    return p.player;
+  }
+
+  // A copy of the dialogue and trade screens off the page, and a stand-in for the host's interface that draws into it and passes
+  // anything said out loud (a line in the corner, a banner, the radio) on to the guest.
+  remoteUI(p) {
+    if (p.R) return p.R;
+    const c = this, g = this.g, host = g.ui, root = document.createElement('div');
+    root.innerHTML = document.getElementById('dialog').outerHTML + document.getElementById('trade').outerHTML;
+    const fwd = (m) => c.send(p.id, m), q = (id) => root.querySelector(`#${id}`);
+    const R = Object.create(host);
+    Object.assign(R, {
+      remote: true, modal: null, prevModal: [], dlgNpc: null, tradeNpc: null, typeTimer: null, typeFull: '', dlgSel: -1, floaters: [],
+      open(name) { this.modal = name; },
+      closeAll() { this.modal = null; this.dlgNpc = null; this.tradeNpc = null; },
+      back() { this.closeAll(); },
+      showHUD() {},
+      say(text) { this.typeFull = text; q('dlg-text').textContent = text; },
+      finishLine() {},
+      openDialog(npc) { this.dlgNpc = npc; this.open('dialog'); this.say(g.dialogue.greeting(npc)); this.renderOptions(); },
+      backToDialog() { this.open('dialog'); this.say(this.smallTalk()); this.renderOptions(); },
+      // The host's screen is not the one reading a contract.
+      showContractPage(page) { const had = document.body.classList.contains('reading-contract'); host.showContractPage.call(this, page); if (!had) document.body.classList.remove('reading-contract'); },
+      hideContractPage() { const had = document.body.classList.contains('reading-contract'); host.hideContractPage.call(this); if (had) document.body.classList.add('reading-contract'); },
+      toast(text, kind = '') { fwd({ t: 'ui-toast', text: String(text), kind }); },
+      banner(title, text) { fwd({ t: 'ui-banner', title, text }); },
+      radio(who, text) { fwd({ t: 'ui-toast', text: who ? `${who}: ${text}` : text }); },
+      typeToast(text) { fwd({ t: 'ui-toast', text }); },
+      typeOut(o) { if (o && o.send) o.send(); if (o && o.then) o.then(); },
+      floatSay(n, text) { if (n && (n === this.dlgNpc || n === this.tradeNpc)) fwd({ t: 'ui-float', text }); },
+      hitMarker() {}, damageIndicator() {},
+    });
+    p.R = R;
+    p.root = root;
+    return R;
+  }
+
+  // Run something as the guest: their character as the player, the stand-in as the interface. Then show them the result.
+  asGuest(p, fn) {
+    const g = this.g, R = this.remoteUI(p), pl = this.guestPlayer(p), au = g.audio, simple = au.simple;
+    const keepP = g.player, keepUI = g.ui, ownResume = Object.prototype.hasOwnProperty.call(g, 'resume'), keepResume = g.resume;
+    const before = { health: pl.health, infection: pl.infection, hunger: pl.hunger, rest: pl.rest, stamina: pl.stamina };
+    // The group's name is one name: what a guest does for it counts for everyone.
+    pl.crewRep = g.player.crewRep || 0;
+    const rep0 = pl.crewRep;
+    g.player = pl;
+    g.ui = R;
+    g.resume = () => R.closeAll();
+    au.simple = function (kind, x, y, z) { if (x === undefined) { p.sfx = kind; return undefined; } return simple.call(this, kind, x, y, z); };
+    setUiRoot(p.root);
+    try { fn(); } catch (e) {
+      console.warn('co-op: guest conversation went wrong', e);
+      R.closeAll();
+      this.send(p.id, { t: 'ui-toast', text: 'They have nothing more to say right now.', kind: 'bad' });
+    } finally {
+      setUiRoot(null);
+      g.player = keepP;
+      g.ui = keepUI;
+      if (ownResume) g.resume = keepResume; else delete g.resume;
+      au.simple = simple;
+    }
+    if (pl.crewRep !== rep0) keepP.crewRep = (keepP.crewRep || 0) + (pl.crewRep - rep0);
+    const changed = {};
+    for (const k of Object.keys(before)) if (pl[k] !== before[k]) changed[k] = pl[k];
+    this.pushScreen(p, changed);
+    if (p.sfx) { this.send(p.id, { t: 'ui-sfx', k: p.sfx }); p.sfx = null; }
+  }
+
+  pushScreen(p, changed = {}) {
+    const R = p.R, root = p.root, q = (id) => root.querySelector(`#${id}`), save = p.player.toSave(), me = { ...changed };
+    for (const k of CHAR_KEYS) me[k] = save[k];
+    this.guestBook[p.key] = { ...(this.guestBook[p.key] || {}), ...JSON.parse(JSON.stringify(me)) };
+    if (!R.modal) { this.send(p.id, { t: 'ui', mode: null, me }); return; }
+    let rid = 0;
+    for (const b of root.querySelectorAll('#dlg-opts button, #dlg-jobs button, #trade-buy button, #trade-sell button')) b.dataset.rid = String(rid++);
+    const n = R.modal === 'trade' ? R.tradeNpc || R.dlgNpc : R.dlgNpc;
+    this.send(p.id, {
+      t: 'ui', mode: R.modal, me, npc: n ? { x: r2(n.x), y: r2(n.y), z: r2(n.z), name: n.name, kid: !!n.kid } : null,
+      name: q('dlg-name').textContent, role: q('dlg-role').textContent, standing: q('dlg-standing').textContent, text: R.typeFull,
+      opts: q('dlg-opts').innerHTML, jobs: q('dlg-jobs').innerHTML, page: q('dialog').classList.contains('with-page') ? q('contract-page').innerHTML : '',
+      title: q('trade-title').textContent, sum: q('trade-sum').textContent, buy: q('trade-buy').innerHTML, sell: q('trade-sell').innerHTML,
+    });
+  }
+
+  // Who a guest is looking at, from where they stand and which way they face.
+  npcFor(p, o, f) {
+    const g = this.g, hit = g.world.raycast(o[0], o[1], o[2], f[0], f[1], f[2], 4.6);
+    const n = g.npcs.lookAt(o, f, 4.2, hit ? hit.dist : 4.2) || g.npcs.acrossCounter(o, f);
+    return n && n.kind !== 'raider' && !n.dead ? n : null;
+  }
+
+  lookFor(p) {
+    const q = p.pose, g = this.g;
+    if (!q || !q.alive || (p.R && p.R.modal)) return null;
+    const cp = Math.cos(q.pitch), o = [q.x, q.y + (q.crouch ? 1.7 : 2.4), q.z], f = [Math.sin(q.yaw) * cp, Math.sin(q.pitch), -Math.cos(q.yaw) * cp];
+    const n = this.npcFor(p, o, f);
+    if (!n) return null;
+    const keep = g.player;
+    g.player = this.guestPlayer(p);
+    try { return n.promptLabel ? n.promptLabel() : `Talk to ${n.name}`; } catch { return `Talk to ${n.name}`; } finally { g.player = keep; }
+  }
+
+  remoteTalk(p, m) {
+    const g = this.g, o = m.o, f = m.f;
+    if (!Array.isArray(o) || !Array.isArray(f) || this.g.state !== 'play') return;
+    const n = this.npcFor(p, o, f);
+    if (!n) return;
+    const tell = (text) => this.send(p.id, { t: 'ui-toast', text });
+    if (n.state === 7) { tell(`${n.name} is asleep.`); return; }
+    const service = n.kind === 'clerk' || n.kind === 'vendor' || n.kind === 'boss' || n.kind === 'named' || n.doctor;
+    let close = 0;
+    if (service) g.horde.forRadius(n.x, n.z, 7, () => { close++; });
+    const busy = service ? n.flee || n.giving || close >= 2 : n.flee || n.threat || n.alarmed || n.fighting || n.aim > .2 || n.state === 3;
+    if (n.kind !== 'follower' && busy) { tell(`${n.name}: Not now!`); return; }
+    // One conversation at a time with anyone.
+    if (g.ui.modal === 'dialog' && g.ui.dlgNpc === n) { tell(`${n.name} is talking to ${g.player.charName}.`); return; }
+    for (const o2 of this.peers.values()) if (o2 !== p && o2.R && (o2.R.dlgNpc === n || o2.R.tradeNpc === n) && o2.R.modal) { tell(`${n.name} is talking to ${o2.name}.`); return; }
+    this.asGuest(p, () => p.R.openDialog(n));
+  }
+
+  // --- Guest: a conversation on the host, shown here -------------------------------------------------------------------------------
+  talk() {
+    const P = this.g.player;
+    this.sendChar();
+    this.sendHost({ t: 'talk', o: P.eyePos().map(r2), f: P.forward().map((v) => Math.round(v * 1000) / 1000) });
+  }
+
+  sendChar() {
+    const s = this.g.player.toSave();
+    this.sendHost({ t: 'char', save: s });
+    this.charT = 3;
+  }
+
+  // What the host's people did to this character: paid, sold to, given kit, hired, owed.
+  applyMe(me) {
+    if (!me) return;
+    Object.assign(this.g.player, JSON.parse(JSON.stringify(me)));
+  }
+
+  showScreen(m) {
+    const g = this.g, ui = g.ui, $ = (id) => document.getElementById(id);
+    if (!m.mode) {
+      if (this.talkingRemote) { this.talkingRemote = false; document.body.classList.remove('reading-contract'); this.realResume(); }
+      return;
+    }
+    const first = !this.talkingRemote;
+    this.talkingRemote = true;
+    const a = this.talkAnchor || (this.talkAnchor = { dead: false, state: 0, yaw: 0 });
+    if (m.npc) Object.assign(a, m.npc);
+    if (first) { a.voice = undefined; g.openModal(() => {}); }
+    ui.dlgNpc = a;
+    if (m.mode === 'dialog') {
+      if (ui.modal !== 'dialog') { document.body.classList.add('talking'); ui.open('dialog', false); }
+      $('dlg-name').textContent = m.name; $('dlg-role').textContent = m.role; $('dlg-standing').textContent = m.standing;
+      if (first || m.text !== this.lastText) { this.lastText = m.text; ui.say(m.text || ''); }
+      $('dlg-opts').innerHTML = m.opts || ''; $('dlg-jobs').innerHTML = m.jobs || '';
+      const dlg = $('dialog');
+      if (m.page) { $('contract-page').innerHTML = m.page; dlg.classList.add('with-page'); document.body.classList.add('reading-contract'); } else { dlg.classList.remove('with-page'); document.body.classList.remove('reading-contract'); }
+      ui.dlgSel = -1;
+    } else {
+      ui.tradeNpc = a;
+      if (ui.modal !== 'trade') ui.open('trade', false);
+      $('trade-title').textContent = m.title; $('trade-sum').textContent = m.sum;
+      $('trade-buy').innerHTML = m.buy || ''; $('trade-sell').innerHTML = m.sell || '';
+    }
+    for (const b of document.querySelectorAll('#dlg-opts [data-rid], #dlg-jobs [data-rid], #trade-buy [data-rid], #trade-sell [data-rid]')) {
+      b.addEventListener('click', (e) => { ui.finishLine(); g.audio.simple('ui'); this.sendHost({ t: 'ui-click', rid: +b.dataset.rid, shift: e.shiftKey }); });
+    }
   }
 
   // --- Chat: T to say something --------------------------------------------------------------------------------------------------------
@@ -846,6 +1102,19 @@ export class Coop {
       const h = p.human || (p.human = { coopPeer: p, kind: 'player', x: 0, y: 0, z: 0, dead: false });
       h.x = q.x; h.y = q.y; h.z = q.z; h.dead = !q.alive;
       if (q.alive) { if (!H.humans.includes(h)) H.humans.push(h); foci.push(q); }
+      // Their character stands where they do, for anyone in the city who looks.
+      const pl = this.guestPlayer(p);
+      pl.x = q.x; pl.y = q.y; pl.z = q.z; pl.yaw = q.yaw; pl.alive = q.alive;
+      if ((p.lookT = (p.lookT || 0) - dt) <= 0) {
+        p.lookT = .2;
+        const label = this.lookFor(p);
+        if (label !== p.lookLabel) { p.lookLabel = label; this.send(p.id, { t: 'look', label }); }
+      }
+      // Walked off, or whoever they were talking to is gone: the conversation is over.
+      if (p.R && p.R.modal) {
+        const n = p.R.tradeNpc || p.R.dlgNpc;
+        if (!n || n.dead || !q.alive || Math.hypot(n.x - q.x, n.z - q.z) > 9) { p.R.closeAll(); this.send(p.id, { t: 'ui', mode: null }); }
+      }
     }
     this.hostPhase += Math.min(9, Math.hypot(P.vx, P.vz)) * dt * 2.1;
     if ((this.poseT -= dt) <= 0) {
@@ -870,7 +1139,8 @@ export class Coop {
     const ros = [{ id: this.net.selfId, name: P.charName, host: true, health: P.alive ? P.health : 0, alive: P.alive, kills: P.kills || 0, scrip: P.scrip || 0, weapon: it && (it.type === 'gun' || it.type === 'melee') ? it.name : 'Unarmed', armour: !!P.armor, days: Math.max(1, g.day - (P.bornDay || g.day) + 1), home: P.home, x: r2(P.x), y: r2(P.y), z: r2(P.z) }];
     for (const p of this.peers.values()) if (p.welcomed) ros.push({ id: p.id, name: p.name, ...this.peerCard(p), ...(p.pose ? { x: r2(p.pose.x), y: r2(p.pose.y), z: r2(p.pose.z) } : {}) });
     const crew = g.npcs.followers.filter((f) => !f.dead).map((f) => ({ name: f.name, hp: f.hp, maxHp: f.maxHp, bond: f.bond || 'Member', weapon: CREW_GUN_NAMES[f.weaponName] || 'Unarmed', away: !!(f.order && f.order !== 'call' && f.order !== 'gate') }));
-    return { t: 'w', tod: g.tod, day: g.day, wx: g.weather.toSave(), cs: g.campSim.state.map((s) => s.status), rep: P.crewRep || 0, ros, crew };
+    // The jobs are the group's: everyone sees them on their screen and map.
+    return { t: 'w', tod: g.tod, day: g.day, wx: g.weather.toSave(), cs: g.campSim.state.map((s) => s.status), rep: P.crewRep || 0, ros, crew, jobs: g.jobs.active };
   }
 
   peerCard(p) {
@@ -1024,6 +1294,7 @@ export class Coop {
     (m.cs || []).forEach((s, i) => { const st = g.campSim.state[i]; if (st && st.status !== s) { st.status = s; lights = true; } });
     if (lights) g.refreshCityLights();
     P.crewRep = m.rep || 0;
+    if (Array.isArray(m.jobs)) g.jobs.active = m.jobs;
     this.roster = m.ros || [];
     this.crew = m.crew || [];
     const h = this.roster.find((r) => r.host);
@@ -1049,6 +1320,8 @@ export class Coop {
     if (this.shots.length) { this.sendHost({ t: 'fire', w: this.shotW, o: this.shotO, r: this.shots }); this.shots = []; }
     if (this.outEdits.length) { this.sendHost({ t: 'edits', e: this.outEdits }); this.outEdits = []; }
     if ((this.poseT -= dt) <= 0) { this.poseT = 1 / POSE_HZ; this.net.send(this.hostId, this.writePose(this.poseOf(P)), false); }
+    // The character, for the host to keep: in the save, and for the people of the city to deal with.
+    if (!this.talkingRemote && (this.charT -= dt) <= 0) this.sendChar();
     if ((this.meT -= dt) <= 0) {
       this.meT = 1;
       const it = P.weapon && ITEMS[P.weapon];

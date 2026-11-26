@@ -1045,6 +1045,7 @@ class Game {
       this.ui.toast('You sit down for a while. Move to get up.');
     }
     else if (it.kind === 'loot') this.searchContainer(it.hit);
+    else if (it.kind === 'remote-npc' && this.coop) this.coop.talk();
     else if (it.kind === 'cache') { this.jobs.collect(it.obj.job); this.audio.simple('crate'); }
     else if (it.kind === 'fire') {
       if (it.wet) { this.ui.toast('Too wet to catch. It will have to wait for the rain to ease.', 'bad'); return; }
@@ -2384,6 +2385,7 @@ class Game {
     this.stats = s.stats || this.stats;
     this.pickups = [];
     this.spawnPending = true;
+    if (this.coop) this.coop.guestBook = s.coopGuests || {};
     if (s.permaDead) { this.rollCharacter(); return; }
     this.beginLoad('Returning to the city', null);
   }
@@ -2396,6 +2398,8 @@ class Game {
       version: 1, garvey: GARVEY_V, west: WEST_V, mapV: MAP_V, campsV: CAMPS_V, player: this.player.toSave(), followers: this.npcs.followersToSave(), jobs: this.jobs.toSave(), edits: this.world.exportEdits(), horde: this.horde.exportState(),
       tod: this.tod, day: this.day, difficulty: this.difficulty, stats: this.stats, lightsGone: [...(this.lightsGone || [])], lotHurt: [...(this.lotHurt || new Map())].map(([k, e]) => [k, e.lost, e.base, e.down ? 1 : 0]), camps: this.campSim.toSave(), bikes: this.bikes.toSave(), director: this.director.toSave(), weather: this.weather.toSave(), savedAt: Date.now(),
       permaDead: this.player.loadout === 'survival' && !this.player.alive && !this.coop,
+      // Co-op: the guests' characters, kept with the city they play in.
+      coopGuests: this.coop ? this.coop.guestBook : undefined,
     };
     this.savePending = dbPut(slotKey(this.slot || 1), data).catch((e) => console.warn('save failed', e));
     this.world.editsDirty = false;

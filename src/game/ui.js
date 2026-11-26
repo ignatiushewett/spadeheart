@@ -10,7 +10,11 @@ import { OUTBREAK_DAYS } from './campsim.js';
 import { opBanner } from './opbanner.js';
 import { MODELS as VM_MODELS, LMG_COVER, LMG_BOX } from './viewmodel.js';
 
-const $ = (id) => document.getElementById(id);
+// Co-op: a guest's conversation is worked out here in the host's game, drawn into a copy of the dialogue and trade screens kept off the
+// page, and sent to them. While it is, $ finds things in that copy; anything the copy does not have gets a spare element nobody sees.
+let uiRoot = null;
+export const setUiRoot = (el) => { uiRoot = el; };
+const $ = (id) => (uiRoot ? uiRoot.querySelector(`#${id}`) || uiRoot.spare || (uiRoot.spare = document.createElement('div')) : document.getElementById(id));
 // The water as the map canvas paints it, so nothing shows where the map runs out.
 const OCEAN = '#152c37';
 const SHOW_INFECTED_ON_MAP = false;   // the red wash and the dots for the dead, on the big map
