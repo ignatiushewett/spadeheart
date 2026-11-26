@@ -9,6 +9,7 @@ Or download repository (Windows, needs [Node.js](https://nodejs.org)):
 
 `Run in Browser.bat` - Run in browser
 
+<img src="previews/spade-logo.png" width="60" alt="Preview">
 <img src="previews/shpreview8.png" alt="Preview">
 <img src="previews/shpreview9.png" alt="Preview">
 <img src="previews/shpreview6.png" alt="Preview">
