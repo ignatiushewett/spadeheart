@@ -463,7 +463,7 @@ export class UI {
     // V-sync belongs to the desktop app's window: a browser always holds the game to the screen's refresh rate.
     if (window.desktop && window.desktop.config) {
       $('s-vsync-row').style.display = '';
-      window.desktop.config().then((c) => { $('s-vsync').value = c && c.vsync ? 'on' : 'off'; }).catch(() => {});
+      window.desktop.config().then((c) => { $('s-vsync').value = c && c.uncapped === true ? 'off' : 'on'; }).catch(() => {});
       $('s-vsync').addEventListener('change', (e) => { window.desktop.setVsync(e.target.value === 'on'); this.toast('Restart the game for this to take effect.'); });
     }
     $('s-clock').addEventListener('change', (e) => { clock24 = s.clock24 = e.target.value === '24'; g.saveSettings(); });

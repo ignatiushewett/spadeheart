@@ -437,6 +437,13 @@ body.waking #hud > * { visibility: hidden; }
 .coop-slot .host { color: #c8453a; font-weight: 600; flex: none; }
 .coop-slot.me { border-color: rgba(233,228,216,.4); }
 .coop-slot.empty { color: var(--faint); border-style: dashed; background: transparent; }
+.coop-top { display: grid; grid-template-columns: minmax(0, 1fr) 48%; gap: 14px; align-items: start; }
+.coop-top > :only-child { grid-column: 1 / -1; }
+.coop-top .coop-code { flex-wrap: wrap; row-gap: 2px; padding: 8px 12px; }
+.coop-top .coop-code span { flex-basis: 100%; }
+.coop-map { position: relative; aspect-ratio: 16 / 9; background: #0b0a09; border: 1px solid var(--line); overflow: hidden; }
+.coop-map img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.coop-map span { position: absolute; left: 0; right: 0; bottom: 0; padding: 18px 10px 6px; background: linear-gradient(transparent, rgba(0,0,0,.75)); color: var(--ink); font-weight: 700; font-size: 13px; letter-spacing: .06em; text-transform: uppercase; }
 .coop-kv { display: flex; justify-content: space-between; gap: 12px; padding: 7px 2px; border-bottom: 1px solid var(--line); font-size: 13px; }
 .coop-kv span { color: var(--faint); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; align-self: center; }
 .coop-kv b { color: var(--ink); font-weight: 600; text-align: right; }
@@ -794,7 +801,7 @@ body.talking #hud > *:not(#caption) { visibility: hidden; }
         <div class="row" data-hint="How much of the city you see at once, in degrees. Wider shows more but makes things smaller."><label>Field of view</label><input type="range" id="s-fov" data-k="fov" min="60" max="120" step="1"><output id="s-fov-o"></output></div>
         <div class="row" data-hint="Lifts or darkens the whole picture. Nights are meant to be dark; raise this if you cannot see anything at all."><label>Brightness</label><input type="range" id="s-bright" data-k="brightness" min="0.6" max="1.6" step="0.05"><output id="s-bright-o"></output></div>
         <div class="row" data-hint="How strong the colours are. 100% is the game's own look. Higher brings out the duller colours most; lower drains them."><label>Vibrance</label><input type="range" id="s-vibrance" data-k="vibrance" min="0" max="2" step="0.05"><output id="s-vibrance-o"></output></div>
-        <div class="row" id="s-vsync-row" style="display:none" data-hint="Off lets the frame rate go past your screen's refresh rate (the default). On holds it to the refresh rate. Takes effect when you next start the game."><label>V-Sync</label><select id="s-vsync"><option value="off">Off</option><option value="on">On</option></select><span></span></div>
+        <div class="row" id="s-vsync-row" style="display:none" data-hint="On holds the frame rate to your screen's refresh rate (the default). Off lets it go past. Takes effect when you next start the game."><label>V-Sync</label><select id="s-vsync"><option value="on">On</option><option value="off">Off</option></select><span></span></div>
         <div class="row" data-hint="Caps the frame rate. Saves power and heat on a laptop."><label>FPS limit</label><select id="s-fps"><option value="0">Off</option><option value="30">30</option><option value="60">60</option><option value="90">90</option><option value="120">120</option><option value="144">144</option></select><span></span></div>
         <div class="row" data-hint="How much your view and your gun sway as you walk."><label>View bobbing</label><input type="range" id="s-bob" data-k="bob" min="0" max="1.5" step="0.05"><output id="s-bob-o"></output></div>
         <div class="row" data-hint="How hard explosions, collapses and gunfire knock the camera about."><label>Camera shake</label><input type="range" id="s-shake" data-k="shake" min="0" max="1.5" step="0.05"><output id="s-shake-o"></output></div>

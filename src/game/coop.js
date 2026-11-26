@@ -37,7 +37,7 @@ const SPAWNS = [['with', 'With a player'], ['away', 'Away from everyone']];
 // Ready-made sets of settings. Changing any one of them after makes it Custom.
 const PRESETS = {
   survival: { name: 'Survival', note: 'The standard game: the standard kit in Carver Yard, lose what you carry, come back beside a player.', set: { loadout: 'survival', camp: 'garvey', keep: false, death: 'lose', ff: true, spawn: 'with', respawn: 12, range: 72 } },
-  deathmatch: { name: 'Deathmatch', note: 'A full kit in a random settlement, keep what you carry, friendly fire, room to spread out, and come back away from everyone.', set: { loadout: 'veteran', camp: 'random', keep: true, death: 'keep', ff: true, spawn: 'away', respawn: 5, range: 104 } },
+  deathmatch: { name: 'Deathmatch', note: 'A random kit in a random settlement, a new one each time you die, friendly fire, room to spread out, and come back away from everyone.', set: { loadout: 'random', camp: 'random', keep: false, death: 'kit', ff: true, spawn: 'away', respawn: 5, range: 104 } },
   creative: { name: 'Creative', note: 'Every weapon and endless building blocks, keep what you carry, no friendly fire.', set: { loadout: 'creative', keep: true, death: 'keep', ff: false, spawn: 'with', respawn: 5, range: 72 } },
 };
 const presetOf = (S) => Object.keys(PRESETS).find((k) => Object.entries(PRESETS[k].set).every(([key, v]) => S[key] === v)) || 'custom';
@@ -185,15 +185,17 @@ export class Coop {
         const name = me ? n.selfName : (this.names && this.names[id]) || shared[id] || (isHost ? (L.data && L.data.name) : '') || 'Joining...';
         left += `<div class="coop-slot${me ? ' me' : ''}"><span class="idx">${i + 1}</span><b>${esc(name)}</b>${isHost ? '<span class="host">(Host)</span>' : ''}</div>`;
       }
-      let right = '<div class="ng-label" style="margin-top:0">Game</div>';
+      // Top right, a look at where the game starts: the settlement picked, or for Random, all of them.
+      const S = this.host ? this.settings : this.lobbySettings(L);
+      const at = !S ? null : S.camp === 'random' ? { key: 'random', name: 'Random' } : this.g.layout.camps.find((c) => c.key === S.camp);
+      const map = at ? `<div class="coop-map"><img src="images/camps/${esc(at.key)}.jpg" alt=""><span>${esc(at.name)}</span></div>` : '';
+      let right = '<div class="coop-top"><div><div class="ng-label" style="margin-top:0">Game</div>';
       if (L && L.code) right += `<div class="coop-code"><span>Room code</span><b>${esc(L.code)}</b>${this.host ? '<button class="btn" id="coop-copy">Copy</button>' : ''}</div>`;
       const commit = String(this.version()).split(':')[1] || '';
       const state = this.host ? (n.usesCodes ? (n.roomOpen ? 'Open' : 'Reconnecting...') : 'Open') : this.hostStarted ? 'In game. Joining...' : 'Waiting for the host';
-      right += `<div class="coop-kv"><span>Status</span><b>${state}</b></div><div class="coop-kv"><span>Players</span><b>${ids.length} / ${max}</b></div><div class="coop-kv"><span>Connection</span><b>${esc(n.label)}</b></div>${commit ? `<div class="coop-kv"><span>Version</span><b>${esc(commit)}</b></div>` : ''}`;
+      right += `<div class="coop-kv"><span>Status</span><b>${state}</b></div><div class="coop-kv"><span>Players</span><b>${ids.length} / ${max}</b></div><div class="coop-kv"><span>Connection</span><b>${esc(n.label)}</b></div>${commit ? `<div class="coop-kv"><span>Version</span><b>${esc(commit)}</b></div>` : ''}</div>${map}</div>`;
       right += '<div class="ng-label">Settings</div>';
-      const S = this.host ? this.settings : this.lobbySettings(L);
       if (S) {
-        const camp = (this.g.layout.camps.find((c) => c.key === S.camp) || {}).name || '';
         const cur = RANGES.find((q) => q.r === S.range) || RANGES[1], preset = presetOf(S);
         const rows = [
           ['coop-preset', 'Mode', [...Object.entries(PRESETS).map(([k, p]) => [k, p.name]), ['custom', 'Custom']], preset],
@@ -209,10 +211,7 @@ export class Coop {
           if (this.host) right += `<div class="coop-set"><label for="${id}">${label}</label><select id="${id}" class="btn">${opts.map(([v, t]) => `<option value="${esc(v)}"${String(v) === String(val) ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select></div>`;
           else right += `<div class="coop-kv"><span>${label}</span><b>${esc((opts.find(([v]) => String(v) === String(val)) || [, val])[1])}</b></div>`;
         }
-        const note = preset !== 'custom' ? PRESETS[preset].note : 'Custom settings.';
-        right += `<div class="coop-note">${note} Guest range: ${cur.note.toLowerCase()}${this.host && this.coopSave ? ` Continue picks up your last multiplayer game (day ${this.coopSave.day}).` : ''}</div>`;
-        void camp;
-      } else right += '<div class="coop-note">The host\'s settings show here.</div>';
+      }
       html += `<div class="coop-lobby"><div>${left}</div><div>${right}</div></div>`;
       if (this.status) html += `<div class="coop-status">${esc(this.status)}</div>`;
       ft = '<button class="btn" id="coop-leave">Leave</button><span style="flex:1"></span>';
