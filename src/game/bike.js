@@ -664,7 +664,7 @@ export class Bikes {
         if (!id || !(FLAGS[id] & F_LEAF) || (TREE.has(id) && !field)) continue;
         cut++;
         // A few bits thrown low and off to the sides; none up where they would be in your face.
-        if (W.set(x, y, z, 0) && y < b.y + 2 && Math.random() < .6) g.particles.debris(x, y, z, id, 1, 1.6);
+        if (W.set(x, y, z, 0) && y < b.y + 2 && Math.random() < .6) g.particles.debris(x, y, z, id, 1, 1.6, true);
       }
     }
     b.thrashT = (b.thrashT || 0) - dt;

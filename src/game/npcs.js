@@ -5027,7 +5027,7 @@ export class NPCs {
     if (g.horde.inCamp(hit.x + .5, hit.z + .5, 4) && !(rough && g.horde.inCamp(hit.x + .5, hit.z + .5, -5))) return;
     // A rifle round chews a real piece out of brick and plaster, not a scratch.
     const broke = W.hit(hit.x, hit.y, hit.z, 3);
-    if (Math.hypot(hit.x - g.player.x, hit.z - g.player.z) < 70) g.particles.debris(hit.x, hit.y, hit.z, hit.id, broke ? 5 : 2, 2);
+    if (Math.hypot(hit.x - g.player.x, hit.z - g.player.z) < 70) g.particles.debris(hit.x, hit.y, hit.z, hit.id, broke ? 5 : 2, 2, !!broke);
     if (broke) g.horde.nearDirty = true;
   }
 

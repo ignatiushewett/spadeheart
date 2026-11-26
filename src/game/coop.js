@@ -517,7 +517,7 @@ export class Coop {
     const set = W.set;
     this.hook(W, 'set', function (x, y, z, id, record = true) {
       const ok = set.call(this, x, y, z, id, record);
-      if (ok && record) g.editsOut.push(x, y, z, id);
+      if (ok && (record || g.gateSync)) g.editsOut.push(x, y, z, id);
       return ok;
     });
     // The guests are people the dead go for, and a bite on one is sent to them.
@@ -566,7 +566,7 @@ export class Coop {
       this.fxOut.push(e);
     };
     const wrap = (obj, key, k, n) => { const f = obj[key]; this.hook(obj, key, function (...a) { rec(k, a, n); return f.apply(this, a); }); };
-    wrap(fx, 'blood', 'b', 8); wrap(fx, 'gore', 'g', 4); wrap(fx, 'explosion', 'x', 4); wrap(fx, 'debris', 'd', 6);
+    wrap(fx, 'blood', 'b', 8); wrap(fx, 'gore', 'g', 4); wrap(fx, 'explosion', 'x', 4); wrap(fx, 'debris', 'd', 7);
     wrap(fx, 'tracer', 't', 6); wrap(fx, 'spark', 'k', 7); wrap(fx, 'muzzle', 'M', 7);
     wrap(au, 'explosion', 'X', 5); wrap(au, 'moan', 'm', 4); wrap(au, 'bodyFall', 'f', 4);
     const gun = au.gun, simple = au.simple;
@@ -581,6 +581,8 @@ export class Coop {
       return simple.call(this, kind, x, y, z);
     });
     H.foci = [];
+    const updateGates = G.npcs.updateGates;
+    this.hook(G.npcs, 'updateGates', function (...a) { g.gateSync = true; try { return updateGates.apply(this, a); } finally { g.gateSync = false; } });
     // The host's shots: a flash at the muzzle, for the guests (the host sees their own in their hands).
     const fireGun = G.player.fireGun;
     this.hook(G.player, 'fireGun', function (it, id) {
@@ -1365,9 +1367,9 @@ export class Coop {
   follow(d, q, dt) {
     const k = 1 - Math.exp(-dt * 14), ox = d.x, oz = d.z;
     if (Math.hypot(q.x - d.x, q.z - d.z) > 8) { d.x = q.x; d.y = q.y; d.z = q.z; } else { d.x += (q.x - d.x) * k; d.y += (q.y - d.y) * k; d.z += (q.z - d.z) * k; }
-    d.yaw += wrapPi(q.yaw - d.yaw) * k;
+    if (q.alive) d.yaw += wrapPi(q.yaw - d.yaw) * k;
     const sp = Math.min(9, Math.hypot(d.x - ox, d.z - oz) / Math.max(dt, 1e-3));
-    d.phase += sp * dt * 2.1;
+    if (q.alive) d.phase += sp * dt * 2.1;
     if (!q.alive && d.downAt === undefined) d.downAt = this.g.time;
     if (q.alive) d.downAt = undefined;
     this.soak(d, dt);
@@ -1431,7 +1433,7 @@ export class Coop {
         if (!n || n.dead || !q.alive || Math.hypot(n.x - q.x, n.z - q.z) > 9) { p.R.closeAll(); this.send(p.id, { t: 'ui', mode: null }); }
       }
     }
-    this.hostPhase += Math.min(9, Math.hypot(P.vx, P.vz)) * dt * 2.1;
+    if (P.alive) this.hostPhase += Math.min(9, Math.hypot(P.vx, P.vz)) * dt * 2.1;
     const hb = this.hostBody || (this.hostBody = {});
     hb.x = P.x; hb.y = P.y; hb.z = P.z;
     this.soak(hb, dt);
@@ -1563,9 +1565,9 @@ export class Coop {
       if (best) {
         best.used = true;
         best.prate = Math.max(0, Math.min(40, (s.phase - best.tphase) / gap));
-        best.tx = s.x; best.ty = s.y; best.tz = s.z; best.tyaw = s.yaw; best.tphase = s.phase; best.state = s.state; best.extra = s.extra;
+        best.tx = s.x; best.ty = s.y; best.tz = s.z; best.tyaw = s.yaw; best.tphase = s.phase; best.state = best.tstate = s.state; best.extra = s.extra;
         out.push(best);
-      } else out.push({ x: s.x, y: s.y, z: s.z, yaw: s.yaw, phase: s.phase, tx: s.x, ty: s.y, tz: s.z, tyaw: s.yaw, tphase: s.phase, prate: 0, state: s.state, variant: s.variant, extra: s.extra, kind: s.kind });
+      } else out.push({ x: s.x, y: s.y, z: s.z, yaw: s.yaw, phase: s.phase, tx: s.x, ty: s.y, tz: s.z, tyaw: s.yaw, tphase: s.phase, prate: 0, state: s.state, tstate: s.state, variant: s.variant, extra: s.extra, kind: s.kind });
     }
     for (const p of out) p.used = false;
     this.puppets = out;
@@ -1598,7 +1600,7 @@ export class Coop {
         case 'g': fx.gore(x, y, z, a); break;
         case 'M': fx.muzzle(x, y, z, a, b, c, d || 1); g.tempLights.push({ x, y, z, r: 16, cr: 7, cg: 4.2, cb: 1.6, t: .07, max: .07 }); break;
         case 'x': fx.explosion(x, y, z, a); g.tempLights.push({ x, y: y + 1, z, r: a * 10, cr: 22, cg: 12, cb: 4, t: .55, max: .55 }); break;
-        case 'd': fx.debris(x, y, z, a, b, c); break;
+        case 'd': fx.debris(x, y, z, a, b, c, !!d); break;
         case 't': fx.tracer(x, y, z, a, b, c); break;
         case 'k': fx.spark(x, y, z, a, b, c, d); break;
         case 'X': au.explosion(x, y, z, a, b); { const P = g.player, dd = Math.hypot(P.x - x, P.y + 1.2 - y, P.z - z); g.explFlash = Math.max(g.explFlash, Math.min(1, 25 / (dd * dd + 5))); P.shake = Math.min(1.4, P.shake + Math.min(1, a * 35 / (dd + 2))); } break;
@@ -1660,6 +1662,8 @@ export class Coop {
       if (Math.abs(p.tx - p.x) + Math.abs(p.tz - p.z) > 6) { p.x = p.tx; p.y = p.ty; p.z = p.tz; } else { p.x += (p.tx - p.x) * k; p.y += (p.ty - p.y) * k; p.z += (p.tz - p.z) * k; }
       p.yaw += wrapPi(p.tyaw - p.yaw) * k;
       p.phase = p.tphase + p.prate * age;
+      // The dead (and the dying) count up a second at a time from the moment they went down: carried on between snapshots.
+      if (p.tstate >= 10) p.state = p.tstate + age;
       if (p.kind === 0 && p.variant < HUMAN_VARIANT_START && p.state < 10 && Math.abs(p.x - P.x) + Math.abs(p.z - P.z) < 56) { near++; if (p.state >= 1) chasing++; }
     }
     H.nearCount = near; H.chasers = chasing;
@@ -1889,10 +1893,15 @@ export class Coop {
     this.g.ui.radio(who, text, 'Private Frequency');
   }
 
-  // The sirens and the search stop. A settlement that has barred someone still shoots on sight when they come back to its wall.
+  // The sirens and the search stop at every settlement where nobody in the game is still wanted. Someone else's crimes keep theirs going.
   calmHunts() {
-    const g = this.g;
-    g.campSim.state.forEach((s) => { if (s) s.huntT = 0; });
+    const g = this.g, N = g.npcs, keep = g.player;
+    const players = [this.hostP || keep, ...[...this.peers.values()].filter((p) => p.welcomed && p.player).map((p) => p.player)];
+    g.campSim.state.forEach((s, i) => {
+      if (!s || !(s.huntT > 0)) return;
+      const wanted = players.some((pl) => { g.player = pl; try { return N.hostileCamp(i) || N.banned(i); } finally { g.player = keep; } });
+      if (!wanted) s.huntT = 0;
+    });
     for (const p of this.peers.values()) if (p.player) this.guestAnger(p, 0);
   }
 
@@ -1940,8 +1949,8 @@ export class Coop {
   playerInView(P) {
     const o = P.eyePos(), f = P.forward(), a = f[0] * f[0] + f[2] * f[2];
     if (a < 1e-5) return null;
-    const hit = this.g.world.raycast(o[0], o[1], o[2], f[0], f[1], f[2], 14);
-    let best = null, bt = hit ? hit.dist : 14;
+    const hit = this.g.world.raycast(o[0], o[1], o[2], f[0], f[1], f[2], 4.6);
+    let best = null, bt = hit ? hit.dist : 4.6;
     for (const m of this.markers()) {
       if (m.dead || m.y === undefined) continue;
       const t = ((m.x - o[0]) * f[0] + (m.z - o[2]) * f[2]) / a;

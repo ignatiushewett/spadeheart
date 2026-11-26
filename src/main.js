@@ -61,6 +61,9 @@ const DB_NAME = 'acez';
 // Weston, the plateau and Albion on the skyline, with the edge of the map only far off in the haze.
 // How far out the title screen builds the city in full. The view there holds still, so it can afford to see a long way.
 const MENU_VIEW = 704;
+// The title screen follows the graphics setting: on Ultra it sees as far as it can and is drawn supersampled; lower settings see less
+// (with the haze brought in to match) and are drawn plain, down to Potato.
+const MENU_FIDELITY = { potato: { view: 192, fog: 1.4, ss: false }, low: { view: 320, fog: .9, ss: false }, medium: { view: 448, fog: .6, ss: false }, high: { view: 576, fog: .4, ss: true }, ultra: { view: MENU_VIEW, fog: .3, ss: true } };
 const MENU_VEIL_MAX = 45;   // seconds the title screen waits on black for the view to build, at most
 const MENU_SHOT = { angle: -.18, dist: 185, height: 88, turn: -.32, pitch: -.14, fov: 1.05, flight: 125, startHeight: 30, startOff: 44, startPitch: -.1 };
 // The version name, shown only where the commit cannot be found (a copy of the files with no git folder and no stamp).
@@ -714,7 +717,7 @@ class Game {
       if (HP[id] === 255) return;
       const broke = W.hit(x, y, z, force);
       if (broke) this.campSim.noteBroken(x, y, z, broke);
-      this.particles.debris(x, y, z, id, 2, 2);
+      this.particles.debris(x, y, z, id, 2, 2, !!broke);
       // A crowd tearing at a wall is a din, not a separate sound for every hand on it.
       if (rand() < .35 || broke) this.audio.simple('block', x, y, z);
       if (broke) H.nearDirty = true;
@@ -1346,7 +1349,7 @@ class Game {
     if (F.length > 32) F.splice(0, F.length - 32);
     for (let k = 0; k < removed.length; k += 4 * Math.max(1, Math.floor(removed.length / 4 / 160))) {
       const id = removed[k + 3];
-      this.particles.debris(removed[k], removed[k + 1], removed[k + 2], id, 1, radius * 2.8);
+      this.particles.debris(removed[k], removed[k + 1], removed[k + 2], id, 1, radius * 2.8, true);
     }
     P.voxelsBroken += removed.length / 4;
     this.audio.explosion(x, y, z, radius / 5, loud ? 320 : 90);
@@ -1394,7 +1397,7 @@ class Game {
     this.npcs.wallDamaged(x, z);
     this.campSim.playerHole(x, y, z, id);
     this.player.voxelsBroken++;
-    this.particles.debris(x, y, z, id, 7, 3);
+    this.particles.debris(x, y, z, id, 7, 3, true);
     this.particles.dust(x + .5, y + .5, z + .5, 2, .8);
     this.horde.nearDirty = true;
   }
@@ -2883,7 +2886,8 @@ class Game {
     if (!paused && this.state !== 'loading') this.updateWeather(dt);
     if (this.state === 'play' && !paused) this.updateFires(dt);
     // The title screen sees further than the game does; back in the game it is whatever the settings say again.
-    const wantView = this.state === 'menu' ? Math.max(this.settings.view, MENU_VIEW) : this.settings.view;
+    const mf = MENU_FIDELITY[this.settings.quality] || MENU_FIDELITY.ultra;
+    const wantView = this.state === 'menu' ? Math.max(this.settings.view, mf.view) : this.settings.view;
     if (this.world && this.state !== 'loading' && this.world.viewRadius !== wantView) { this.world.viewRadius = wantView; this.world.lastCX = -999; }
     // Off the title screen before it had finished building: the black goes with it.
     if (this.state !== 'menu' && this.menuVeilT !== -1e9 && this.menuVeilT !== undefined) { document.getElementById('menu-veil').className = ''; this.menuVeilT = -1e9; }
@@ -2943,9 +2947,10 @@ class Game {
     r.rainIndoor = play ? Math.min(1, Math.max(0, (1 - P.skyVis) / .92)) : 0;
     if (play) this.drips.update(dt, cam);
     // The title screen holds still, so it can afford to be drawn supersampled: sharper, and with clean edges.
-    r.superK = this.state === 'menu' ? 2 : 1;
+    const mfi = MENU_FIDELITY[this.settings.quality] || MENU_FIDELITY.ultra;
+    r.superK = this.state === 'menu' && mfi.ss ? 2 : 1;
     // Thin enough on the menu to see across the harbour, the distance fading in over a long way rather than a short one.
-    r.fogK = play ? 1 : this.state === 'menu' ? .3 : 1.5;
+    r.fogK = play ? 1 : this.state === 'menu' ? mfi.fog : 1.5;
     r.rainFloor = r.sky.night * (this.state === 'menu' ? .09 : .12);
     // In the game, at night, the streaks also get more body: out in the dark they are all you have to tell it is raining.
     r.rainNight = play ? r.sky.night * 1.1 : 0;

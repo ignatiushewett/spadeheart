@@ -1412,7 +1412,7 @@ export class CampSim {
       if (mend) for (let k = 0; k < out.length; k += 4) this.noteBroken(out[k], out[k + 1], out[k + 2], out[k + 3]);
       if (edge === 0 && y > STREET_Y + 4) this.crush(c, x, z, r + 2);
       if (Math.hypot(x - P.x, z - P.z) < 110) {
-        g.particles.debris(x, y, z, out[3], 3, 6);
+        g.particles.debris(x, y, z, out[3], 3, 6, true);
         g.particles.dust(x, y, z, 3, 2);
         if (rand() < .25) g.audio.collapse(x, y, z, .22);
       }
@@ -1573,7 +1573,7 @@ export class CampSim {
     s.drawing = true;
     s.quiet = 0;
     if (!silent) {
-      for (let k = 0; k < cells.length; k += 4 * 3) g.particles.debris(cells[k], cells[k + 1], cells[k + 2], cells[k + 3], 2, 7);
+      for (let k = 0; k < cells.length; k += 4 * 3) g.particles.debris(cells[k], cells[k + 1], cells[k + 2], cells[k + 3], 2, 7, true);
       g.particles.explosion(midX + .5, STREET_Y + 2, midZ + .5, .9);
       g.particles.dust(midX, STREET_Y + 2, midZ, 8, 4);
       g.audio.collapse(midX, STREET_Y + 2, midZ, .5);

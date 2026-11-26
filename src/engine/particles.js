@@ -12,7 +12,7 @@ export class Particles {
   constructor(gl, world) {
     this.world = world;
     this.cn = 0;
-    const CF = 15; // x y z vx vy vz size r g b rot rotV life glow flags
+    const CF = 17; // x y z vx vy vz size r g b rot rotV life glow flags, then for a piece of a broken block: the size it shrinks to, how long it has been shrinking
     this.c = new Float32Array(CUBE_CAP * CF);
     this.CF = CF;
     this.cubeInst = new Float32Array(CUBE_CAP * CUBE_STRIDE);
@@ -74,11 +74,13 @@ export class Particles {
   }
 
   cube(x, y, z, vx, vy, vz, size, r, g, b, life, glow = 0, flags = 0) {
-    if (this.cn >= CUBE_CAP) return;
+    if (this.cn >= CUBE_CAP) return -1;
     const c = this.c, k = this.cn++ * this.CF;
     c[k] = x; c[k + 1] = y; c[k + 2] = z; c[k + 3] = vx; c[k + 4] = vy; c[k + 5] = vz;
     c[k + 6] = size; c[k + 7] = r; c[k + 8] = g; c[k + 9] = b;
     c[k + 10] = rand() * 6.28; c[k + 11] = (rand() - .5) * 14; c[k + 12] = life; c[k + 13] = glow; c[k + 14] = flags;
+    c[k + 15] = 0; c[k + 16] = 0;
+    return k;
   }
 
   sprite(kind, x, y, z, vx, vy, vz, size, grow, r, g, b, a, life, stretch = 0, gravity = 0) {
@@ -115,11 +117,15 @@ export class Particles {
   }
 
   // --- Effects -----------------------------------------------------------------
-  debris(x, y, z, id, n = 6, power = 3) {
-    const r = PALETTE[id * 4] / 255, g = PALETTE[id * 4 + 1] / 255, b = PALETTE[id * 4 + 2] / 255;
+  // Bits knocked off a block. When the block itself has gone (whole), its pieces start out as the whole block, where it stood, and break
+  // down to their own size within a fifth of a second as they fly: it comes apart rather than vanishing into chips. They move the same.
+  debris(x, y, z, id, n = 6, power = 3, whole = false) {
+    const r = PALETTE[id * 4] / 255, g = PALETTE[id * 4 + 1] / 255, b = PALETTE[id * 4 + 2] / 255, c = this.c;
     for (let i = 0; i < n; i++) {
       const s = .12 + rand() * .22;
-      this.cube(x + rand(), y + rand(), z + rand(), (rand() - .5) * power, rand() * power, (rand() - .5) * power, s, r, g, b, 2 + rand() * 2.5, 0, 1);
+      if (!whole) { this.cube(x + rand(), y + rand(), z + rand(), (rand() - .5) * power, rand() * power, (rand() - .5) * power, s, r, g, b, 2 + rand() * 2.5, 0, 1); continue; }
+      const k = this.cube(x + .5, y + .5, z + .5, (rand() - .5) * power, rand() * power, (rand() - .5) * power, 1, r, g, b, 2 + rand() * 2.5, 0, 1);
+      if (k >= 0) { c[k + 10] = 0; c[k + 15] = s; c[k + 16] = 0; }
     }
   }
 
@@ -249,6 +255,11 @@ export class Particles {
         continue;
       }
       const flags = c[k + 14];
+      if (c[k + 15] > 0) {
+        const t = Math.min(1, (c[k + 16] += dt) / .2);
+        c[k + 6] = 1 + (c[k + 15] - 1) * t * (2 - t);
+        if (t >= 1) c[k + 15] = 0;
+      }
       c[k + 4] -= (flags === 2 ? 18 : 16) * dt;
       c[k] += c[k + 3] * dt; c[k + 1] += c[k + 4] * dt; c[k + 2] += c[k + 5] * dt;
       c[k + 10] += c[k + 11] * dt * (flags === 2 ? .15 : 1);

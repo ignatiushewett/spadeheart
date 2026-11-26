@@ -2518,7 +2518,7 @@ export class UI {
 
   inTurn(fn) {
     const now = performance.now(), at = Math.max(now, this.radioNextAt || 0);
-    this.radioNextAt = at + 1500;
+    this.radioNextAt = at + 3000;
     if (at - now > 20) setTimeout(fn, at - now); else fn();
   }
 
