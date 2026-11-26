@@ -801,7 +801,7 @@ export class UI {
 
     const pr = $('prompt');
     if (!this.g.locked && !this.modal && P.alive) { pr.style.display = 'block'; pr.textContent = 'Click to play'; }
-    else if (P.interact && P.alive) { pr.style.display = 'block'; pr.innerHTML = `<span class="kbd">E</span> ${P.interact.label}`; }
+    else if (P.interact && P.alive) { pr.style.display = 'block'; if (P.interact.noKey) pr.textContent = P.interact.label; else pr.innerHTML = `<span class="kbd">E</span> ${P.interact.label}`; }
     else pr.style.display = 'none';
 
     this.updateMagBar();
@@ -2513,11 +2513,24 @@ export class UI {
 
   // Radio traffic between the camps, heard wherever you are.
   // Calls that come in together (a settlement shouting its alarm, say) are heard one after another, a moment apart, not all at once.
-  radio(who, text, station = null) {
+  radio(who, text, station = null) { this.inTurn(() => this.showRadio(who, text, station)); }
+
+  inTurn(fn) {
     const now = performance.now(), at = Math.max(now, this.radioNextAt || 0);
     this.radioNextAt = at + 1500;
-    if (at - now > 20) { setTimeout(() => this.showRadio(who, text, station), at - now); return; }
-    this.showRadio(who, text, station);
+    if (at - now > 20) setTimeout(fn, at - now); else fn();
+  }
+
+  // Co-op: a death, in among the radio calls but read like a kill feed: the line alone, edged in red.
+  feedLine(text) {
+    this.inTurn(() => {
+      const box = $('toasts'), d = document.createElement('div');
+      d.className = 'radio kf';
+      d.textContent = text;
+      box.appendChild(d);
+      while (box.children.length > 7) box.removeChild(box.firstChild);
+      setTimeout(() => d.remove(), 9000);
+    });
   }
 
   showRadio(who, text, station = null) {

@@ -274,13 +274,15 @@ export function planCamp(def, id, r, ground) {
     c.sentries.push({ x: x + .5, z: z + .5, yaw: side === 'N' ? Math.PI : side === 'S' ? 0 : side === 'W' ? -Math.PI / 2 : Math.PI / 2, outer: true });
   }
   const walkY = YB + hc;
-  // A thin line on the wall itself: a few people walking each side of it. Most people here are down in the town.
+  // A thin line on the wall itself: a few people walking each side of it. Most people here are down in the town. They walk the board
+  // right behind the parapet (the wall's top block, which rises one above the walkway), close enough to see over it, not up on it.
+  const EDGE_N = 1.6, EDGE_S = .6;   // from the wall's line: the first board in, which lies on the far side of it for S and E
   const POST = 3;   // one lookout per this many 13-voxel stretches
   let run = 0;
   for (let x = r.x0 + 14; x < r.x1 - 10; x += 13, run++) {
     if (run % POST === 0) {
-      if (!nearGate('N', x)) c.guards.push({ x: x + .5, y: walkY, z: r.z0 + 3.5, yaw: Math.PI, beat: { side: 'N', axis: 'x', lo: r.x0 + 6, hi: r.x1 - 6 } });
-      if (!nearGate('S', x)) c.guards.push({ x: x + .5, y: walkY, z: r.z1 - 2.5, yaw: 0, beat: { side: 'S', axis: 'x', lo: r.x0 + 6, hi: r.x1 - 6 } });
+      if (!nearGate('N', x)) c.guards.push({ x: x + .5, y: walkY, z: r.z0 + EDGE_N, yaw: Math.PI, beat: { side: 'N', axis: 'x', lo: r.x0 + 6, hi: r.x1 - 6 } });
+      if (!nearGate('S', x)) c.guards.push({ x: x + .5, y: walkY, z: r.z1 - EDGE_S, yaw: 0, beat: { side: 'S', axis: 'x', lo: r.x0 + 6, hi: r.x1 - 6 } });
     }
     if (x % 39 < 13) { light(x, r.z0 + 5, 13); light(x, r.z1 - 5, 13); }
     c.pois.push({ x: x + .5, z: r.z0 + 9.5, kind: 'patrol', yaw: Math.PI }, { x: x + .5, z: r.z1 - 8.5, kind: 'patrol', yaw: 0 });
@@ -288,8 +290,8 @@ export function planCamp(def, id, r, ground) {
   run = 0;
   for (let z = r.z0 + 14; z < r.z1 - 10; z += 13, run++) {
     if (run % POST === 0) {
-      if (!nearGate('W', z)) c.guards.push({ x: r.x0 + 3.5, y: walkY, z: z + .5, yaw: -Math.PI / 2, beat: { side: 'W', axis: 'z', lo: r.z0 + 6, hi: r.z1 - 6 } });
-      if (!nearGate('E', z)) c.guards.push({ x: r.x1 - 2.5, y: walkY, z: z + .5, yaw: Math.PI / 2, beat: { side: 'E', axis: 'z', lo: r.z0 + 6, hi: r.z1 - 6 } });
+      if (!nearGate('W', z)) c.guards.push({ x: r.x0 + EDGE_N, y: walkY, z: z + .5, yaw: -Math.PI / 2, beat: { side: 'W', axis: 'z', lo: r.z0 + 6, hi: r.z1 - 6 } });
+      if (!nearGate('E', z)) c.guards.push({ x: r.x1 - EDGE_S, y: walkY, z: z + .5, yaw: Math.PI / 2, beat: { side: 'E', axis: 'z', lo: r.z0 + 6, hi: r.z1 - 6 } });
     }
     if (z % 39 < 13) { light(r.x0 + 5, z, 13); light(r.x1 - 5, z, 13); }
     c.pois.push({ x: r.x0 + 9.5, z: z + .5, kind: 'patrol', yaw: -Math.PI / 2 }, { x: r.x1 - 8.5, z: z + .5, kind: 'patrol', yaw: Math.PI / 2 });

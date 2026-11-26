@@ -263,6 +263,8 @@ select { background: #1c1b18; color: var(--ink); border: 1px solid var(--line); 
 #mapbox #loc { box-sizing: border-box; width: 196px; padding: 5px 8px; background: rgba(10,10,10,.72); border: 1px solid rgba(255,255,255,.2); border-top: 0; text-align: center; font-size: 13px; line-height: 1.3; text-shadow: 0 1px 2px #000; }
 #hud.no-map #mapbox #loc { border-top: 1px solid rgba(255,255,255,.2); }
 #prompt { position: absolute; left: 50%; bottom: 25%; transform: translateX(-50%); padding: 5px 12px; background: rgba(0,0,0,.6); display: none; white-space: nowrap; }
+/* A co-op death among the radio calls: the line alone, like a kill feed. */
+#toasts .radio.kf { align-self: flex-start; width: fit-content; max-width: 100%; padding: 4px 10px; background: rgba(10,10,9,.62); border-left: none; border-right: 3px solid #c8453a; color: #efe9d9; font: 600 13px/1.3 Quantico, Bahnschrift, Segoe UI, sans-serif; text-shadow: 0 1px 2px #000; }
 #toasts { position: absolute; left: 26px; bottom: 150px; display: flex; flex-direction: column; gap: 3px; width: 420px; }
 #toasts div { background: rgba(0,0,0,.5); padding: 3px 9px; font: 13px/1.4 var(--mono); width: fit-content; animation: toast 3.8s forwards; border-left: 2px solid var(--amber); }
 #toasts div.bad { border-left-color: var(--red); }

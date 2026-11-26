@@ -10,7 +10,7 @@ import { PALETTE } from '../shared/materials.js';
 export const QUALITY = {
   // For old or weak machines: half resolution, small shadows, a short view, fewer of the dead about, and none of the extras (no grass
   // blades, nothing swaying in the wind, no dripping water).
-  potato: { name: 'Potato', shadow: 512, cascades: 2, ssao: false, rays: false, motion: false, dof: false, volume: false, scale: .5, view: 128, cap: 4000, grass: false, sway: 0, drips: false, grassWave: false, grain: .05 },
+  potato: { name: 'Potato', shadow: 512, cascades: 2, ssao: false, rays: false, motion: true, dof: false, volume: false, scale: .5, view: 128, cap: 4000, grass: false, sway: 0, drips: false, grassWave: false, grain: .05 },
   low: { name: 'Low', shadow: 1024, cascades: 2, ssao: false, rays: false, motion: false, dof: false, volume: false, scale: .85, view: 224, sway: 1, drips: true },
   medium: { name: 'Medium', shadow: 1536, cascades: 3, ssao: false, rays: false, motion: false, dof: true, volume: true, scale: 1, view: 288, sway: 1, drips: true },
   high: { name: 'High', shadow: 2048, cascades: 3, ssao: true, rays: false, motion: false, dof: true, volume: true, scale: 1, view: 320, sway: 1, drips: true },

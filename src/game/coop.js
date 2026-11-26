@@ -177,7 +177,9 @@ export class Coop {
         const id = ids[i];
         if (!id) { left += `<div class="coop-slot empty"><span class="idx">${i + 1}</span>Open</div>`; continue; }
         const me = id === n.selfId, isHost = L && id === L.owner;
-        const name = me ? n.selfName : (this.names && this.names[id]) || (isHost ? (L.data && L.data.name) : '') || 'Joining...';
+        let shared = {};
+        try { shared = JSON.parse((L.data && L.data.names) || '{}') || {}; } catch { shared = {}; }
+        const name = me ? n.selfName : (this.names && this.names[id]) || shared[id] || (isHost ? (L.data && L.data.name) : '') || 'Joining...';
         left += `<div class="coop-slot${me ? ' me' : ''}"><span class="idx">${i + 1}</span><b>${esc(name)}</b>${isHost ? '<span class="host">(Host)</span>' : ''}</div>`;
       }
       let right = '<div class="ng-label" style="margin-top:0">Game</div>';
@@ -524,6 +526,11 @@ export class Coop {
     this.hook(H, 'onHitHuman', (h) => (h.coopPeer ? this.bite(h.coopPeer) : hitHuman(h)));
     this.hostP = G.player;
     this.hostUI = G.ui;
+    const lookAround = G.player.updateInteract;
+    this.hook(G.player, 'updateInteract', function () {
+      lookAround.call(this);
+      if (!this.interact && this.alive) { const who = g.playerInView(this); if (who) this.interact = { kind: 'player', label: who, noKey: true }; }
+    });
     this.hookDamage(G.player);
     const crewRadio = G.ui.crewRadio;
     this.hook(G.ui, 'crewRadio', function (who, text) {
@@ -735,6 +742,7 @@ export class Coop {
     this.hook(P, 'updateInteract', function () {
       updateInteract.call(this);
       if (c.lookLabel && this.alive && !(this.interact && this.interact.kind === 'bikeoff')) this.interact = { kind: 'remote-npc', label: c.lookLabel };
+      if (!this.interact && this.alive) { const who = c.playerInView(this); if (who) this.interact = { kind: 'player', label: who, noKey: true }; }
     });
     const resume = G.resume;
     this.realResume = () => resume.call(G);
@@ -832,6 +840,7 @@ export class Coop {
         this.peers.set(from, p);
       }
       this.names[from] = p.name;
+      this.net.setData({ names: JSON.stringify(this.names) }).catch(() => {});
       if (this.inGame && g.state === 'play') { if (!p.welcomed) this.welcome(p); } else this.send(from, { t: 'lobby', started: this.inGame });
       if (this.view === 'lobby') this.render();
       return;
@@ -1765,11 +1774,11 @@ export class Coop {
     for (const p of this.peers.values()) if (p.welcomed) this.send(p.id, { t: 'feed', text });
   }
 
-  // Who died and how: a call on the group's frequency, and in its log.
+  // Who died and how: a line among the radio calls, read like a kill feed, and in the group channel's log.
   killFeed(text) {
     if (!text) return;
     this.g.campSim.logNews({ kind: 'crew', who: 'Group', mine: false, text });
-    (this.hostUI || this.g.ui).radio('Group', text, 'Private Frequency');
+    (this.hostUI || this.g.ui).feedLine(text);
   }
 
   // The host and every guest dead at once (with at least one guest in the game).
@@ -1833,8 +1842,8 @@ export class Coop {
     P.vx = P.vy = P.vz = 0;
     this.hostDownAt = undefined;
     if (at) { P.x = at.x; P.y = at.y; P.z = at.z; }
-    // Dying settles it, as it does in the main game: the hunt for you is over and what you owed is forgotten. Only a settlement you have
-    // been barred from for good still wants you dead. A guest's record is kept by the host, so the host is told.
+    // Dying settles it: the hunt for you is over, and every settlement takes you as it found you, bans and all. A guest's record is kept
+    // by the host, so the host is told.
     this.forgive(P);
     if (this.guest) this.sendHost({ t: 'respawned' });
     else this.calmHunts();
@@ -1853,17 +1862,20 @@ export class Coop {
     if (at) { g.ui.closeAll(); g.ui.showHUD(true); g.lock(); }
   }
 
+  // Dying clears your name everywhere: no warrant, no grudge, no bail owed, no ban, and standing that had sunk below nothing is back to
+  // nothing. (The main game keeps a ban through death; in co-op the host's rule is that a death settles everything.)
   forgive(pl) {
-    const banned = pl.bail || {};
     pl.rep = Math.max(0, pl.rep || 0);
-    for (const k of Object.keys(pl.campRep || {})) if (banned[k] !== 'banned') pl.campRep[k] = Math.max(0, pl.campRep[k] || 0);
+    for (const k of Object.keys(pl.campRep || {})) pl.campRep[k] = Math.max(0, pl.campRep[k] || 0);
     if (pl === this.g.player && this.g.npcs) { this.g.npcs.trespassing = -1; this.g.npcs.trespassT = 0; }
     pl.grief = {};
     pl.wanted = {};
-    pl.bail = Object.fromEntries(Object.entries(pl.bail || {}).filter(([, v]) => v === 'banned'));
+    pl.bail = {};
     pl.bailExtra = {};
     pl.bailLock = {};
+    pl.campKills = {};
   }
+
 
   // Something the whole group should hear, on its frequency: who joined or left, who is down. Not to the one it is about.
   groupNote(who, text, except = null) {
@@ -1908,21 +1920,38 @@ export class Coop {
 
   // The other players, for the compass and the maps, the way companions are shown: where they are and which way they face.
   markers() {
-    const out = [], mark = (name, x, z, yaw, dead) => out.push({ name, x, z, ys: Math.PI - (yaw || 0), dead: !!dead });
+    const out = [], mark = (name, x, z, yaw, dead, y) => out.push({ name, x, y, z, ys: Math.PI - (yaw || 0), dead: !!dead });
     if (this.host) {
-      for (const p of this.peers.values()) if (p.welcomed && p.pose && p.draw) mark(p.name, p.draw.x, p.draw.z, p.draw.yaw, !p.pose.alive);
+      for (const p of this.peers.values()) if (p.welcomed && p.pose && p.draw) mark(p.name, p.draw.x, p.draw.z, p.draw.yaw, !p.pose.alive, p.draw.y);
       return out;
     }
     const h = this.hostPose;
     for (const r of this.roster) {
       if (r.id === this.net.selfId) continue;
-      if (r.host && h) mark(r.name, h.x, h.z, h.yaw, !h.alive);
+      if (r.host && h) mark(r.name, h.x, h.z, h.yaw, !h.alive, h.y);
       else if (r.x !== undefined) {
         const a = this.anchors && this.anchors.get(r.id);
-        mark(r.name, a ? a.x : r.x, a ? a.z : r.z, 0, !r.alive);
+        mark(r.name, a ? a.x : r.x, a ? a.z : r.z, 0, !r.alive, a ? a.y : r.y);
       }
     }
     return out;
+  }
+
+  // Another player in front of you and near enough to read: their name, the way the city's people are shown, with nothing to press.
+  playerInView(P) {
+    const o = P.eyePos(), f = P.forward(), a = f[0] * f[0] + f[2] * f[2];
+    if (a < 1e-5) return null;
+    const hit = this.g.world.raycast(o[0], o[1], o[2], f[0], f[1], f[2], 14);
+    let best = null, bt = hit ? hit.dist : 14;
+    for (const m of this.markers()) {
+      if (m.dead || m.y === undefined) continue;
+      const t = ((m.x - o[0]) * f[0] + (m.z - o[2]) * f[2]) / a;
+      if (t <= .3 || t >= bt) continue;
+      const hx = o[0] + f[0] * t - m.x, hz = o[2] + f[2] * t - m.z, hy = o[1] + f[1] * t;
+      if (hx * hx + hz * hz > .35 || hy < m.y || hy > m.y + 2.8) continue;
+      bt = t; best = m.name;
+    }
+    return best;
   }
 
   // A moan for the sound beds, from one of the dead near a guest.
