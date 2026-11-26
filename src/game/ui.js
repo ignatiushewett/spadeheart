@@ -459,6 +459,12 @@ export class UI {
     const lookOf = () => Object.keys(LOOKS).find((k) => Object.entries(LOOKS[k]).every(([key, v]) => Math.abs((s[key] ?? 0) - v) < 1e-6)) || 'custom';
     for (const el of document.querySelectorAll('#settings [data-k]')) el.addEventListener('input', () => { look.value = lookOf(); });
     $('s-fps').addEventListener('change', (e) => { s.fpsCap = +e.target.value; g.saveSettings(); });
+    // V-sync belongs to the desktop app's window: a browser always holds the game to the screen's refresh rate.
+    if (window.desktop && window.desktop.config) {
+      $('s-vsync-row').style.display = '';
+      window.desktop.config().then((c) => { $('s-vsync').value = c && c.vsync ? 'on' : 'off'; }).catch(() => {});
+      $('s-vsync').addEventListener('change', (e) => { window.desktop.setVsync(e.target.value === 'on'); this.toast('Restart the game for this to take effect.'); });
+    }
     $('s-clock').addEventListener('change', (e) => { clock24 = s.clock24 = e.target.value === '24'; g.saveSettings(); });
     // Puts every control in step with the settings, for opening the panel and after a reset or a preset.
     const fill = () => {

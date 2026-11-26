@@ -225,7 +225,7 @@ class Game {
     const s = this.settings;
     s.quality = key; s.view = q.view; s.scale = q.scale; s.motion = q.motion; s.dof = q.dof;
     if (q.cap) s.cap = q.cap;
-    for (const k of ['sway', 'drips', 'grassWave']) if (k in q) s[k] = q[k];
+    for (const k of ['sway', 'drips', 'grassWave', 'grain']) if (k in q) s[k] = q[k];
     this.saveSettings();
     this.applySettings(true);
   }
@@ -738,14 +738,14 @@ class Game {
       // F1, out in the corner where nothing else is: the whole HUD off for a clean view, and back. Not saved: a new session has it on.
       if (e.code === 'F1') { e.preventDefault(); if (this.state === 'play') document.getElementById('hud').classList.toggle('hud-off'); }
       // The dev tools stay hidden until someone types the word, in each game: a new or loaded game locks them again.
-      if (this.state === 'play' && !this.devUnlocked && e.code.startsWith('Key')) {
+      if (this.state === 'play' && !this.devUnlocked && !(this.coop && this.coop.guest) && e.code.startsWith('Key')) {
         this.devTyped = ((this.devTyped || '') + e.code.slice(3)).slice(-5);
         if (this.devTyped === 'IDKFA') {
           this.devUnlocked = true;
           this.ui.radio(null, 'Somebody on this channel knows the old codes. F4 opens the dev tools.', 'Pirate');
         }
       }
-      if (e.code === 'F4') { e.preventDefault(); if (this.state === 'play' && this.devUnlocked) this.toggleDev(); }
+      if (e.code === 'F4') { e.preventDefault(); if (this.state === 'play' && this.devUnlocked && !(this.coop && this.coop.guest)) this.toggleDev(); }
       if (this.state === 'play') this.onKey(e);
     });
     window.addEventListener('keyup', (e) => { I.keys[e.code] = false; });

@@ -19,6 +19,16 @@ if (!app.requestSingleInstanceLock()) { app.quit(); process.exit(0); }
 // On a laptop with two graphics chips, use the fast one.
 app.commandLine.appendSwitch('force_high_performance_gpu');
 
+// The desktop app's own settings, kept beside its saves. V-sync is off unless asked for: the frame rate is not held to the screen's
+// refresh rate (the game's own FPS limit still applies). These switches only work before the app starts, hence a restart to change it.
+const CONFIG = path.join(app.getPath('userData'), 'spadeheart-desktop.json');
+let config = {};
+try { config = JSON.parse(fs.readFileSync(CONFIG, 'utf8')) || {}; } catch { config = {}; }
+if (!config.vsync) {
+  app.commandLine.appendSwitch('disable-frame-rate-limit');
+  app.commandLine.appendSwitch('disable-gpu-vsync');
+}
+
 // Steam. Run with --steam (put it in the game's launch options in Steam) and the window is drawn the way Steam's overlay (Shift+Tab) can
 // draw on top of. That costs a little, so it stays off otherwise. Steam's own launch variables switch it on too, as a fallback.
 const STEAM = process.argv.includes('--steam') || !!(process.env.SteamGameId || +process.env.SteamAppId);
@@ -145,6 +155,8 @@ app.whenReady().then(() => {
   // Quit on the title screen, and Exit to desktop when paused.
   // If anything (the Steam library, say) holds the app open after quitting, it is made to exit, so the console it ran from closes too.
   ipcMain.on('app:quit', () => { app.quit(); setTimeout(() => app.exit(0), 2000).unref(); });
+  ipcMain.handle('app:config', () => config);
+  ipcMain.on('app:setVsync', (e, on) => { config.vsync = !!on; try { fs.writeFileSync(CONFIG, JSON.stringify(config)); } catch (err) { console.warn('settings not saved', err && err.message); } });
   if (launchLobby) win.webContents.once('did-finish-load', () => setTimeout(() => toWin('invite', { lobby: launchLobby }), 1500));
   win.once('ready-to-show', () => { win.maximize(); win.show(); });
   win.loadURL('app://spadeheart/index.html');

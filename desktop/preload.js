@@ -5,6 +5,8 @@ const { contextBridge, ipcRenderer } = require('electron');
 // The desktop app itself: the game can close it (Quit on the title screen, Exit to desktop when paused).
 contextBridge.exposeInMainWorld('desktop', {
   quit: () => ipcRenderer.send('app:quit'),
+  config: () => ipcRenderer.invoke('app:config'),
+  setVsync: (on) => ipcRenderer.send('app:setVsync', !!on),
 });
 
 contextBridge.exposeInMainWorld('steam', {
