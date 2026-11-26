@@ -49,7 +49,7 @@ export class SteamNet {
 // Online in any browser: WebRTC, peer to peer. PeerJS's free public server introduces the two browsers (it sees the room code and
 // connection details, nothing of the game), and Google's public STUN servers help them find a way through each other's routers. The host
 // is "spadeheart-<code>" there; guests connect to it with the code. Everything then goes straight between the players.
-// (A few strict networks need a relay server to pass the traffic through, and there is none here: those players cannot connect.)
+// Where they cannot reach each other directly, relay servers pass the traffic between them (see ICE below).
 const PEERJS = 'https://cdn.jsdelivr.net/npm/peerjs@1.5.4/+esm';
 const ROOM_PREFIX = 'spadeheart-coop-';
 // How the two browsers reach each other: STUN to find a way through each router, and when there is none (a phone hotspot, a strict
@@ -92,8 +92,7 @@ export class WebNet {
   // A peer on the introducing server, under the given name (or one it makes up).
   openPeer(id) {
     return new Promise((resolve, reject) => {
-      // Introduced through Spadeheart's own server (the free public one loses rooms between players on different connections).
-      const opts = { debug: 0, host: 'spadeheart-peer.onrender.com', port: 443, secure: true, path: '/', config: { iceServers: ICE } };
+      const opts = { debug: 0, config: { iceServers: ICE } };
       const peer = id ? new this.Peer(id, opts) : new this.Peer(opts);
       const fail = (e) => { peer.destroy(); reject(new Error(e && e.type === 'unavailable-id' ? 'That room code is taken.' : e && e.type === 'peer-unavailable' ? 'No game with that code.' : (e && e.message) || 'Could not reach the server.')); };
       peer.once('open', (pid) => { peer.off('error', fail); resolve(peer); void pid; });
@@ -107,7 +106,17 @@ export class WebNet {
     peer.on('connection', (c) => this.adopt(c));
     peer.on('error', (e) => console.warn('co-op: peer error', e && e.type));
     peer.on('disconnected', () => { if (this.peer === peer && !peer.destroyed) peer.reconnect(); });
+    // A browser can drop a page's link to the introducing server (a tab left in the background, a laptop lid, a network blip), and then
+    // nobody can find the room. It keeps trying to get it back, and the lobby says whether the room is open.
+    clearInterval(this.keep);
+    this.keep = setInterval(() => {
+      if (this.peer !== peer || peer.destroyed) { clearInterval(this.keep); return; }
+      if (peer.disconnected) { try { peer.reconnect(); } catch { /* tried again next time */ } }
+    }, 3000);
   }
+
+  // The room can be found by others: this page is registered with the introducing server.
+  get roomOpen() { return !!(this.peer && this.peer.open && !this.peer.disconnected && !this.peer.destroyed); }
 
   adopt(c) {
     const id = c.peer, slot = this.conns.get(id) || {};
@@ -213,7 +222,7 @@ export class WebNet {
       const timer = setTimeout(() => reject(new Error('No game with that code answered.')), 12000);
       c.once('open', () => { clearTimeout(timer); resolve(c); });
       c.once('error', (e) => { clearTimeout(timer); reject(e); });
-      peer.once('error', (e) => { clearTimeout(timer); reject(new Error(e && e.type === 'peer-unavailable' ? 'No game with that code.' : 'Could not connect.')); });
+      peer.once('error', (e) => { clearTimeout(timer); reject(new Error(e && e.type === 'peer-unavailable' ? `No game with the code ${code} is open. Check the code, and that the host's game is open on their screen.` : 'Could not connect.')); });
     });
     try {
       this.adopt(await open('r', true));
@@ -231,6 +240,7 @@ export class WebNet {
     if (L && L.owner === this.selfId) for (const id of L.members) if (id !== this.selfId) this.ctrl(id, { k: 'lobby', lobby: { ...L, members: [] } });
     for (const slot of this.conns.values()) { try { if (slot.r) slot.r.close(); if (slot.u) slot.u.close(); } catch { /* already gone */ } }
     this.conns.clear();
+    clearInterval(this.keep);
     if (this.peer) { const p = this.peer; this.peer = null; setTimeout(() => { try { p.destroy(); } catch { /* gone */ } }, 300); }
   }
 

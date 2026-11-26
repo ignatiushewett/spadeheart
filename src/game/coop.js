@@ -164,6 +164,7 @@ export class Coop {
     } else {
       const L = n.lobby, ids = L ? L.members : [];
       if (L && L.code) html += `<div class="coop-code"><span>Room code</span><b>${esc(L.code)}</b>${this.host ? '<button class="btn" id="coop-copy">Copy</button>' : ''}</div>`;
+      if (L && L.code && this.host) html += `<div class="coop-note">${n.roomOpen ? 'Room open. Keep this screen open while friends join.' : 'Reconnecting to the server. Friends cannot join until it is back.'}</div>`;
       html += `<div class="ng-label" style="margin-top:0">${this.host ? 'Your game' : 'Players'}</div>`;
       for (const id of ids) {
         const me = id === n.selfId, isHost = L && id === L.owner;
@@ -1254,6 +1255,8 @@ export class Coop {
   frame() {
     if (!this.role) return;
     const now = performance.now();
+    // The host's room, open or not, as it changes.
+    if (this.host && this.view === 'lobby' && this.net && this.net.usesCodes && this.net.roomOpen !== this.roomWas) { this.roomWas = this.net.roomOpen; this.render(); }
     // Still here, even through a loading screen.
     if ((this.inGame || this.welcomeAt) && now - (this.kaAt || 0) > 2000) {
       this.kaAt = now;
