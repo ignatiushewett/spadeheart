@@ -271,7 +271,8 @@ export class Coop {
   async joinLobby(id) {
     this.status = 'Joining...';
     this.render();
-    try { await this.net.join(id); } catch (e) { this.status = `Could not join: ${e.message}`; this.render(); return; }
+    this.net.status = (text) => { this.status = text; this.render(); };
+    try { await this.net.join(id); } catch (e) { this.status = `Could not join: ${e.message}`; this.render(); return; } finally { this.net.status = null; }
     this.role = 'guest';
     this.names = {};
     this.hostId = this.net.hostId();

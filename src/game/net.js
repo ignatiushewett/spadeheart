@@ -49,16 +49,18 @@ export class SteamNet {
 // Online in any browser: WebRTC, peer to peer. PeerJS's free public server introduces the two browsers (it sees the room code and
 // connection details, nothing of the game), and Google's public STUN servers help them find a way through each other's routers. The host
 // is "spadeheart-<code>" there; guests connect to it with the code. Everything then goes straight between the players.
-// Where they cannot reach each other directly, relay servers pass the traffic between them (see ICE below).
+// Where they cannot reach each other directly (a strict router, a phone hotspot, a school or work network), they both connect to
+// Spadeheart's relay server instead, and it passes the messages between them (relay/ in this repository).
 const PEERJS = 'https://cdn.jsdelivr.net/npm/peerjs@1.5.4/+esm';
 const ROOM_PREFIX = 'spadeheart-coop-';
-// How the two browsers reach each other: STUN to find a way through each router, and when there is none (a phone hotspot, a strict
-// router, some school and work networks), TURN relays that pass the traffic between them. These are free public ones.
-const ICE = [
-  { urls: 'stun:stun.l.google.com:19302' },
-  { urls: ['turn:openrelay.metered.ca:80', 'turn:openrelay.metered.ca:443', 'turn:openrelay.metered.ca:443?transport=tcp'], username: 'openrelayproject', credential: 'openrelayproject' },
-  { urls: ['turn:eu-0.turn.peerjs.com:3478', 'turn:us-0.turn.peerjs.com:3478'], username: 'peerjs', credential: 'peerjsp' },
-];
+// STUN finds a way through each router for a direct connection.
+const ICE = [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }];
+// The relay: Spadeheart's own, on Render. (For testing, localStorage spadeheart.relay points elsewhere, and spadeheart.forceRelay = 1
+// skips the direct connection.)
+const RELAY_URL = 'wss://spadeheart-relay.onrender.com';
+const stored = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
+const relayUrl = () => stored('spadeheart.relay') || RELAY_URL;
+const RELAY_WAIT = 75000;   // the free server sleeps when nobody has played for a while, and takes up to a minute to wake
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const CTRL = 0, FRAG = 240, FRAG_SIZE = 48000;
 const txt = new TextEncoder(), untxt = new TextDecoder();
@@ -116,7 +118,65 @@ export class WebNet {
   }
 
   // The room can be found by others: this page is registered with the introducing server.
-  get roomOpen() { return !!(this.peer && this.peer.open && !this.peer.disconnected && !this.peer.destroyed); }
+  get roomOpen() { return !!(this.peer && this.peer.open && !this.peer.disconnected && !this.peer.destroyed) || !!this.relayOpen; }
+
+  // --- The relay ----------------------------------------------------------------------------------------------------------------------
+  relayConnect(code, role) {
+    return new Promise((resolve, reject) => {
+      let ws, done = false;
+      const finish = (fn, v) => { if (!done) { done = true; clearTimeout(timer); fn(v); } };
+      try { ws = new WebSocket(`${relayUrl()}/?room=${encodeURIComponent(code)}&id=${encodeURIComponent(this.selfId)}&role=${role}`); } catch (e) { reject(e); return; }
+      ws.binaryType = 'arraybuffer';
+      const timer = setTimeout(() => { finish(reject, new Error('The relay server did not answer.')); try { ws.close(); } catch { /* gone */ } }, RELAY_WAIT);
+      ws.onmessage = (e) => {
+        if (typeof e.data === 'string') {
+          let m;
+          try { m = JSON.parse(e.data); } catch { return; }
+          if (m.k === 'ready') finish(resolve, ws);
+          else if (m.k === 'error') { const err = new Error(m.why); err.why = m.why; finish(reject, err); }
+          else if (m.k === 'gone') { const s = this.conns.get(m.id); if (s && s.relay) this.drop(m.id); }
+          return;
+        }
+        const b = new Uint8Array(e.data), n = b[0], from = untxt.decode(b.subarray(1, 1 + n));
+        // Whoever talks through the relay is answered through it, even if a direct connection to them was half made.
+        const s = this.conns.get(from) || {};
+        s.relay = true;
+        this.conns.set(from, s);
+        this.receive(from, b.subarray(1 + n));
+      };
+      ws.onclose = () => {
+        finish(reject, new Error('The relay server closed the connection.'));
+        if (this.relay !== ws) return;
+        this.relay = null;
+        this.relayOpen = false;
+        // Everyone reached through it is gone with it.
+        for (const [id, s] of [...this.conns]) if (s.relay) this.drop(id);
+        if (this.relayCode) setTimeout(() => this.hostRelay(this.relayCode), 5000);
+      };
+      ws.onerror = () => {};
+    });
+  }
+
+  relaySend(to, b) {
+    const ws = this.relay;
+    if (!ws || ws.readyState !== 1) return;
+    const id = txt.encode(to), out = new Uint8Array(1 + id.length + b.length);
+    out[0] = id.length; out.set(id, 1); out.set(b, 1 + id.length);
+    ws.send(out);
+  }
+
+  // A host keeps its room open on the relay too, for anyone who cannot reach it directly, and gets it back if it drops.
+  async hostRelay(code) {
+    if (this.relayCode !== code || this.relay) return;
+    try {
+      const ws = await this.relayConnect(code, 'host');
+      if (this.relayCode !== code) { ws.close(); return; }
+      this.relay = ws;
+      this.relayOpen = true;
+    } catch (e) {
+      if (this.relayCode === code && !this.relay) setTimeout(() => this.hostRelay(code), 10000);
+    }
+  }
 
   adopt(c) {
     const id = c.peer, slot = this.conns.get(id) || {};
@@ -130,6 +190,13 @@ export class WebNet {
   lost(id, c) {
     const slot = this.conns.get(id);
     if (!slot || (slot.r !== c && slot.u !== c)) return;
+    // Still reached through the relay: only the direct connection is gone.
+    if (slot.relay) { if (slot.r === c) slot.r = null; if (slot.u === c) slot.u = null; return; }
+    this.drop(id);
+  }
+
+  drop(id) {
+    if (!this.conns.has(id)) return;
     this.conns.delete(id);
     if (!this.lobby) return;
     if (this.lobby.owner === this.selfId) {
@@ -181,6 +248,7 @@ export class WebNet {
 
   raw(to, b, reliable) {
     const slot = this.conns.get(to);
+    if (slot && slot.relay) { this.relaySend(to, b); return; }
     const c = slot && (!reliable && slot.u && slot.u.open ? slot.u : slot.r);
     if (!c || !c.open) return;
     try { c.send(b); } catch (e) { console.warn('co-op: send failed', e && e.message); }
@@ -202,6 +270,8 @@ export class WebNet {
     this.watch(peer);
     this.code = code;
     this.lobby = { id: code, code, owner: this.selfId, members: [this.selfId], data: { name: this.selfName, ...(data || {}) } };
+    this.relayCode = code;
+    this.hostRelay(code);
     return this.lobby;
   }
 
@@ -212,22 +282,39 @@ export class WebNet {
     await this.leave();
     code = String(code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
     if (code.length < 4) throw new Error('Type the room code you were given.');
-    const peer = await this.openPeer(null);
-    this.watch(peer);
-    const hostId = ROOM_PREFIX + code;
+    let peer = null;
+    try { peer = await this.openPeer(null); this.watch(peer); } catch { /* the introducing server is out of reach: the relay may still do */ }
+    if (!peer) this.selfId = `relay-${Math.random().toString(36).slice(2, 12)}`;
+    const hostId = ROOM_PREFIX + code, noGame = `No game with the code ${code} is open. Check the code, and that the host's game is open on their screen.`;
     this.code = code;
     this.lobby = { id: code, code, owner: hostId, members: [], data: {} };
-    const open = (label, reliable) => new Promise((resolve, reject) => {
+    const open = (label, reliable, wait) => new Promise((resolve, reject) => {
       const c = peer.connect(hostId, { label, reliable, serialization: 'raw' });
-      const timer = setTimeout(() => reject(new Error('No game with that code answered.')), 12000);
+      const timer = setTimeout(() => reject(new Error('timeout')), wait);
       c.once('open', () => { clearTimeout(timer); resolve(c); });
       c.once('error', (e) => { clearTimeout(timer); reject(e); });
-      peer.once('error', (e) => { clearTimeout(timer); reject(new Error(e && e.type === 'peer-unavailable' ? `No game with the code ${code} is open. Check the code, and that the host's game is open on their screen.` : 'Could not connect.')); });
+      peer.once('error', (e) => { clearTimeout(timer); reject(new Error(e && e.type === 'peer-unavailable' ? 'no-room' : 'failed')); });
     });
-    try {
-      this.adopt(await open('r', true));
-      this.adopt(await open('u', false));
-    } catch (e) { await this.leave(); throw e; }
+    // Directly first: quickest, and nothing in between.
+    let direct = false;
+    if (peer && stored('spadeheart.forceRelay') !== '1') {
+      try {
+        this.adopt(await open('r', true, 9000));
+        direct = true;
+        try { this.adopt(await open('u', false, 4000)); } catch { /* everything can go on the first channel */ }
+      } catch { direct = false; }
+    }
+    // Then through the relay.
+    if (!direct) {
+      try {
+        if (this.status) this.status('Connecting through the relay...');
+        this.relay = await this.relayConnect(code, 'guest');
+        this.conns.set(hostId, { relay: true });
+      } catch (e) {
+        await this.leave();
+        throw new Error(e.why === 'no-room' ? noGame : e.why === 'full' ? 'That game is full.' : 'Could not connect to that game, directly or through the relay.');
+      }
+    }
     this.ctrl(hostId, { k: 'enter', name: this.selfName });
     for (let t = 0; t < 40 && !this.lobby.members.includes(this.selfId); t++) await new Promise((r) => setTimeout(r, 100));
     if (!this.lobby.members.includes(this.selfId)) { await this.leave(); throw new Error('That game did not let you in. It may be full.'); }
@@ -241,6 +328,9 @@ export class WebNet {
     for (const slot of this.conns.values()) { try { if (slot.r) slot.r.close(); if (slot.u) slot.u.close(); } catch { /* already gone */ } }
     this.conns.clear();
     clearInterval(this.keep);
+    this.relayCode = null;
+    this.relayOpen = false;
+    if (this.relay) { const r = this.relay; this.relay = null; try { r.close(); } catch { /* gone */ } }
     if (this.peer) { const p = this.peer; this.peer = null; setTimeout(() => { try { p.destroy(); } catch { /* gone */ } }, 300); }
   }
 

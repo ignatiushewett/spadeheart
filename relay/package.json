@@ -1,0 +1,15 @@
+{
+  "name": "spadeheart-relay",
+  "private": true,
+  "description": "Passes Spadeheart co-op messages between players who cannot connect to each other directly.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "ws": "8.18.0"
+  }
+}
