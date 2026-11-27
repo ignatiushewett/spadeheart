@@ -681,11 +681,18 @@ export const FAR_VS = COMMON + FRAME_UNIFORMS + /* glsl */`
 layout(location=0) in vec3 aPos;
 layout(location=1) in vec3 aNormal;
 layout(location=2) in vec4 aColor;
+layout(location=3) in vec4 aGlass;   // glass colour (0-255) and window spacing
+layout(location=4) in vec4 aTrim;    // trim colour (0-255), window width + 16 x cast
+layout(location=5) in float aBits;   // where the windows start: along (0-7), up (0-5), house, blank silo
 out vec3 vWorld;
 out vec3 vNormal;
 out vec4 vColor;
+flat out vec4 vGlass;
+flat out vec4 vTrim;
+flat out float vBits;
 void main(){
   vWorld=aPos; vNormal=aNormal; vColor=aColor;
+  vGlass=vec4(aGlass.rgb/255.,aGlass.a); vTrim=vec4(aTrim.rgb/255.,aTrim.a); vBits=aBits;
   gl_Position=uViewProj*vec4(aPos,1.);
 }`;
 
@@ -693,10 +700,17 @@ export const FAR_FS = COMMON + FRAME_UNIFORMS + LIGHTING + /* glsl */`
 in vec3 vWorld;
 in vec3 vNormal;
 in vec4 vColor;
+flat in vec4 vGlass;
+flat in vec4 vTrim;
+flat in float vBits;
 uniform sampler2D uLoadMask;
 uniform vec2 uWorldSize;
 uniform float uNightGlow;
 layout(location=0) out vec4 outCol;
+// How much of a pixel's width, centred on x, falls inside a stripe w wide that starts at a and repeats every p. Worked out exactly (the
+// difference of the running total of stripe), so a pattern too fine for the pixel comes out as its average, and never crawls.
+float stripeSum(float x,float p,float a,float w){ float u=x-a; return floor(u/p)*w+clamp(mod(u,p),0.,w); }
+float stripe(float x,float fw,float p,float a,float w){ fw=max(fw,1e-3); return (stripeSum(x+fw*.5,p,a,w)-stripeSum(x-fw*.5,p,a,w))/fw; }
 void main(){
   // Voxel chunks replace the proxy column by column as they finish meshing.
   float m=texture(uLoadMask,vWorld.xz/uWorldSize).r;
@@ -705,26 +719,39 @@ void main(){
   vec3 n=vNormal;
   vec3 col=vColor.rgb;
   float dist=length(vWorld-uCam);
-  float windows=0.;
-  float lit=0.;
-  // Ground (flagged .3) has no windows in it, however steep.
-  if(abs(n.y)<.5&&abs(vColor.a-.3)>.1){
+  float win=0.,trim=0.,lit=0.;
+  vec3 glassC=vGlass.rgb, trimC=vTrim.rgb;
+  // A building's walls, drawn the way its real facade is laid out (see building() in gen.js): a trim line at every floor, every six
+  // blocks up from the ground it stands on; a row of windows from a block over the sill to a block under the ceiling (the whole storey on
+  // a glass tower, the middle of it on a house); and a window wherever the style's spacing and width put one along the wall, starting
+  // where that building starts them. A blank silo is all wall, with a band every eight.
+  if(abs(n.y)<.5&&vColor.a>.9&&vGlass.a>0.){
+    float bits=vBits;
+    float phase=mod(bits,8.), lift=mod(floor(bits/8.),8.);
+    bool house=mod(floor(bits/64.),2.)>.5, blank=bits>=128.;
+    float p=vGlass.a, w=mod(vTrim.a,16.), kindW=floor(vTrim.a/16.);
     float t=abs(n.x)>.5?vWorld.z:vWorld.x;
-    float pitch=vColor.a>.5?3.:4.;
-    float fy=fract((vWorld.y-11.)/6.);
-    float fx=fract(t/pitch);
-    float aa=clamp(dist*.0015,0.,.5);
-    float wx=smoothstep(.5+aa,.5-aa,abs(fx-.5)*1.5);
-    float wy=smoothstep(.4+aa,.4-aa,abs(fy-.55));
-    windows=wx*wy;
-    if(vColor.a>.5) windows=max(windows,.75);
-    vec2 cell=vec2(floor(t/pitch),floor((vWorld.y-11.)/6.));
-    lit=step(.9985,hash12(cell+floor(vWorld.xz/64.)));
+    float rel=vWorld.y-11.-lift;
+    // A little wider than a pixel, so the edges stay soft as well as the fine patterns even.
+    float ft=fwidth(t)*1.25, fy=fwidth(vWorld.y)*1.25;
+    if(blank) trim=stripe(rel,fy,8.,7.,1.);
+    else {
+      trim=stripe(rel,fy,6.,0.,1.);
+      float lo=kindW>1.5?1.:2., hi=kindW>1.5?6.:house?4.:5.;
+      win=stripe(t+phase,ft,p,0.,w)*stripe(rel,fy,6.,lo,hi-lo);
+      if(kindW>.5&&kindW<1.5) trim=max(trim,stripe(t,ft,p,p-1.,1.)*(1.-win));
+      // Now and then a lit one at night, while they are big enough to make out.
+      vec2 cell=vec2(floor((t+phase)/p),floor(rel/6.));
+      float fine=max(ft/p,fy/6.);
+      lit=step(.9985,hash12(cell+floor(vWorld.xz/64.)))*(1.-smoothstep(.3,1.,fine));
+    }
   }
-  vec3 glass=mix(col*.25,uHorizon*.8,.5);
+  // Glass, dark with the rooms behind it, catching a little of the sky; at night it goes darker.
+  vec3 glass=mix(glassC,uHorizon*.55,.14);
   float dark=clamp(uNightGlow,0.,1.);
   glass=mix(glass,vec3(dot(glass,vec3(.3,.5,.2))),dark*.8)*mix(1.,.4,dark);
-  vec3 alb=mix(col,glass,windows*.8);
+  vec3 alb=mix(mix(col,trimC,trim),glass,win);
+  float windows=win;
   float ndl=max(dot(n,uSunDir),0.);
   float sh=ndl>0.?sampleShadow(vWorld,n,dist):0.;
   vec3 amb=mix(uGroundCol,uSkyCol,n.y*.5+.5);

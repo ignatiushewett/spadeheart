@@ -21,24 +21,29 @@ export class FarCity {
     this.buckets = [];
     const W = WX / CELL, D = WZ / CELL;
     const H = new Uint8Array(W * D);
-    const C = new Uint16Array(W * D);
+    // Which style a cell is, and how that building's windows sit on it: how far along (from its seed) and how far up (from the ground it
+    // stands on), so its stand-in has its windows where the real one has them. Cells only merge with ones that match in all of it.
+    const C = new Uint16Array(W * D), BLD = [];
     const { height, lot, buildings, ground, terr } = L;
     for (let z = 0; z < D; z++) for (let x = 0; x < W; x++) {
       const i = (z * CELL + 2) * WX + x * CELL + 2;
       const h = height[i];
       if (h && lot[i]) {
+        const b = buildings[lot[i] - 1];
         H[x + z * W] = h;
-        C[x + z * W] = 1 + buildings[lot[i] - 1].style;
+        const key = (1 + b.style) | ((b.seed & 7) << 6) | ((((b.lift | 0) % 6 + 6) % 6) << 9) | (b.house ? 1 << 12 : 0) | (b.blank ? 1 << 13 : 0);
+        C[x + z * W] = key;
       }
     }
     // (Trees are drawn far off as pictures now, by FarTrees, not as boxes here.)
     const palette = (c) => {
-      if (c === 200) return { col: srgb(M.COPPER, 1), glass: 0 };
-      if (c === 201) return { col: srgb(M.SCHIST, 1), glass: 0, solid: true };
-      if (c >= 202) return { col: srgb(c === 202 ? M.LEAF : M.LEAF2, 1), glass: 0, solid: true };
-      const s = STYLES[c - 1];
-      return { col: srgb(s.wall, 1), roof: srgb(s.roof, 1), glass: s.cast === 2 ? 1 : 0 };
+      const s = STYLES[(c & 63) - 1];
+      // The facade the shader draws over the wall: the style's own glass and trim, its window spacing and width, and whether it is cast
+      // iron (a pilaster between the windows), a curtain wall, a house, or a blank silo.
+      const face = { glass: srgb(s.glass, 1), trim: srgb(s.trim, 1), p: s.p, w: s.w, cast: s.cast, phase: (c >> 6) & 7, lift: (c >> 9) & 7, house: !!(c & (1 << 12)), blank: !!(c & (1 << 13)) };
+      return { col: srgb(s.wall, 1), roof: srgb(s.roof, 1), glass: 1, face };
     };
+    void BLD;
     const cache = new Map();
     const pal = (c) => { let p = cache.get(c); if (!p) { p = palette(c); cache.set(c, p); } return p; };
 
@@ -46,9 +51,12 @@ export class FarCity {
     // The ground itself goes in buckets of its own: it is drawn, but it casts no shadow worth the cost of a second and third pass.
     const tverts = Array.from({ length: Math.ceil(WZ / BUCKET) }, () => []);
     const used = new Uint8Array(W * D);
-    const quad = (out, p, n, col, glass) => {
+    // kind: 0 a plain box (no windows), .3 the ground, 1 a building. face: its facade, for the walls of a building.
+    const NOFACE = { glass: [0, 0, 0], trim: [0, 0, 0], p: 0, w: 0, cast: 0, phase: 0, lift: 0, house: false, blank: false };
+    const quad = (out, p, n, col, kind, face = NOFACE) => {
+      const f = face, bits = f.phase | (f.lift << 3) | (f.house ? 64 : 0) | (f.blank ? 128 : 0);
       for (const v of p) {
-        out.push(v[0], v[1], v[2], n[0], n[1], n[2], col[0], col[1], col[2], glass);
+        out.push(v[0], v[1], v[2], n[0], n[1], n[2], col[0], col[1], col[2], kind, f.glass[0], f.glass[1], f.glass[2], f.p, f.trim[0], f.trim[1], f.trim[2], f.w | (f.cast << 4), bits);
       }
     };
     const heightAt = (x, z) => (x < 0 || z < 0 || x >= W || z >= D) ? 0 : H[x + z * W];
@@ -71,15 +79,16 @@ export class FarCity {
       const p = pal(c);
       const bucket = verts[Math.min(verts.length - 1, Math.floor(z0 / BUCKET))];
       quad(bucket, [[x0, h, z1], [x1, h, z1], [x1, h, z0], [x0, h, z0]], [0, 1, 0], p.roof || p.col, 0);
+      const F = p.face;
       // Sides only reach down to the lowest neighbour, keeping the proxy light.
       let lowW = h, lowE = h, lowN = h, lowS = h;
       for (let a = 0; a < d; a++) { lowW = Math.min(lowW, heightAt(x - 1, z + a)); lowE = Math.min(lowE, heightAt(x + w, z + a)); }
       for (let b = 0; b < w; b++) { lowN = Math.min(lowN, heightAt(x + b, z - 1)); lowS = Math.min(lowS, heightAt(x + b, z + d)); }
       const base = (v) => Math.max(STREET_Y - 2, v);
-      if (lowW < h) quad(bucket, [[x0, base(lowW), z0], [x0, base(lowW), z1], [x0, h, z1], [x0, h, z0]], [-1, 0, 0], p.col, p.glass);
-      if (lowE < h) quad(bucket, [[x1, base(lowE), z1], [x1, base(lowE), z0], [x1, h, z0], [x1, h, z1]], [1, 0, 0], p.col, p.glass);
-      if (lowN < h) quad(bucket, [[x1, base(lowN), z0], [x0, base(lowN), z0], [x0, h, z0], [x1, h, z0]], [0, 0, -1], p.col, p.glass);
-      if (lowS < h) quad(bucket, [[x0, base(lowS), z1], [x1, base(lowS), z1], [x1, h, z1], [x0, h, z1]], [0, 0, 1], p.col, p.glass);
+      if (lowW < h) quad(bucket, [[x0, base(lowW), z0], [x0, base(lowW), z1], [x0, h, z1], [x0, h, z0]], [-1, 0, 0], p.col, 1, F);
+      if (lowE < h) quad(bucket, [[x1, base(lowE), z1], [x1, base(lowE), z0], [x1, h, z0], [x1, h, z1]], [1, 0, 0], p.col, 1, F);
+      if (lowN < h) quad(bucket, [[x1, base(lowN), z0], [x0, base(lowN), z0], [x0, h, z0], [x1, h, z0]], [0, 0, -1], p.col, 1, F);
+      if (lowS < h) quad(bucket, [[x0, base(lowS), z1], [x1, base(lowS), z1], [x1, h, z1], [x0, h, z1]], [0, 0, 1], p.col, 1, F);
     }
     // The country: one quad to every sixteen blocks, tilted to the slope, and lifted where the forest stands on it.
     {
@@ -215,13 +224,16 @@ export class FarCity {
     for (let bb = 0; bb < verts.length * 2; bb++) {
       const ground = bb >= verts.length, b = bb % verts.length, arr = ground ? tverts[b] : verts[b];
       if (!arr.length) continue;
-      const vertCount = arr.length / 10;
-      const buf = new ArrayBuffer(vertCount * 20);
+      const N = 19, SZ = 28, vertCount = arr.length / N;
+      const buf = new ArrayBuffer(vertCount * SZ);
       const fv = new Float32Array(buf), iv = new Int8Array(buf), uv = new Uint8Array(buf);
-      for (let k = 0, o = 0; k < arr.length; k += 10, o += 20) {
+      const c8 = (v) => Math.max(0, Math.min(255, Math.round(v * 255)));
+      for (let k = 0, o = 0; k < arr.length; k += N, o += SZ) {
         fv[o >> 2] = arr[k]; fv[(o >> 2) + 1] = arr[k + 1]; fv[(o >> 2) + 2] = arr[k + 2];
-        iv[o + 12] = arr[k + 3] * 127; iv[o + 13] = arr[k + 4] * 127; iv[o + 14] = arr[k + 5] * 127;
-        uv[o + 16] = Math.min(255, arr[k + 6] * 255); uv[o + 17] = Math.min(255, arr[k + 7] * 255); uv[o + 18] = Math.min(255, arr[k + 8] * 255); uv[o + 19] = arr[k + 9] * 255;
+        iv[o + 12] = arr[k + 3] * 127; iv[o + 13] = arr[k + 4] * 127; iv[o + 14] = arr[k + 5] * 127; uv[o + 15] = arr[k + 18];
+        uv[o + 16] = c8(arr[k + 6]); uv[o + 17] = c8(arr[k + 7]); uv[o + 18] = c8(arr[k + 8]); uv[o + 19] = c8(arr[k + 9]);
+        uv[o + 20] = c8(arr[k + 10]); uv[o + 21] = c8(arr[k + 11]); uv[o + 22] = c8(arr[k + 12]); uv[o + 23] = arr[k + 13];
+        uv[o + 24] = c8(arr[k + 14]); uv[o + 25] = c8(arr[k + 15]); uv[o + 26] = c8(arr[k + 16]); uv[o + 27] = arr[k + 17];
       }
       const vao = gl.createVertexArray();
       gl.bindVertexArray(vao);
@@ -229,11 +241,19 @@ export class FarCity {
       gl.bindBuffer(gl.ARRAY_BUFFER, vb);
       gl.bufferData(gl.ARRAY_BUFFER, buf, gl.STATIC_DRAW);
       gl.enableVertexAttribArray(0);
-      gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 20, 0);
+      gl.vertexAttribPointer(0, 3, gl.FLOAT, false, SZ, 0);
       gl.enableVertexAttribArray(1);
-      gl.vertexAttribPointer(1, 3, gl.BYTE, true, 20, 12);
+      gl.vertexAttribPointer(1, 3, gl.BYTE, true, SZ, 12);
       gl.enableVertexAttribArray(2);
-      gl.vertexAttribPointer(2, 4, gl.UNSIGNED_BYTE, true, 20, 16);
+      gl.vertexAttribPointer(2, 4, gl.UNSIGNED_BYTE, true, SZ, 16);
+      // The facade: glass colour and window spacing, trim colour and window width (with the kind of wall in the high bits), and the
+      // bits for where the windows start (raw bytes, unpacked in the shader).
+      gl.enableVertexAttribArray(3);
+      gl.vertexAttribPointer(3, 4, gl.UNSIGNED_BYTE, false, SZ, 20);
+      gl.enableVertexAttribArray(4);
+      gl.vertexAttribPointer(4, 4, gl.UNSIGNED_BYTE, false, SZ, 24);
+      gl.enableVertexAttribArray(5);
+      gl.vertexAttribPointer(5, 1, gl.UNSIGNED_BYTE, false, SZ, 15);
       const idx = new Uint32Array(vertCount / 4 * 6);
       for (let q = 0, v = 0, k = 0; q < vertCount / 4; q++, v += 4) {
         idx[k++] = v; idx[k++] = v + 1; idx[k++] = v + 2; idx[k++] = v; idx[k++] = v + 2; idx[k++] = v + 3;
