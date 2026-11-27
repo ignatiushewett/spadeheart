@@ -184,7 +184,6 @@ export class Coop {
         const name = me ? n.selfName : (this.names && this.names[id]) || shared[id] || (isHost ? (L.data && L.data.name) : '') || 'Joining...';
         left += `<div class="coop-slot${me ? ' me' : ''}"><span class="idx">${i + 1}</span><b>${esc(name)}</b>${isHost ? '<span class="host">(Host)</span>' : ''}</div>`;
       }
-      if (L && L.code) left += `<div class="coop-code"><span>Room code</span><b>${esc(L.code)}</b>${this.host ? '<button class="btn" id="coop-copy">Copy</button>' : ''}</div>`;
       // Top right, a look at where the game starts: the settlement picked, or for Random, all of them.
       const S = this.host ? this.settings : this.lobbySettings(L);
       const at = !S ? null : S.camp === 'random' ? { key: 'random', name: 'Random' } : this.g.layout.camps.find((c) => c.key === S.camp);
@@ -194,6 +193,7 @@ export class Coop {
       const commit = String(this.version()).split(':')[1] || '';
       const state = this.host ? (n.usesCodes ? (n.roomOpen ? 'Open' : 'Reconnecting...') : 'Open') : this.hostStarted ? 'In game. Joining...' : 'Waiting for the host';
       left += `<div class="coop-kv"><span>Status</span><b>${state}</b></div><div class="coop-kv"><span>Players</span><b>${ids.length} / ${max}</b></div><div class="coop-kv"><span>Connection</span><b>${esc(n.label)}</b></div>${commit ? `<div class="coop-kv"><span>Version</span><b>${esc(commit)}</b></div>` : ''}`;
+      if (L && L.code) left += `<div class="coop-code"><span>Room code</span><b>${esc(L.code)}</b>${this.host ? '<button class="btn" id="coop-copy">Copy</button>' : ''}</div>`;
       right += `<div class="ng-label"${map ? '' : ' style="margin-top:0"'}>Settings</div>`;
       if (S) {
         const cur = RANGES.find((q) => q.r === S.range) || RANGES[1], preset = presetOf(S);
@@ -212,7 +212,7 @@ export class Coop {
           else right += `<div class="coop-kv"><span>${label}</span><b>${esc((opts.find(([v]) => String(v) === String(val)) || [, val])[1])}</b></div>`;
         }
       }
-      html += `<div class="coop-lobby"><div>${left}</div><div>${right}</div></div>`;
+      html += `<div class="coop-lobby"><div class="coop-left">${left}</div><div>${right}</div></div>`;
       if (this.status) html += `<div class="coop-status">${esc(this.status)}</div>`;
       ft = '<button class="btn" id="coop-leave">Leave</button><span style="flex:1"></span>';
       if (n.canInvite) ft += '<button class="btn" id="coop-invite">Invite friends</button>';
@@ -1048,13 +1048,13 @@ export class Coop {
     this.guestBook[p.key] = { ...(this.guestBook[p.key] || {}), ...JSON.parse(JSON.stringify(me)) };
     if (!R.modal) { this.send(p.id, { t: 'ui', mode: null, me }); return; }
     let rid = 0;
-    for (const b of root.querySelectorAll('#dlg-opts button, #dlg-jobs button, #trade-buy button, #trade-sell button')) b.dataset.rid = String(rid++);
+    for (const b of root.querySelectorAll('#dlg-opts button, #dlg-jobs button, #trade-tabs button, #trade-buy button, #trade-sell button')) b.dataset.rid = String(rid++);
     const n = R.modal === 'trade' ? R.tradeNpc || R.dlgNpc : R.dlgNpc;
     this.send(p.id, {
       t: 'ui', mode: R.modal, me, npc: n ? { x: r2(n.x), y: r2(n.y), z: r2(n.z), name: n.name, kid: !!n.kid } : null,
       name: q('dlg-name').textContent, role: q('dlg-role').textContent, standing: q('dlg-standing').textContent, text: R.typeFull,
       opts: q('dlg-opts').innerHTML, jobs: q('dlg-jobs').innerHTML, page: q('dialog').classList.contains('with-page') ? q('contract-page').innerHTML : '',
-      title: q('trade-title').textContent, sum: q('trade-sum').textContent, buy: q('trade-buy').innerHTML, sell: q('trade-sell').innerHTML,
+      title: q('trade-title').textContent, sum: q('trade-sum').textContent, tabs: q('trade-tabs').innerHTML, buy: q('trade-buy').innerHTML, sell: q('trade-sell').innerHTML,
     });
   }
 
@@ -1144,9 +1144,10 @@ export class Coop {
       ui.tradeNpc = a;
       if (ui.modal !== 'trade') ui.open('trade', false);
       $('trade-title').textContent = m.title; $('trade-sum').textContent = m.sum;
-      $('trade-buy').innerHTML = m.buy || ''; $('trade-sell').innerHTML = m.sell || '';
+      $('trade-tabs').innerHTML = m.tabs || ''; $('trade-buy').innerHTML = m.buy || ''; $('trade-sell').innerHTML = m.sell || '';
+      $('trade-buy').classList.add('dz'); $('trade-sell').classList.add('dz');
     }
-    for (const b of document.querySelectorAll('#dlg-opts [data-rid], #dlg-jobs [data-rid], #trade-buy [data-rid], #trade-sell [data-rid]')) {
+    for (const b of document.querySelectorAll('#dlg-opts [data-rid], #dlg-jobs [data-rid], #trade-tabs [data-rid], #trade-buy [data-rid], #trade-sell [data-rid]')) {
       b.addEventListener('click', (e) => { ui.finishLine(); g.audio.simple('ui'); this.sendHost({ t: 'ui-click', rid: +b.dataset.rid, shift: e.shiftKey }); });
     }
   }

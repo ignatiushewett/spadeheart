@@ -132,6 +132,8 @@ const INV_SIZE = { pistol: [2, 1], revolver: [2, 1], smg: [3, 2], shotgun: [4, 2
   crowbar: [3, 1], axe: [3, 2], sledge: [4, 2], dynamite: [2, 1], medkit: [2, 2], antibiotic: [2, 1], stim: [2, 1], ammo_rocket: [2, 1], jacket: [2, 2], riot: [3, 3],
   tactical: [3, 3], backpack: [3, 3], flashlight: [2, 1], bike_keys: [2, 1], metrocard: [2, 1], cloth: [2, 1], scrap: [2, 1], whiskey: [1, 2], water: [1, 2] };
 const invSize = (id) => INV_SIZE[id] || [1, 1];
+// The bag's tabs, and what goes under each.
+const INV_TABS = [['weapons', 'Weapons', ['melee', 'gun', 'throw', 'tool']], ['building', 'Building', ['block']], ['apparel', 'Apparel', ['armor', 'pack']], ['aid', 'Aid', ['med', 'food']], ['ammo', 'Ammo', ['ammo']], ['misc', 'Misc', ['papers', 'keys']], ['junk', 'Junk', ['junk']]];
 // A voice's own colour on the radio: blues and greens and violets, one per name, the same every time.
 const voiceTint = (who) => {
   let hh = 7;
@@ -1671,7 +1673,7 @@ export class UI {
   // pointer (or was last used) laid out in full on the right. Left and right arrows go from tab to tab.
   renderInventory(detail) {
     const P = this.g.player;
-    const TABS = [['weapons', 'Weapons', ['melee', 'gun', 'throw', 'tool']], ['building', 'Building', ['block']], ['apparel', 'Apparel', ['armor', 'pack']], ['aid', 'Aid', ['med', 'food']], ['ammo', 'Ammo', ['ammo']], ['misc', 'Misc', ['papers', 'keys']], ['junk', 'Junk', ['junk']]];
+    const TABS = INV_TABS;
     const idsOf = (types) => Object.keys(P.inventory).filter((id) => types.includes(ITEMS[id]?.type)).sort((a, b) => WEAPON_ORDER.indexOf(a) - WEAPON_ORDER.indexOf(b) || ITEMS[a].name.localeCompare(ITEMS[b].name));
     // Something just used or picked: its own tab comes up.
     if (detail && ITEMS[detail]) { const t = TABS.find((q) => q[2].includes(ITEMS[detail].type)); if (t) this.invTab = t[0]; }
@@ -1845,44 +1847,127 @@ export class UI {
     this.renderTrade();
   }
 
+  // Trading, laid out like the bag: your things in a grid on the left, theirs on the right, each the size it is in the bag, with what it
+  // goes for in its corner. Click to trade a lot (Shift for ten), or drag it across to the other side. Tabs along the top as in the bag.
   renderTrade() {
     const g = this.g, P = g.player, n = this.tradeNpc;
     const role = n.role || 'general';
     const stock = g.npcs.stockFor(n.camp, role, n.stockKey);
     $('trade-title').textContent = `${n.name}, ${n.title && n.part ? n.title : ROLES[role].title}`;
     $('trade-sum').textContent = `${SP} ${fmt(P.scrip)}    ${P.carryWeight().toFixed(1)} / ${P.carryCap()} kg`;
-    const buy = $('trade-buy'), sell = $('trade-sell');
-    buy.innerHTML = '<div class="list-title">For sale</div>';
-    sell.innerHTML = '<div class="list-title">Your goods</div>';
-    const row = (id, count, price, onClick) => {
-      const it = ITEMS[id];
+    const TABS = [['all', 'All', null], ...INV_TABS];
+    if (!TABS.some((t) => t[0] === this.tradeTab)) this.tradeTab = 'all';
+    const types = TABS.find((t) => t[0] === this.tradeTab)[2];
+    const inTab = (id) => !types || types.includes(ITEMS[id].type);
+    const order = (a, b) => ITEMS[a].type.localeCompare(ITEMS[b].type) || ITEMS[b].value - ITEMS[a].value;
+    const tabs = $('trade-tabs');
+    tabs.innerHTML = '';
+    for (const [key, name] of TABS) {
       const b = document.createElement('button');
-      b.className = 'item';
-      const lot = it.bundle || 1;
-      if (price === 0) b.style.display = 'none';
-      b.innerHTML = `<span>${it.name} <small>x${count}</small></span><small>${lot > 1 ? `${lot} for ` : ''}${price * lot}</small>`;
-      b.addEventListener('mouseenter', () => this.itemDetail('trade-detail', id));
-      b.addEventListener('click', (e) => onClick(id, lot * (e.shiftKey ? 10 : 1)));
-      return b;
-    };
-    const ids = Object.keys(stock).filter((id) => stock[id] > 0);
-    ids.sort((a, b) => ITEMS[a].type.localeCompare(ITEMS[b].type) || ITEMS[b].value - ITEMS[a].value);
-    for (const id of ids) {
-      const b = row(id, stock[id], this.priceBuy(id), (i, amount) => this.buy(i, amount, stock));
+      b.className = `inv-tab${key === this.tradeTab ? ' on' : ''}`;
+      b.textContent = name;
+      b.addEventListener('click', () => { this.tradeTab = key; this.g.audio.simple('ui'); this.renderTrade(); });
+      tabs.appendChild(b);
+    }
+    if (!this.tradeKeys && !this.remote) {
+      this.tradeKeys = true;
+      document.addEventListener('keydown', (e) => {
+        if (this.modal !== 'trade' || (e.code !== 'ArrowLeft' && e.code !== 'ArrowRight') || !this.tradeNpc || (this.g.coopHub && this.g.coopHub.talkingRemote)) return;
+        const keys = ['all', ...INV_TABS.map((t) => t[0])], k = keys.indexOf(this.tradeTab);
+        this.tradeTab = keys[(k + (e.code === 'ArrowRight' ? 1 : keys.length - 1)) % keys.length];
+        this.g.audio.simple('ui');
+        this.renderTrade();
+        e.preventDefault();
+      });
+    }
+    const buy = $('trade-buy'), sell = $('trade-sell');
+    const theirs = Object.keys(stock).filter((id) => stock[id] > 0 && ITEMS[id] && inTab(id)).sort(order).map((id) => {
+      const price = this.priceBuy(id), lot = ITEMS[id].bundle || 1;
       // The good stuff goes to people the camp knows, unless you started out as someone they would know already.
       const need = n.camp >= 0 && P.loadout !== 'veteran' ? (TRUST_LOCK[id] || 0) : 0;
-      if (need > g.dialogue.standing(n.camp)) {
-        b.disabled = true;
-        b.classList.add('locked');
-        b.title = `Only for people who are ${standingName(need)} here`;
-        b.querySelector('small:last-child').textContent = standingName(need);
+      const locked = need > g.dialogue.standing(n.camp) ? `Only for people who are ${standingName(need)} here` : '';
+      return { id, count: stock[id], price, lot, locked };
+    });
+    const mine = Object.keys(P.inventory).filter((id) => ITEMS[id] && inTab(id) && this.priceSell(id, role) > 0).sort(order).map((id) => (
+      { id, count: P.count(id), price: this.priceSell(id, role), lot: ITEMS[id].bundle || 1, eq: P.weapon === id || P.armor === id }));
+    const doBuy = (id, k) => this.buy(id, (ITEMS[id].bundle || 1) * k, stock);
+    const doSell = (id, k) => this.sell(id, (ITEMS[id].bundle || 1) * k, stock, role);
+    this.tradeGrid(sell, buy, 'Your goods', mine, doSell, 'Nothing they would buy.');
+    this.tradeGrid(buy, sell, 'For sale', theirs, doBuy, 'Sold out until tomorrow.');
+  }
+
+  // One side of the trade, as a grid. Every square is a button, so a guest's screen, copied over from the host's, works the same.
+  tradeGrid(box, other, title, entries, act, none) {
+    const COLS = 8, GAP = 2, w0 = box.clientWidth || 440;
+    const CELL = Math.max(34, Math.min(60, Math.floor((w0 - 24 - 12 - (COLS - 1) * GAP) / COLS))), STEP = CELL + GAP;
+    box.classList.add('dz');
+    box.innerHTML = `<div class="list-title">${title}</div>`;
+    if (!entries.length) { box.insertAdjacentHTML('beforeend', `<div class="dz-none">${none}</div>`); return; }
+    const occ = [], at = {};
+    const fits = (x, y, w, h) => {
+      if (x + w > COLS) return false;
+      for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) if (occ[yy * COLS + xx]) return false;
+      return true;
+    };
+    let rows = 0;
+    for (const e of entries) {
+      const [w, h] = invSize(e.id);
+      find: for (let y = 0; y < 400; y++) for (let x = 0; x + w <= COLS; x++) if (fits(x, y, w, h)) {
+        for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) occ[yy * COLS + xx] = e.id;
+        at[e.id] = [x, y];
+        rows = Math.max(rows, y + h);
+        break find;
       }
-      buy.appendChild(b);
     }
-    if (!ids.length) buy.insertAdjacentHTML('beforeend', '<div style="color:var(--dim);padding:8px">Sold out until tomorrow.</div>');
-    const mine = Object.keys(P.inventory).filter((id) => ITEMS[id]);
-    mine.sort((a, b) => ITEMS[a].type.localeCompare(ITEMS[b].type) || ITEMS[b].value - ITEMS[a].value);
-    for (const id of mine) sell.appendChild(row(id, P.count(id), this.priceSell(id, role), (i, amount) => this.sell(i, amount, stock, role)));
+    rows = Math.max(rows + 1, 6);
+    const grid = document.createElement('div');
+    grid.className = 'dz-grid';
+    grid.style.width = `${COLS * STEP - GAP}px`; grid.style.height = `${rows * STEP - GAP}px`;
+    let cells = '';
+    for (let y = 0; y < rows; y++) for (let x = 0; x < COLS; x++) cells += `<i class="dz-cell" style="left:${x * STEP}px;top:${y * STEP}px;width:${CELL}px;height:${CELL}px"></i>`;
+    grid.innerHTML = cells;
+    box.appendChild(grid);
+    for (const e of entries) {
+      const it = ITEMS[e.id], [w, h] = invSize(e.id), [x, y] = at[e.id];
+      const b = document.createElement('button');
+      b.className = `dz-item${e.eq ? ' eq' : ''}${e.locked ? ' locked' : ''}${h === 1 ? ' flat' : ''}${it.type === 'block' ? ' blk' : ''}`;
+      b.style.left = `${x * STEP}px`; b.style.top = `${y * STEP}px`; b.style.width = `${w * STEP - GAP}px`; b.style.height = `${h * STEP - GAP}px`;
+      const cost = `${e.lot > 1 ? `${e.lot} for ` : ''}${SP} ${fmt(e.price * e.lot)}`;
+      b.title = `${it.name}${e.count > 1 ? ` x${e.count}` : ''}: ${e.locked || cost}`;
+      if (e.locked) b.disabled = true;
+      b.innerHTML = `${e.count > 1 ? `<span class="q">${e.count}</span>` : ''}${it.type === 'block' ? iconFor(e.id).replace('viewBox="0 0 32 16"', 'viewBox="10 2 12 12"') : iconFor(e.id)}<span class="p">${e.locked ? 'Locked' : `${SP}${fmt(e.price * e.lot)}`}</span>`;
+      b.addEventListener('mouseenter', () => { this.itemDetail('trade-detail', e.id); $('trade-detail').insertAdjacentHTML('beforeend', `<br><span class="mono" style="color:var(--amber)">${e.locked || cost}</span>`); });
+      b.addEventListener('click', (ev) => { if (performance.now() - (this.tradeDragAt || 0) < 250) return; act(e.id, ev.shiftKey ? 10 : 1); });
+      // Picked up and carried over to the other side: traded, the same as a click.
+      b.addEventListener('pointerdown', (ev) => {
+        if (ev.button !== 0 || e.locked) return;
+        const sx = ev.clientX, sy = ev.clientY;
+        let moving = false, over = false;
+        const move = (m) => {
+          const dx = m.clientX - sx, dy = m.clientY - sy;
+          if (!moving && Math.hypot(dx, dy) < 6) return;
+          moving = true;
+          b.classList.add('drag');
+          b.style.transform = `translate(${dx}px, ${dy}px)`;
+          const r = other.getBoundingClientRect();
+          over = m.clientX >= r.left && m.clientX <= r.right && m.clientY >= r.top && m.clientY <= r.bottom;
+          other.classList.toggle('dz-over', over);
+        };
+        const up = (u) => {
+          window.removeEventListener('pointermove', move);
+          window.removeEventListener('pointerup', up);
+          other.classList.remove('dz-over');
+          if (!moving) return;
+          this.tradeDragAt = performance.now();
+          b.classList.remove('drag');
+          b.style.transform = '';
+          if (over) act(e.id, u.shiftKey ? 10 : 1);
+        };
+        window.addEventListener('pointermove', move);
+        window.addEventListener('pointerup', up);
+      });
+      grid.appendChild(b);
+    }
   }
 
   buy(id, amount, stock) {

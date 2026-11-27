@@ -446,7 +446,9 @@ body.waking #hud > * { visibility: hidden; }
 .coop-set { display: grid; grid-template-columns: 150px 1fr; align-items: center; gap: 12px; margin: 4px 0; }
 .coop-set label { color: var(--faint); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; }
 .coop-set select { justify-self: stretch; min-width: 0; padding: 6px 8px; }
-.coop-code { display: flex; align-items: center; gap: 14px; padding: 12px 14px; margin: 14px 0 6px; background: var(--panel-2); border: 1px solid var(--amber); }
+.coop-left { display: flex; flex-direction: column; align-self: stretch; }
+.coop-left .coop-code { margin-top: auto; }
+.coop-code { display: flex; align-items: center; gap: 14px; padding: 12px 14px; margin: 14px 0 0; background: var(--panel-2); border: 1px solid var(--amber); }
 .coop-code span { color: var(--faint); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; }
 .coop-code b { flex: 1; color: var(--ink); font: 700 24px var(--mono); letter-spacing: .25em; }
 /* Co-op chat: T to say something. It comes up over your head for the others, the way the people of the city talk. */
@@ -534,7 +536,15 @@ body.waking #hud > * { visibility: hidden; }
 #trade-buy .item small, #trade-sell .item small { font: 13px var(--mono); color: var(--amber); }
 #trade-buy .item span small, #trade-sell .item span small { color: var(--dim); }
 #trade-buy .list-title, #trade-sell .list-title { font-family: var(--mono); font-size: 13px; }
-#trade-detail { font-family: var(--mono); }
+#trade-detail { font-family: var(--mono); min-height: 62px; }
+#trade-buy.dz, #trade-sell.dz { padding: 0 12px 12px; scrollbar-gutter: stable; border: 1px solid transparent; }
+#trade-buy.dz-over, #trade-sell.dz-over { border-color: var(--green); background: rgba(127,176,105,.06); }
+#trade-panel .dz-item { padding: 0; font: inherit; }
+#trade-panel .dz-item .p { position: absolute; left: 2px; bottom: 2px; z-index: 1; font: 10px var(--mono); color: var(--amber); background: rgba(10,10,9,.78); padding: 0 3px; text-shadow: 0 1px 0 #000; white-space: nowrap; max-width: calc(100% - 4px); overflow: hidden; }
+#trade-panel .dz-item.locked { opacity: .45; cursor: not-allowed; }
+#trade-panel .dz-item.locked .p { color: var(--dim); }
+#trade-panel .dz-item:disabled:hover { background: var(--panel-2); border-color: var(--line); }
+.dz-none { color: var(--dim); padding: 8px 2px; font: 14px var(--mono); }
 #inv-detail .dt { color: var(--ink); font-size: 19px; font-weight: 600; margin-bottom: 6px; }
 #inv-detail .dd { color: var(--dim); font-size: 13px; line-height: 1.5; margin: 0 0 10px; }
 #inv-detail table { width: 100%; border-collapse: collapse; font-size: 14px; }
@@ -925,12 +935,13 @@ body.talking #hud > *:not(#caption) { visibility: hidden; }
 <div id="trade" class="screen center">
   <div class="panel" id="trade-panel">
     <div class="panel-head"><h2 id="trade-title"></h2><span id="trade-sum" class="mono" style="color:var(--amber);font-size:14px"></span></div>
+    <div class="inv-tabs" id="trade-tabs"></div>
     <div class="panel-body split" style="flex:1;overflow:hidden">
       <div class="list" id="trade-sell"></div>
       <div class="list" id="trade-buy"></div>
     </div>
     <div class="detail" id="trade-detail" style="margin:0 20px;padding-bottom:6px"></div>
-    <div class="panel-foot"><span style="flex:1;color:var(--faint);font-size:12px;align-self:center">Click to trade one lot. Shift-click to trade ten.</span><button class="btn primary" data-close>Done</button></div>
+    <div class="panel-foot"><span style="flex:1;color:var(--faint);font-size:12px;align-self:center">Click or drag across to trade one lot. Shift for ten. Left and right arrows change tab.</span><button class="btn primary" data-close>Done</button></div>
   </div>
 </div>
 
