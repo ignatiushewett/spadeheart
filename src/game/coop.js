@@ -1344,32 +1344,35 @@ export class Coop {
   poseOf(P) {
     const it = P.weapon ? ITEMS[P.weapon] : null, moving = Math.hypot(P.vx, P.vz) > .6;
     const ready = !!it && it.type === 'gun' && (P.ads > .3 || P.fireCd > 0);
-    return { x: P.x, y: P.y, z: P.z, yaw: P.yaw, pitch: P.pitch, alive: P.alive, moving, crouch: !!P.crouch, ready, swing: P.swing > 0, w: BODY_WEAPON[P.weapon] || 0, hp: Math.max(0, Math.round(P.health)) };
+    return { x: P.x, y: P.y, z: P.z, yaw: P.yaw, pitch: P.pitch, alive: P.alive, moving, crouch: !!P.crouch, sit: !!P.sitting && P.alive, ready, swing: P.swing > 0, w: BODY_WEAPON[P.weapon] || 0, hp: Math.max(0, Math.round(P.health)) };
   }
 
   writePose(q) {
     const b = new Uint8Array(24), v = new DataView(b.buffer);
     b[0] = P_POSE;
     v.setFloat32(1, q.x, true); v.setFloat32(5, q.y, true); v.setFloat32(9, q.z, true); v.setFloat32(13, q.yaw, true); v.setFloat32(17, q.pitch, true);
-    b[21] = (q.alive ? 1 : 0) | (q.moving ? 2 : 0) | (q.crouch ? 4 : 0) | (q.ready ? 8 : 0) | (q.swing ? 16 : 0);
+    b[21] = (q.alive ? 1 : 0) | (q.moving ? 2 : 0) | (q.crouch ? 4 : 0) | (q.ready ? 8 : 0) | (q.swing ? 16 : 0) | (q.sit ? 32 : 0);
     b[22] = q.w; b[23] = Math.min(255, q.hp);
     return b;
   }
 
   readPose(b) {
     const v = new DataView(b.buffer, b.byteOffset, b.byteLength), f = b[21];
-    return { x: v.getFloat32(1, true), y: v.getFloat32(5, true), z: v.getFloat32(9, true), yaw: v.getFloat32(13, true), pitch: v.getFloat32(17, true), alive: !!(f & 1), moving: !!(f & 2), crouch: !!(f & 4), ready: !!(f & 8), swing: !!(f & 16), w: b[22], hp: b[23], t: performance.now() };
+    return { x: v.getFloat32(1, true), y: v.getFloat32(5, true), z: v.getFloat32(9, true), yaw: v.getFloat32(13, true), pitch: v.getFloat32(17, true), alive: !!(f & 1), moving: !!(f & 2), crouch: !!(f & 4), sit: !!(f & 32), ready: !!(f & 8), swing: !!(f & 16), w: b[22], hp: b[23], t: performance.now() };
   }
 
   // A player's body, as the people of the city are drawn. Facing: a player's yaw points along (sin, -cos), a body's along (sin, cos).
   pushBody(A, id, d, q) {
-    const st = !q.alive ? 10 + Math.min(60, this.g.time - (d.downAt ?? this.g.time)) : q.moving ? .7 : 0;
+    const st = !q.alive ? 10 + Math.min(60, this.g.time - (d.downAt ?? this.g.time)) : q.sit ? 5 : q.moving ? .7 : 0;
+    // Sat down: drawn the way the people of the city sit, on the seat rather than stood on top of it. (A seated player is up on the
+    // block; a seated body has its feet at the foot of it.)
+    const y = q.sit && q.alive ? d.y - 1 : d.y;
     const aim = q.ready ? Math.max(0, Math.min(63, Math.round((q.pitch + .8) / 1.2 * 63))) : 42;
     const extra = q.w * 2 + aim * 32768 + (q.ready ? 2097152 : 0) + Math.min(7, Math.round((d.wet || 0) * 8)) * 4096;
-    if (A.add) A.push(0, d.x, d.y, d.z, Math.PI - d.yaw, d.phase, st, bodyVariant(id), extra);
+    if (A.add) A.push(0, d.x, y, d.z, Math.PI - d.yaw, d.phase, st, bodyVariant(id), extra);
     else {
       const cam = this.g.renderer.camPos, dx = d.x - cam[0], dz = d.z - cam[2];
-      A.push(dx * dx + dz * dz < 50 * 50 ? 0 : 1, d.x, d.y, d.z, Math.PI - d.yaw, d.phase, st, bodyVariant(id), extra);
+      A.push(dx * dx + dz * dz < 50 * 50 ? 0 : 1, d.x, y, d.z, Math.PI - d.yaw, d.phase, st, bodyVariant(id), extra);
     }
   }
 

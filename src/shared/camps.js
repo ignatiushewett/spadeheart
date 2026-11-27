@@ -392,6 +392,12 @@ export function planCamp(def, id, r, ground) {
     for (const [v, u] of [[9, 3], [9, Wd - 4], [D - 9, 3], [D - 9, Wd - 4]]) {
       for (const [a, b, yaw] of [[0, 0, Math.PI / 2], [1, 1, 0], [-1, 1, Math.PI]]) hallPoi(v + a, u + b, 'talk', yaw);
     }
+    // Cots in the two back corners either side of the tower, for whoever has nowhere else: feet at the foot of each, the head back on
+    // the pillow by the side wall.
+    for (const v of [5, 7]) {
+      c.pois.push({ x: x1 - v + .5, z: z0 + 4.95, kind: 'sleep', yaw: 0 });
+      c.pois.push({ x: x1 - v + .5, z: z0 + Wd - 4.95, kind: 'sleep', yaw: Math.PI });
+    }
     // Everyone who could not face the queue: out front and along that side of the building, drifting from one spot to the next. The way to the door stays open.
     c.hallYard = [];
     for (let dx = 2; dx <= 11; dx += 3) for (let z = z0 - 3; z <= z1 + 4; z += 3) {
@@ -2111,6 +2117,19 @@ function stampPart(p, c, box, put, car, letterAt) {
       for (let u = mid - 7; u <= mid + 7; u++) if (Math.abs(u - mid) > 5) for (let y = YB; y <= YB + 2; y++) C(D - 2, y, u, M.SHELF);
       for (let v = D - 7; v <= D - 6; v++) for (let u = mid - 3; u <= mid + 3; u++) C(v, YB, u, M.WOOD);
       for (let u = mid - 5; u <= mid + 5; u++) for (let y = YB + 1; y <= YB + 5; y++) C(D - 2, y, u, (u + mid) % 2 && y % 2 ? M.TENT_W : M.PLANK);
+      // Up over the board, where the altar used to be: the plain wooden cross that always hung there, two tall coloured windows either
+      // side of it in the gable, and the congregation's colours hung between.
+      for (let y = YB + 8; y <= YB + 17; y++) C(D - 2, y, mid, M.WOOD_D);
+      for (let u = mid - 3; u <= mid + 3; u++) C(D - 2, YB + 14, u, M.WOOD_D);
+      for (const u of [mid - 6, mid + 6]) for (let y = YB + 8; y <= YB + 13; y++) C(D - 1, y, u, y === YB + 8 ? M.WOOD_D : M.STAINED);
+      for (const u of [mid - 6, mid + 6]) C(D - 1, YB + 14, u, M.WOOD_D);
+      for (const s of [-1, 1]) for (let y = YB + 7; y <= YB + 12; y++) for (let k = 2; k <= 3; k++) C(D - 2, y, mid + s * k, y > YB + 10 ? p.flag2 : p.flag1);
+      // The beds in the back corners by the door: pillow by the side wall, mattress, blanket.
+      const quilts = [M.BLANKET_R, M.BLANKET_B, M.BLANKET_C, M.BLANKET_G];
+      [5, 7].forEach((v, i) => {
+        C(v, YB, 2, M.PILLOW); C(v, YB, 3, M.MATTRESS); C(v, YB, 4, quilts[i]);
+        C(v, YB, Wd - 3, M.PILLOW); C(v, YB, Wd - 4, M.MATTRESS); C(v, YB, Wd - 5, quilts[i + 2]);
+      });
       break;
     }
     case 'wreck': {

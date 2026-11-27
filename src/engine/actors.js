@@ -272,6 +272,67 @@ function buildVariantTexture(gl) {
     (o) => { o.shirt = [76, 84, 54]; o.vest = [60, 66, 44]; o.shirt2 = [50, 56, 36]; o.pants = [70, 76, 50]; o.hat = [62, 68, 44]; o.flags = 1; o.shoes = [30, 26, 22]; },    // national guard
     (o) => { o.shirt = [80, 60, 44]; o.vest = [54, 50, 44]; o.shirt2 = [100, 90, 70]; o.pants = [60, 54, 44]; },  // layered, street
   ];
+  // The infected, dressed by their own draw of the dice (so the people behind the walls look just as they always have). Mostly what
+  // people had on when it happened, in every colour and none of them quite the same: a uniform or a hard hat now and then, never so
+  // often that the same one keeps turning up. Then six weeks of weather and worse on all of it.
+  const zr = makeRng(31337);
+  const ZTEES = [...TEES, [96, 40, 36], [50, 56, 90], [86, 96, 60], [150, 140, 120], [110, 104, 96], [140, 96, 60], [90, 60, 90], [60, 90, 100], [176, 70, 60], [200, 200, 190], [44, 52, 40], [120, 110, 70]];
+  const ZJEANS = [...JEANS, [60, 56, 50], [86, 80, 66], [36, 40, 52], [96, 92, 86], [52, 44, 36], [120, 110, 92]];
+  const ZCOATS = [[70, 60, 48], [44, 46, 52], [96, 84, 62], [60, 66, 50], [110, 50, 40], [40, 54, 76], [28, 28, 30], [130, 120, 100]];
+  const pickZ = (a) => a[Math.floor(zr() * a.length)];
+  // A colour, a little off from every other one like it: lighter or darker, warmer or cooler.
+  const jit = (c, a = 18) => { const k = .8 + zr() * .34; return c.map((v) => Math.max(8, Math.min(240, v * k + (zr() - .5) * a))); };
+  const hatOf = (cols, p) => { if (zr() < p) return { hat: jit(pickZ(cols)), flags: 1 }; return { hat: [0, 0, 0], flags: 0 }; };
+  const ZLOOKS = [
+    [7, () => { const s = jit(pickZ(ZTEES)); return { shirt: s, vest: s, shirt2: s, pants: jit(pickZ(ZJEANS)) }; }],                                     // a T-shirt and jeans
+    [4, () => { const h = jit(pickZ(ZTEES)); return { shirt: h, vest: h, shirt2: h.map((v) => v * .75), pants: jit(pickZ(ZJEANS)), hair: h }; }],         // hoodie, hood up
+    [4, () => { const s = jit(pickZ(ZTEES)), j = jit(pickZ(ZCOATS)); return { shirt: s, vest: j, shirt2: j, pants: jit(pickZ(ZJEANS)) }; }],               // a jacket over a T-shirt
+    [3, () => { const s = jit(pickZ([[98, 48, 42], [54, 62, 76], [74, 84, 50], [96, 70, 44], [120, 40, 40], [60, 60, 66]])); return { shirt: s, vest: s, shirt2: s, pants: jit(pickZ(ZJEANS)) }; }],   // flannel
+    [3, () => { const s = jit(pickZ([[110, 90, 70], [70, 80, 96], [120, 120, 112], [90, 46, 50], [60, 76, 60], [150, 130, 96]])); return { shirt: s, vest: s, shirt2: s, pants: jit(pickZ(ZJEANS)) }; }],   // a sweater
+    [3, () => { const s = jit(pickZ([[200, 200, 196], [150, 170, 196], [196, 186, 160], [170, 150, 160]])); return { shirt: s, vest: s, shirt2: s, pants: jit(pickZ([[60, 60, 66], [110, 100, 80], [40, 40, 46], [80, 76, 70]])), shoes: [24, 20, 18] }; }],   // shirt and slacks
+    [2, () => { const s = jit(pickZ([[58, 60, 68], [30, 34, 44], [80, 76, 70], [44, 40, 36]])); return { shirt: s, vest: s, shirt2: jit([200, 200, 195]), pants: s, shoes: [20, 18, 16] }; }],   // a suit
+    [2, () => { const s = jit(pickZ([[150, 50, 90], [60, 60, 130], [40, 40, 40], [200, 170, 60], [90, 110, 80], [170, 90, 70]])); return { shirt: s, vest: s, shirt2: s, pants: s, shoes: [30, 20, 20] }; }],   // a dress
+    [2, () => { const s = jit(pickZ([[200, 196, 186], [40, 40, 44], [150, 60, 50], [70, 90, 120]])); return { shirt: s, vest: s, shirt2: [0, 0, 0], pants: jit(pickZ(ZJEANS)), bareArms: true }; }],   // a vest top, bare arms
+    [2, () => { const c = jit(pickZ([[40, 50, 70], [110, 40, 36], [40, 40, 42], [70, 80, 54], [150, 130, 70]])); return { shirt: c, vest: c, shirt2: c, pants: jit(pickZ(ZJEANS)), bulk: true }; }],   // a puffer coat
+    [1.5, () => { const s = jit(pickZ([[84, 104, 138], [156, 86, 44], [116, 114, 106], [60, 66, 50]])); return { shirt: s, vest: s, shirt2: s, pants: s.map((v) => v * .9), shoes: [62, 44, 30] }; }],   // coveralls
+    [1.5, () => { const s = jit(pickZ([[80, 150, 150], [90, 130, 170], [190, 190, 196], [110, 90, 130]])); return { shirt: s, vest: s, shirt2: s, pants: s, shoes: [200, 200, 200] }; }],   // scrubs
+    [1.2, () => { const s = jit(pickZ([[170, 190, 200], [190, 196, 186], [150, 170, 150]])); return { shirt: s, vest: s, shirt2: s, pants: [0, 0, 0], bareLegs: true, shoes: [170, 170, 160] }; }],   // a hospital gown
+    [1.5, () => { const s = jit(pickZ([[90, 110, 150], [150, 80, 90], [120, 120, 130], [90, 120, 90], [170, 150, 120]])); return { shirt: s, vest: s, shirt2: s, pants: s.map((v) => v * .9), shoes: [80, 70, 64] }; }],   // pyjamas
+    [1, () => { const r = jit(pickZ([[110, 80, 70], [70, 70, 90], [150, 140, 130], [90, 40, 46]])); return { shirt: jit([180, 176, 166]), vest: r, shirt2: r, pants: jit(pickZ(ZJEANS)) }; }],   // a dressing gown
+    [1, () => { const s = jit(pickZ([[110, 70, 40], [40, 60, 110], [140, 40, 40], [70, 70, 70]])); return { shirt: s, vest: s, shirt2: s, pants: jit([50, 50, 54]), ...hatOf([s], .25) }; }],   // a courier's polo and cap
+    [1, () => { const s = jit([60, 62, 70]); return { shirt: jit([190, 190, 196]), vest: s, shirt2: s, pants: s, shoes: [20, 18, 16] }; }],   // security
+    [1, () => { const b = jit(pickZ([[40, 50, 80], [80, 30, 40], [40, 60, 50]])); return { shirt: jit([200, 200, 196]), vest: b, shirt2: b, pants: jit(pickZ([[60, 60, 66], [80, 70, 60]])) }; }],   // a school blazer
+    [1, () => { const d = jit(pickZ([[50, 65, 95], [70, 76, 60], [110, 90, 60]])); return { shirt: jit(pickZ(ZTEES)), vest: d, shirt2: jit(pickZ(ZTEES)), pants: d }; }],   // dungarees
+    [1, () => { const s = jit(pickZ([[200, 40, 50], [40, 90, 180], [230, 230, 230], [240, 150, 40], [60, 160, 120]])); return { shirt: s, vest: s, shirt2: s, pants: zr() < .6 ? [0, 0, 0] : jit([40, 40, 44]), bareLegs: true, shoes: [220, 220, 220] }; }],   // out for a run
+    [.6, () => { const hv = jit(pickZ([[215, 190, 30], [230, 120, 20], [170, 196, 60]])); return { shirt: jit([90, 90, 96]), vest: hv, shirt2: jit([90, 90, 96]), pants: jit([70, 60, 45]), shoes: [90, 60, 30], ...hatOf([[220, 200, 40], [230, 230, 226], [230, 120, 30], [60, 90, 160]], .35) }; }],   // a building site
+    [.6, () => ({ shirt: jit([30, 40, 66]), vest: jit([24, 30, 50]), shirt2: jit([20, 24, 36]), pants: jit([22, 26, 42]), ...hatOf([[20, 24, 40]], .4) })],   // police
+    [.4, () => ({ shirt: jit([120, 100, 50]), vest: jit([150, 130, 60]), shirt2: jit([150, 130, 60]), pants: jit([90, 75, 40]), shoes: [20, 20, 20], ...hatOf([[150, 110, 30], [40, 40, 40]], .35) })],   // a firefighter
+    [.4, () => ({ shirt: jit([205, 205, 200]), vest: jit([205, 205, 200]), shirt2: jit([90, 90, 90]), pants: jit([60, 60, 66]), ...hatOf([[220, 220, 215]], .25) })],   // a chef
+    [.6, () => ({ shirt: jit([76, 84, 54]), vest: jit([60, 66, 44]), shirt2: jit([50, 56, 36]), pants: jit([70, 76, 50]), shoes: [30, 26, 22], ...hatOf([[62, 68, 44]], .5) })],   // national guard
+    [.6, () => { const s = jit(pickZ(ZTEES)); return { shirt: s, vest: s, shirt2: s, pants: jit([110, 95, 75]), shoes: [220, 220, 220], ...hatOf(ZTEES, .2) }; }],   // a visitor, in shorts
+  ];
+  const ZTOTAL = ZLOOKS.reduce((a, [w]) => a + w, 0);
+  // What the weather and the rest of it have done: everything drifting towards the colour of dried mud, some more than others.
+  const grime = (c, k) => [c[0] + (62 - c[0]) * k, c[1] + (54 - c[1]) * k, c[2] + (44 - c[2]) * k];
+  const zombieLook = (o, base) => {
+    let r = zr() * ZTOTAL, make = ZLOOKS[0][1];
+    for (const [w, f] of ZLOOKS) { r -= w; if (r <= 0) { make = f; break; } }
+    const L = make();
+    // Skin from grey-green to waxy to bruised: the same faces, turned more or less far.
+    const pale = .55 + zr() * .3, tint = pickZ([[26, 34, 24], [34, 34, 30], [30, 26, 30], [36, 40, 26]]);
+    o.skin = [base[0] * pale + tint[0], base[1] * (pale + .06) + tint[1], base[2] * (pale - .04) + tint[2]];
+    const k = .18 + zr() * .3;
+    o.shirt = grime(L.shirt, k); o.vest = grime(L.vest, k);
+    // Bare arms and legs show skin.
+    o.shirt2 = L.bareArms ? o.skin : grime(L.shirt2, k);
+    o.pants = L.bareLegs && (L.pants[0] + L.pants[1] + L.pants[2]) === 0 ? o.skin : grime(L.pants, k * 1.2);
+    o.shoes = grime(L.shoes || jit(pickZ(SHOES)), k);
+    o.hair = L.hair ? grime(L.hair, k) : jit(pickZ(HAIR), 10);
+    o.hat = L.hat ? grime(L.hat, k * 1.3) : [0, 0, 0];
+    o.flags = (L.flags || 0) | (L.bulk || zr() < .1 ? 16 : 0) | (zr() < .06 ? 4 : 0);
+    o.zdirt = .6 + zr() * .32;
+    o.zbald = zr() < .1;
+  };
   // Survivors dress for the work: layers, boots, and gear strapped on.
   const CAMO = [[76, 84, 54], [62, 68, 46], [88, 84, 62], [52, 58, 44]];
   const FLANNEL = [[98, 48, 42], [54, 62, 76], [74, 84, 50], [96, 70, 44]];
@@ -330,10 +391,11 @@ function buildVariantTexture(gl) {
     const base = rng.pick(SKINS);
     const o = { skin: base, shirt: null, pants: null, shoes: rng.pick(SHOES), hair: rng.pick(HAIR), hat: [0, 0, 0], vest: null, shirt2: null, flags: 0 };
     if (zombie) o.skin = [base[0] * .72 + 26, base[1] * .78 + 34, base[2] * .68 + 24];
-    if (zombie) OUTFITS[rng.int(0, OUTFITS.length - 1)](o);
+    if (zombie) { OUTFITS[rng.int(0, OUTFITS.length - 1)](o); zombieLook(o, base); }
     else WARD[wardrobeOf(row)](o, row);
-    const bald = rng() < .08;
-    const dirt = zombie ? rng.range(.62, .9) : rng.range(.8, .96);
+    // (Drawn for every row, so the rows after this one come out the same whatever this one is.)
+    const bald0 = rng() < .08, dirt0 = zombie ? rng.range(.62, .9) : rng.range(.8, .96);
+    const bald = zombie ? o.zbald : bald0, dirt = zombie ? o.zdirt : dirt0;
     const put = (col, c, a = 255, tint = 1) => {
       const k = (col + row * W) * 4;
       tex[k] = Math.min(255, c[0] * tint); tex[k + 1] = Math.min(255, c[1] * tint); tex[k + 2] = Math.min(255, c[2] * tint); tex[k + 3] = a;

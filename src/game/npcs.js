@@ -163,11 +163,82 @@ const RAIDER_GUN = {
 const RAIDER_NAMES = ['Crow', 'Dutch', 'Rat', 'Knuckles', 'Tiny', 'Spook', 'Mace', 'Lefty', 'Boots', 'Sully', 'Razor', 'Ghost', 'Pike', 'Wes', 'Hatch', 'Cricket', 'Nine', 'Dolly', 'Sparks', 'Mouse', 'Preacher', 'Vee', 'Bones', 'Junior', 'Ash', 'Bishop', 'Blue', 'Bricks', 'Buck', 'Chalk', 'Chicago', 'Cinder', 'Cutter', 'Deuce', 'Dice', 'Duke', 'Fang', 'Flint', 'Fox', 'Grease', 'Hollow', 'Jinx', 'Judge', 'Kid', 'Lark', 'Latch', 'Lucky', 'Magpie', 'Monk', 'Moth', 'Needles', 'Nickel', 'Patch', 'Pepper', 'Queenie', 'Rabbit', 'Reno', 'Rook', 'Rust', 'Saint', 'Scratch', 'Shiv', 'Smoke', 'Snake', 'Socks', 'Stitch', 'Tack', 'Tallboy', 'Termite', 'Trey', 'Tuesday', 'Viper', 'Wire', 'Wolf', 'Yonder', 'Zero'];
 const RAIDER_IDLE = ["This block's picked clean.", "Keep it down, they can hear you.", 'I told you, nothing on 9th.', "Where's the rest of the crew?", "I'm so sick of canned peaches.", "Somebody's been through here.", 'Watch the windows.', 'We should have gone north.'];
 // What the Reverend has to say from the front of the church, to the people on his side of it.
-const SERMON = ['The Lord did not promise us an easy road. He promised to walk it with us.', 'Look at the person next to you. They are still here. So are you. Say amen.',
-  'We are not the last of anything. We are the first of whatever comes next.', 'Somebody in this room carried a stranger to that gate. Somebody did. And the Lord saw it.',
-  'They took the city. They did not take the valley, and they did not take this house.', 'You are tired. I know you are tired. Rest here a while, and then we go back to the wall.',
-  'Weeping may endure for a night. I know, church. It has been a long night.', 'Say it with me now. We feed who comes. We bury who falls. We keep the light on.',
-  'Do not ask me why. I have asked Him. I am still waiting on the answer, same as you.', 'Leon Calloway sang in that choir for thirty years. Somebody sing for him tonight.'];
+// The Reverend's sermons. Each one is preached right through, a line at a time, in order; then a breath, and the next one.
+const SERMONS = [
+  [
+    'Good morning, church. I said good morning, church. There it is. You are still here, and so am I.',
+    'I want to talk to you this morning about the valley. Not the one out there past the mill. The one in the Psalm.',
+    'Yea, though I walk through the valley of the shadow of death. You know the words. Your grandmother knew them.',
+    'Now notice he does not say he lives in the valley. He does not say he set up camp there. He says he walks through it.',
+    'Through it, church. Walking means you are going somewhere. Walking means there is another side.',
+    'I have seen this valley fill up with smoke. I have seen the road to Esperance go dark. I have buried more of you than I can say.',
+    'And still every morning that gate opens, and somebody goes out, and somebody comes back. That is walking. That is through.',
+    'I will fear no evil. Not because there is none. Lord knows there is plenty of it walking around out there.',
+    'I will fear no evil, for thou art with me. That is the whole of it. Not that it is safe. That we are not alone in it.',
+    'So when you go up on that wall tonight, and the dark comes in off the river, you say it to yourself. Through. Not in. Through.',
+    'Somebody give me an amen. Thank you. Now somebody give one to the person on the wall right now who cannot hear us.',
+  ],
+  [
+    'I want to tell you about Leon Calloway. Some of you knew him. Most of you heard him before you ever saw him.',
+    'Leon sang in that choir for thirty years. Bass. You could feel it in the boards under your feet.',
+    'When the sirens started, Leon did not run for the hills. Leon walked up and down Mill Street knocking on doors.',
+    'He got the Pruitt children out. He got old Mrs. Abernathy out in a shopping cart, God love her, cursing him the whole way.',
+    'Leon did not make it back to this house. But eleven people did, because he knocked.',
+    'I am not going to stand up here and tell you that was fair. It was not fair. I have been angry about it with the Lord, and He can take it.',
+    'But I will tell you what it was. It was faithful. Leon was faithful in the small thing. A knock on a door.',
+    'You do not have to do the big thing. You do not have to save the city. Nobody in this room is saving the city.',
+    'You just have to knock. Carry the water. Share the beans. Walk the stranger to the gate.',
+    'Somebody sing for Leon tonight. Low, the way he did. I will start it if nobody else will, and you will all regret it.',
+  ],
+  [
+    'Look at the person next to you. Go on, look at them. They are still here. So are you. Say amen.',
+    'Now some of you are looking at somebody you do not like very much. I see you. The Lord sees you too.',
+    'This house has always had people in it who did not care for each other. That is called a church.',
+    'Before all this you could avoid a man. Cross the street. Find another pew. Pretend you did not see him at the store.',
+    'There is no other street now. There is this yard, and that wall, and the people between them.',
+    'The man you cannot stand might be the man who pulls you up the ladder when they come over the wall.',
+    'Love your neighbour. It does not say like him. It does not say agree with him about the water ration.',
+    'It says love him. And love, church, is mostly showing up. Mostly it is just showing up again.',
+    'So this week I want you to do one kind thing for somebody you would rather not. Just one. I will be asking.',
+    'And I will know if you lie to me, because Sister Ruth sees everything and she tells me all of it.',
+  ],
+  [
+    'Weeping may endure for a night. I know, church. I know. It has been a long night.',
+    'It has been a night with no streetlights and no phone that rings and no news that is good.',
+    'Some of you have not slept right since it started. Some of you sleep in your boots. I sleep in mine.',
+    'But I want you to hear the rest of that verse, because people always stop halfway. Joy cometh in the morning.',
+    'Now it does not say what time. It does not give you an hour. I have asked. He does not give the hour.',
+    'But it says morning. It says it comes. Not maybe. Not if the wall holds. It comes.',
+    'And I have seen it, church. I have seen it in this yard. A baby born in the back room in the middle of all this.',
+    'I saw it when the Okafors walked in through that gate after nine days on the road, all six of them.',
+    'Every morning that sun comes up over that ridge and finds us still here, that is a down payment on joy.',
+    'So you weep tonight if you need to. There is no shame in it in this house. But you hold on for the morning.',
+  ],
+  [
+    'They took the city. I am not going to pretend they did not. You have all seen it from the wall.',
+    'They took the bridges and the hospitals and the high rises downtown that we never could afford to live in anyway.',
+    'But hear me. They did not take the valley. And they did not take this house.',
+    'This church was built by people who came up from the south with nothing in their pockets.',
+    'They cut those beams by hand. They raised that roof on Saturdays, after a full week at the mill.',
+    'They were told they could not, and they did it anyway, a board at a time. This house has never been easy.',
+    'So when somebody tells you it is over, you tell them about the boards. A board at a time.',
+    'A sandbag at a time. A meal at a time. A night on the wall at a time. That is how a people is kept.',
+    'We are not the last of anything, church. We are the first of whatever comes next. Write that down.',
+    'And when they tell the story of this valley, I want them to say the light at Carver Yard never once went out.',
+  ],
+  [
+    'Let us pray. Heads down if you are able. Eyes open if you are on watch. He will understand.',
+    'Lord, we come to you tired. You know that already. We are tired in our backs and tired in our hearts.',
+    'We thank you for the water in the well and the beans in the pot. We thank you for every soul that came through that gate.',
+    'We hold up to you the ones out on the road tonight. Keep them off the main streets. Keep their feet quiet.',
+    'We hold up the ones on the wall. Steady their hands. Keep their eyes sharp. Bring every one of them down in the morning.',
+    'We hold up the ones we lost. We do not understand it. We are not going to pretend we do.',
+    'Do not let us harden, Lord. That is my prayer for this house. Do not let what is outside the wall get inside of us.',
+    'Let us still open the gate. Let us still feed who comes. Let us still bury who falls, with their name said out loud.',
+    'And when this is over, if it is ever over, let us walk out of this valley the same people who walked into it. Only stronger.',
+    'Say it with me now. We feed who comes. We bury who falls. We keep the light on. Amen.',
+  ],
+];
 // Kill this many of a settlement's people inside its wall within this many seconds of play, and you are barred from it for good.
 const SPREE_KILLS = 3, SPREE_WINDOW = 300;
 const RAIDER_BREAK = ['Forget this!', "I'm out!", 'Not worth it!', 'Go, go, go!'];
@@ -809,7 +880,8 @@ export class NPCs {
     if (n.hallGoer && kind !== 'sleep' && c.hallPois) {
       let free = c.hallPois.filter((q) => !q.by);
       // During the service the pews on the Reverend's side fill up first.
-      if (c.spots.pulpit && this.inService()) { const side = free.filter((q) => q.kind === 'sit' && Math.sign(q.z - c.clerk.z) === Math.sign(c.spots.pulpit.z - c.clerk.z)); if (side.length) free = side; }
+      // During the service most fill the pews on the Reverend's side; some keep to their usual seat across the aisle.
+      if (c.spots.pulpit && this.inService() && rand() < .7) { const side = free.filter((q) => q.kind === 'sit' && Math.sign(q.z - c.clerk.z) === Math.sign(c.spots.pulpit.z - c.clerk.z)); if (side.length) free = side; }
       if (free.length) { poi = pickOf(free); kind = poi.kind; loose = false; }
     }
     if (n.hallYard && kind !== 'sleep' && c.hallYard) {
@@ -1693,9 +1765,9 @@ export class NPCs {
 
   // On the crew's own channel: you, or one of them.
   crewSay(n, text) {
-    // The group signs off with "Out"; "Over" is yours.
+    // The group signs off with "Over", the same as you.
     if (n) {
-      text = text.replace(/\s*Over\.$/, '');
+      text = text.replace(/\bOut\.$/, 'Over.');
       (this.crewRecent || (this.crewRecent = [])).push({ text, t: this.g.time });
       if (this.crewRecent.length > 30) this.crewRecent.shift();
     }
@@ -4617,7 +4689,18 @@ export class NPCs {
       // Preaching: facing his side of the church, arms going, a line every few seconds for whoever is in the pews.
       n.yaw = goal.yaw;
       if (Math.sin(g.time * 1.4 + n.tick) > -.2) n.state = 4;
-      if ((R.say -= dt) <= 0) { R.say = 6 + rand() * 5; if (dp < 45) g.ui.floatSay(n, pickOf(SERMON), 4.5); }
+      // Through one sermon a line at a time, each given time to land; then a pause, and on to another. It goes on whether or not
+      // anyone is near enough to hear it, so walking in partway through, you walk in partway through.
+      if ((R.say -= dt) <= 0) {
+        if (R.sermon === undefined || R.line >= SERMONS[R.sermon].length) {
+          let k = Math.floor(rand() * SERMONS.length);
+          if (k === R.sermon) k = (k + 1) % SERMONS.length;
+          R.sermon = k; R.line = 0;
+        }
+        const text = SERMONS[R.sermon][R.line++];
+        R.say = 2.6 + text.length * .062 + (R.line >= SERMONS[R.sermon].length ? 14 : 0);
+        if (dp < 45) g.ui.floatSay(n, text, 2 + text.length * .055);
+      }
     } else if (dp < 8) n.yaw = Math.atan2(P.x - n.x, P.z - n.z);
     else if (goal.yaw !== undefined) n.yaw = goal.yaw;
   }
@@ -6034,7 +6117,7 @@ export class Jobs {
     this.active.splice(this.active.indexOf(j), 1);
     e.pay = this.crewCut(j, e.pay);
     g.player.scrip += e.pay;
-    g.npcs.crewRepAdd(3);
+    g.npcs.crewRepAdd(6);
     g.stats.ops = (g.stats.ops || 0) + 1;
     g.audio.simple('coin');
     const c = g.layout.camps[campId], op = g.campSim.state[campId].op;
@@ -6442,7 +6525,7 @@ export class Jobs {
     const paid = this.crewCut(j, j.reward);
     P.scrip += paid;
     P.rep = Math.min(100, P.rep + 3);
-    g.npcs.crewRepAdd(2);
+    g.npcs.crewRepAdd(5);
     const out = [`${paid} spades`];
     if (j.bonus) { const n = ITEMS[j.bonus].bundle || 1; P.gain(j.bonus, n); out.push(`${n} ${ITEMS[j.bonus].name}`); }
     g.stats.jobs++;
@@ -6455,7 +6538,7 @@ export class Jobs {
     if (job.intro) P.dlg.flags.introDone = true;
     job.reward = this.crewCut(job, job.reward);
     P.scrip += job.reward;
-    g.npcs.crewRepAdd(stood ? 4 : 2);
+    g.npcs.crewRepAdd(stood ? 8 : 5);
     // People remember how much you did.
     P.rep = Math.min(100, P.rep + (stood ? (job.kills >= 25 ? 3 : 1) : 2));
     g.dialogue.addStanding(job.campId, stood ? Math.min(12, Math.ceil(job.kills / 8)) : 6);

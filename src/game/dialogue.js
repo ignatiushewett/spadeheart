@@ -157,7 +157,21 @@ export class Dialogue {
       return true;
     };
     if (thread) return thread.map((id) => all.find((t) => t.id === id)).filter((t) => t && usable(t));
-    return all.filter((t) => !t.sub && usable(t));
+    // Someone with a story of their own who is in your group still takes orders like anyone else in it.
+    return [...all.filter((t) => !t.sub && usable(t)), ...this.crewTopics(npc)];
+  }
+
+  // Someone in the group, face to face: told to come along again if they were sent home or stood down; or sent home, not sent away: they
+  // go back to their settlement and stay in the group. Letting someone go is done from the Group menu.
+  crewTopics(npc) {
+    const g = this.g, list = [];
+    if (npc.kind !== 'follower') return list;
+    if (npc.order) list.push({ id: 'follow', ask: 'Come with me.', say: pick(['Right behind you.', 'About time. Lead the way.', 'Let me grab my things. All right, ready.', 'Good. I was getting restless.']), follow: true });
+    const hc = npc.order !== 'camp' && g.npcs.crewHomeCamp(npc), there = hc && npc.x > hc.x0 + 2 && npc.x < hc.x1 - 2 && npc.z > hc.z0 + 2 && npc.z < hc.z1 - 2;
+    if (hc) list.push(there
+      ? { id: 'home', ask: 'Stay here for now. I will come and find you.', say: 'All right. I will be around when you need me.', home: true }
+      : { id: 'home', ask: `Head back to ${hc.name}. I will find you there.`, say: 'If you are sure. Watch yourself out there.', home: true });
+    return list;
   }
 
   personaTopics(npc, thread) {
@@ -181,13 +195,7 @@ export class Dialogue {
     const room = g.npcs.followers.length < g.npcs.crewRoom();
     // A patrol sent out to help you: you can tell them they are done, and they head back.
     if (npc.kind === 'roamer' && npc.squad && npc.squad.help) list.push({ id: 'helpdone', ask: 'Thanks for coming out. We are good here, you can head back.', say: pick(['Copy that. Glad we could help. Stay safe.', 'All right. We will let them know at the wall. Watch yourself.', 'Good. Shout on the radio if it goes bad again.']), helpDone: true });
-    // Sent home, not sent away: they go back to their settlement and stay in the group. Letting someone go is done from the Group menu.
-    if (npc.kind === 'follower' && npc.order !== 'camp') {
-      const hc = g.npcs.crewHomeCamp(npc), there = hc && npc.x > hc.x0 + 2 && npc.x < hc.x1 - 2 && npc.z > hc.z0 + 2 && npc.z < hc.z1 - 2;
-      if (hc) list.push(there
-        ? { id: 'home', ask: 'Stay here for now. I will come and find you.', say: 'All right. I will be around when you need me.', home: true }
-        : { id: 'home', ask: `Head back to ${hc.name}. I will find you there.`, say: 'If you are sure. Watch yourself out there.', home: true });
-    }
+    if (npc.kind === 'follower') list.push(...this.crewTopics(npc));
     // A gun for hire, at the bar: they come for money, not for friendship, and anyone can pay.
     else if (npc.hire && room) list.push({ id: 'hire', ask: `[Hire] I need a gun out there. (${npc.hire.fee.toLocaleString('en-US')} spades)`, say: pick(['Money first. Then I go where you go.', 'Paid up front, and I do not do suicide runs. Deal.', 'You pay, I shoot. Lead the way.']), hire: true });
     else if (npc.kind === 'wanderer' && npc.armed && !npc.kid && !npc.role && room) list.push({ id: 'recruit', ask: 'Walk with me for a while.', say: pick(['Safer in numbers. All right, for now.', 'Why not. I was not getting anywhere on my own.', 'You look like you know how to stay alive. I will take that.']), recruit: true });
@@ -256,6 +264,8 @@ export class Dialogue {
     if (t.recruit) g.npcs.recruit(npc);
     if (t.dismiss) g.npcs.dismiss(npc);
     if (t.home) g.npcs.sendHome(npc);
+    // Face to face, so nothing to send over the radio: they fall in behind you from here.
+    if (t.follow) { npc.order = null; npc.atCamp = false; npc.callGate = false; }
     if (t.helpDone && npc.squad) npc.squad.seekT = 0;
     if (t.rest) { P.health = Math.min(100, P.health + 6); if (!npc.fed2) { npc.fed2 = true; this.addStanding(npc.camp, 1); } }
     if (t.set) P.dlg.flags[t.set] = 1;
