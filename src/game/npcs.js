@@ -5708,6 +5708,12 @@ export class NPCs {
     if (a < 1e-5) return null;
     for (const n of this.list) {
       if (n.dead) continue;
+      // Asleep, someone is not stood up at the foot of the bed but lying back along it, the way they are drawn: tested as that.
+      if (n.state === 7) {
+        const t = this.lyingHit(n, ox, oy, oz, dx, dy, dz, maxT);
+        if (t !== null && (!best || t < best.t)) best = { t, n, hx: ox + dx * t, hy: oy + dy * t, hz: oz + dz * t };
+        continue;
+      }
       const ax = n.x - ox, az = n.z - oz;
       const t = Math.max(0, (ax * dx + az * dz) / a);
       if (t > maxT) continue;
@@ -5719,6 +5725,23 @@ export class NPCs {
       if (!best || t < best.t) best = { t, n, hx, hy, hz };
     }
     if (best) { const r = best.n; r.t = best.t; r.hx = best.hx; r.hy = best.hy; r.hz = best.hz; return r; }
+    return null;
+  }
+
+  // Where along the ray it first meets someone lying down: a box from their feet back to their head, as wide as a person and from the
+  // mattress to a little over them, so the pillow end, the blanket and the bit of them in between all count. Null if it misses.
+  lyingHit(n, ox, oy, oz, dx, dy, dz, maxT) {
+    const yaw = n.ys ?? n.yaw ?? 0, bx = -Math.sin(yaw), bz = -Math.cos(yaw);
+    const LEN = n.kid ? 1.9 : 2.75, HALF = n.kid ? .4 : .5, lo = n.y - .15, hi = n.y + 1.35;
+    // Not anywhere near: not worth walking the ray.
+    const cx = n.x + bx * LEN / 2, cz = n.z + bz * LEN / 2;
+    if ((cx - ox) ** 2 + (cz - oz) ** 2 > (maxT + LEN) ** 2) return null;
+    for (let t = 0; t <= maxT; t += .05) {
+      const px = ox + dx * t - n.x, py = oy + dy * t, pz = oz + dz * t - n.z;
+      if (py < lo || py > hi) continue;
+      const along = px * bx + pz * bz, side = px * bz - pz * bx;
+      if (along >= -.25 && along <= LEN && Math.abs(side) <= HALF) return t;
+    }
     return null;
   }
 
