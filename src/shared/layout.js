@@ -299,9 +299,11 @@ export function buildLayout(seed = 1609) {
   // Severn Rock stands in the mouth of the bay, a long swim from anywhere.
   blob(LIGHT.x, LIGHT.z, 34, 31, 7, 2);
 
-  const chamfer = (isZero, max = 255) => {
+  // Distance in blocks to the nearest cell where src[i] is v (or, with neg, is not v), up to max. (Compared straight off the array: a
+  // function asked about each of twenty million cells cost a second of the start-up.)
+  const chamfer = (src, v, neg = false, max = 255) => {
     const d = new Uint8Array(N);
-    for (let i = 0; i < N; i++) d[i] = isZero(i) ? 0 : max;
+    for (let i = 0; i < N; i++) d[i] = (src[i] === v) !== neg ? 0 : max;
     for (let z = 1; z < WZ; z++) for (let x = 1, i = z * WX + 1; x < WX; x++, i++) {
       const v = Math.min(d[i], d[i - 1] + 1, d[i - WX] + 1);
       d[i] = v;
@@ -344,8 +346,8 @@ export function buildLayout(seed = 1609) {
     }
   }
   tick('water');
-  const dw = chamfer((i) => land[i] === 0);
-  const dl = chamfer((i) => land[i] !== 0, 40);
+  const dw = chamfer(land, 0);
+  const dl = chamfer(land, 0, true, 40);
 
   // --- Towns ------------------------------------------------------------------------------------
   // Each town's edge follows the map, broken up the way a town really thins out into the country round it.
@@ -834,7 +836,7 @@ export function buildLayout(seed = 1609) {
   // --- Ground classes -----------------------------------------------------------------------------
   // The edges of some towns are country already: farmhouses on big lots, paddocks and barns, the way Weston builds, inside the town's
   // own bounds. Gibson Valley is all of it; Esperance all round; Dayton and Severn Bay on the side that faces inland.
-  const townEdge = chamfer((i) => !townId[i]);
+  const townEdge = chamfer(townId, 0);
   const OUTSKIRTS = { gibson: [255, () => true], esperance: [120, () => true], dayton: [110, (x) => x < 4330], severn: [120, (x) => x < 3760] };
   const outskirt = (i, x, z) => {
     const t = townId[i] && TOWNS[townId[i] - 1], o = t && OUTSKIRTS[t.key];
@@ -878,6 +880,8 @@ export function buildLayout(seed = 1609) {
     if (lx < 3 || lz < 3 || (v0 && Math.abs(lx - v0) < 1.5) || (v1 && Math.abs(lx - v1) < 1.5) || (h0 && Math.abs(lz - h0) < 1.5)) return -1;
     return CROPS[Math.floor(r2(key * 7 + 3, key * 13 + 1) * CROPS.length)];
   };
+  // (In a function of its own, so it is optimised: buildLayout is too big for that.)
+  (() => {
   for (let z = 0, i = 0; z < WZ; z++) for (let x = 0; x < WX; x++, i++) {
     const m = mask[i];
     if (!land[i]) {
@@ -907,6 +911,7 @@ export function buildLayout(seed = 1609) {
     }
     ground[i] = G.PARK;
   }
+  })();
   for (const i of lineMarks) if (ground[i] === G.ROAD) mark[i] = (mark[i] & 48) | 1;
   // --- Parks, squares and the waterfront -----------------------------------------------------------
   const fillGround = (r, g, only) => {
@@ -1170,6 +1175,8 @@ export function buildLayout(seed = 1609) {
   const stack = new Int32Array(N >> 1);
   const lotsOut = [];
   let blockCount = 0;
+  // (In a function of its own, so it is optimised: buildLayout is too big for that.)
+  (() => {
   for (let start = 0; start < N; start++) {
     if (ground[start] !== G.LOT || lot[start] || label[start]) continue;
     const lbl = ++blockCount;
@@ -1213,6 +1220,7 @@ export function buildLayout(seed = 1609) {
     };
     split(x0, z0, x1, z1);
   }
+  })();
   for (const L of lotsOut) {
     const zone = zoneOf((L.ax + L.bx) >> 1, (L.az + L.bz) >> 1, L.lbl);
     let count = 0;
@@ -1311,6 +1319,8 @@ export function buildLayout(seed = 1609) {
 
   // No sliver of a building: wherever a lot is less than three blocks across, one way or the other, that part of it is left as open
   // ground (an alley in town, grass by a house), so nothing stands a block or two wide off the side of something bigger.
+  // (In a function of its own, so it is optimised: buildLayout is too big for that)
+  (() => {
   for (let pass = 0; pass < 3; pass++) {
     for (let z = 2; z < WZ - 2; z++) for (let x = 2, i = z * WX + 2; x < WX - 2; x++, i++) {
       const id = lot[i];
@@ -1326,8 +1336,11 @@ export function buildLayout(seed = 1609) {
       if (span(1) < 3 || span(WX) < 3) { lot[i] = 0; ground[i] = b.house ? G.PARK : G.ALLEY; mark[i] = 0; }
     }
   }
+  })();
 
   // Edge distance inside each lot drives setbacks, roof pitch and facade detection.
+  // (In a function of its own, so it is optimised: buildLayout is too big for that)
+  (() => {
   for (let z = 1; z < WZ - 1; z++) for (let x = 1, i = z * WX + 1; x < WX - 1; x++, i++) {
     const id = lot[i];
     if (!id) continue;
@@ -1346,6 +1359,7 @@ export function buildLayout(seed = 1609) {
     const b = buildings[id - 1], e = edge[i];
     if (e > b.bestE) { b.bestE = e; b.cx = x; b.cz = z; }
   }
+  })();
   // How tall a building can be depends on how wide it is. Anything too narrow to have a room in it comes down altogether.
   for (const b of buildings) {
     if (b.bestE < 0) { b.gone = true; continue; }
@@ -1427,15 +1441,18 @@ export function buildLayout(seed = 1609) {
   const slump = new Map();
   for (let k = 0; k < rubble.length; k += 2) slump.set(rubble[k], Math.min(slump.get(rubble[k]) ?? 99, rubble[k + 1]));
   const flat = new Uint8Array(N);
+  // (In a function of its own, so it is optimised: buildLayout is too big for that.)
+  (() => {
   for (let i = 0; i < N; i++) {
     const g = ground[i];
     flat[i] = (g === G.WATER || townId[i] || (mask[i] && !tun[i]) || g === G.FIELD || g === G.LOT || g === G.DIRT || g === G.SAND || g === G.PLAZA || g === G.PROM || land[i] >= 2) ? 1 : 0;
   }
+  })();
   for (const def of CAMP_DEFS) {
     const r = campRects[def.key];
     for (let z = Math.max(0, r.z0 - 34); z <= Math.min(WZ - 1, r.z1 + 34); z++) flat.fill(1, z * WX + Math.max(0, r.x0 - 34), z * WX + Math.min(WX - 1, r.x1 + 34) + 1);
   }
-  const df = chamfer((i) => flat[i] === 1);
+  const df = chamfer(flat, 1);
   const BLEND = 92;
   const forestAt = (x, z) => {
     const n = fbm2(x * .0045 + 3, z * .0045 + 8, 3);
@@ -1458,6 +1475,8 @@ export function buildLayout(seed = 1609) {
   const TUN_N = 1840, TUN_S = 2236, TUN_LINE = [[2515, TUN_N], [2515, 1950], [2516, 2075], [2512, 2200], [2510, TUN_S]];
   const tunHN = sampleQ(BQ, 2515, TUN_N), tunHS = sampleQ(BQ, 2510, TUN_S);
   const tunLevel = (z) => Math.round(tunHN + (tunHS - tunHN) * Math.max(0, Math.min(1, (z - TUN_N) / (TUN_S - TUN_N))));
+  // (In a function of its own, so it is optimised: buildLayout is too big for that.)
+  (() => {
   for (let z = 0, i = 0; z < WZ; z++) {
     {
       const fz = Math.min(QD - 1.001, z / 4), iz = fz | 0, uz = fz - iz;
@@ -1496,9 +1515,12 @@ export function buildLayout(seed = 1609) {
       if (g === G.PARK && t > 70 && ((t > 128 + noise2(x * .02, z * .02) * 30 && Math.hypot(x - MT.x, z - MT.z) > 780) || noise2(x * .03, z * .03) > .9)) ground[i] = G.ROCK;
     }
   }
+  })();
   for (const [i, d] of slump) terr[i] = -d;
   // The tunnel's roof is the hillside: across each row, from the ground on one side of it to the ground on the other, so the ridge
   // carries straight on over the top with no groove or hump where the tunnel is.
+  // (In a function of its own, so it is optimised: buildLayout is too big for that.)
+  (() => {
   for (let z = 1; z < WZ - 1; z++) {
     let x = 1;
     while (x < WX - 1) {
@@ -1516,13 +1538,17 @@ export function buildLayout(seed = 1609) {
       x = xb + 1;
     }
   }
+  })();
   // Cliffs: wherever the hillside is too steep to hold soil. The plateau's edges are lined with them.
+  // (In a function of its own, so it is optimised: buildLayout is too big for that.)
+  (() => {
   for (let z = 2; z < WZ - 2; z++) for (let x = 2, i = z * WX + 2; x < WX - 2; x++, i++) {
     if (ground[i] !== G.PARK || terr[i] < 12) continue;
     // High on Mt. Page the soil holds on steeper ground, so the trees go all the way up and only the real faces are bare.
     const steep = Math.hypot(x - MT.x, z - MT.z) < 420 ? 12 : 7;
     if (Math.abs(terr[i + 2] - terr[i - 2]) + Math.abs(terr[i + 2 * WX] - terr[i - 2 * WX]) > steep) ground[i] = G.ROCK;
   }
+  })();
 
   tick('terrain');
   // --- Props ----------------------------------------------------------------------------------------
@@ -1695,6 +1721,8 @@ export function buildLayout(seed = 1609) {
 
   // Column ceiling in chunks, so empty sky never touches the workers.
   const chunkTop = new Uint8Array(CW * CD);
+  // (In a function of its own, so it is optimised: buildLayout is too big for that.)
+  (() => {
   for (let cz = 0; cz < CD; cz++) for (let cx = 0; cx < CW; cx++) {
     let m = STREET_Y + 2;
     for (let z = cz * CS; z < (cz + 1) * CS; z++) for (let x = cx * CS, i = z * WX + x; x < (cx + 1) * CS; x++, i++) {
@@ -1703,6 +1731,7 @@ export function buildLayout(seed = 1609) {
     }
     chunkTop[cx + cz * CW] = Math.min(255, m);
   }
+  })();
   // Trees and the like stand taller than the ground they are on.
   for (let i = 0; i < propArr.length; i += PROP_STRIDE) {
     const x = propArr[i + 1], z = propArr[i + 2], t = Math.min(255, STREET_Y + Math.max(0, terr[z * WX + x]) + 18);
@@ -1775,7 +1804,7 @@ export function buildLayout(seed = 1609) {
   // How thick the dead are on the ground, before the streets and the camps have their say. It builds as you go in: a few out in the
   // country, more along the roads in, thin on a town's edge and thickening block by block to the middle, thickest of all in the
   // busiest districts. The total is the same as it always was; it has only moved toward the middles.
-  const townOut = chamfer((i) => !!townId[i]);
+  const townOut = chamfer(townId, 0, true);
   const densityOld = (x, z) => {
     const i = cellOf(x, z);
     if (townId[i]) return (DISTRICTS[dist[i] - 1] || { zone: Z.village }).zone.dens;

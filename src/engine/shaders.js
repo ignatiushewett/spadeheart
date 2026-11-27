@@ -417,6 +417,8 @@ void main(){
   float hv=hash12(vp.xz+vp.y*17.3);
   float hb=hash12(floor(vp.xz/4.)+floor(vp.y/3.)*7.1);
   col*=.86+.2*hv+.08*hb;
+  // Leaves a shade darker, so a wood of real trees runs on into the pictures of trees past it without a line where they meet.
+  if((flags&8)!=0) col*=.8;
   // Weather: big slow stains, rain streaks down the walls, and grime rising from the street.
   vec2 wc=abs(n.x)>.5?vec2(vp.z,vp.y):(abs(n.z)>.5?vec2(vp.x,vp.y):vp.xz);
   float stain=vnoise(wc/11.)*.6+vnoise(wc/3.7)*.4;
@@ -527,6 +529,11 @@ void main(){
       // Only the cracks show it: they catch the light in a cold blue. The glass between them is the same glass it always was.
       vec3 edge=(mix(uHorizon,uSkyCol,.5)*.9*(1.-.8*dark)+cityLight(vWorld)*.5+dynLights(vWorld,n)*.15+uSunCol*.1*lit+vec3(.012))*vec3(.55,.8,1.25);
       c=mix(c,edge*1.4,crk*.6*mix(.25,1.,ck));
+    }
+    float farG=smoothstep(70.,190.,dist);
+    if(farG>0.){
+      vec3 deep=vec3(.018,.026,.042)*(.35+.65*(1.-dark))+cityLight(vWorld)*.15;
+      c=mix(c,deep+skyR*.1*(.3+.7*f),farG*.82);
     }
     float alpha=uGlassPass==1?clamp(mix(.38,.5,near)+f*mix(.5,.45,near)+wet*.22+crk*.2*ck,0.,1.):1.;
     outCol=vec4(applyFog(c,vWorld),alpha);
@@ -711,21 +718,40 @@ layout(location=0) out vec4 outCol;
 // difference of the running total of stripe), so a pattern too fine for the pixel comes out as its average, and never crawls.
 float stripeSum(float x,float p,float a,float w){ float u=x-a; return floor(u/p)*w+clamp(mod(u,p),0.,w); }
 float stripe(float x,float fw,float p,float a,float w){ fw=max(fw,1e-3); return (stripeSum(x+fw*.5,p,a,w)-stripeSum(x-fw*.5,p,a,w))/fw; }
+// Wet with the rain, out where nothing is built: darker for being soaked, and on anything facing up a gloss that holds the sky,
+// stronger the flatter you look across it, puddled in patches. Walls just soak dark. (The built blocks do this their own way: CHUNK_FS.)
+float farWet(){ return clamp(max(uRainNow*1.3,uWet),0.,1.); }
+vec3 wetTop(vec3 c,vec3 wp,vec3 n,float wet,float dist,float gloss){
+  // The surface is flat for the reflection even where the stand-in tilts: a step's top, or the street, faces straight up.
+  vec3 up=vec3(0.,1.,0.), V=normalize(uCam-wp), Rf=reflect(-V,up);
+  float fr=pow(1.-max(V.y,0.),3.), dk=clamp(uNightGlow,0.,1.);
+  float pud=smoothstep(.35,.65,vnoise(wp.xz/7.)*.65+vnoise(wp.xz/2.3)*.35);
+  vec3 env=mix(uHorizon,uSkyCol*1.1,clamp(Rf.y*1.4+.15,0.,1.))*(1.-.8*dk)+cityLight(wp)*.8;
+  return c*mix(1.,.58,wet*mix(.7,1.,pud))+env*wet*gloss*(.06+.75*fr)*mix(.55,1.,pud);
+}
 void main(){
   // Voxel chunks replace the proxy column by column as they finish meshing.
   float m=texture(uLoadMask,vWorld.xz/uWorldSize).r;
   bool inWorld=vWorld.x>=0.&&vWorld.z>=0.&&vWorld.x<uWorldSize.x&&vWorld.z<uWorldSize.y;
   if(m>.5&&inWorld) discard;
-  vec3 n=vNormal;
+  bool ground=abs(vColor.a-.3)<.1;
+  // Where the built blocks take over part of a building or a hillside, the stand-in is cut open along the join. What shows through
+  // the cut is the inside of it: drawn as more of the same wall, or the earth under the ground, never as a hole to nothing.
+  bool inside=!gl_FrontFacing;
+  vec3 n=inside?-vNormal:vNormal;
   vec3 col=vColor.rgb;
+  if(inside) col=ground?vec3(.035,.026,.018):col*.6;
   float dist=length(vWorld-uCam);
+  // How big a block is on screen: the fine detail below fades to its average as blocks get smaller than a pixel, so nothing crawls.
+  float px=length(fwidth(vWorld));
+  float fine=smoothstep(.45,1.4,px);
   float win=0.,trim=0.,lit=0.;
   vec3 glassC=vGlass.rgb, trimC=vTrim.rgb;
   // A building's walls, drawn the way its real facade is laid out (see building() in gen.js): a trim line at every floor, every six
   // blocks up from the ground it stands on; a row of windows from a block over the sill to a block under the ceiling (the whole storey on
   // a glass tower, the middle of it on a house); and a window wherever the style's spacing and width put one along the wall, starting
   // where that building starts them. A blank silo is all wall, with a band every eight.
-  if(abs(n.y)<.5&&vColor.a>.9&&vGlass.a>0.){
+  if(!inside&&abs(n.y)<.5&&vColor.a>.9&&vGlass.a>0.){
     float bits=vBits;
     float phase=mod(bits,8.), lift=mod(floor(bits/8.),8.);
     bool house=mod(floor(bits/64.),2.)>.5, blank=bits>=128.;
@@ -742,20 +768,68 @@ void main(){
       if(kindW>.5&&kindW<1.5) trim=max(trim,stripe(t,ft,p,p-1.,1.)*(1.-win));
       // Now and then a lit one at night, while they are big enough to make out.
       vec2 cell=vec2(floor((t+phase)/p),floor(rel/6.));
-      float fine=max(ft/p,fy/6.);
-      lit=step(.9985,hash12(cell+floor(vWorld.xz/64.)))*(1.-smoothstep(.3,1.,fine));
+      float cf=max(ft/p,fy/6.);
+      lit=step(.9985,hash12(cell+floor(vWorld.xz/64.)))*(1.-smoothstep(.3,1.,cf));
     }
   }
+  // The same weathering the built blocks have (see CHUNK_FS), so the two meet without a seam: each block a shade of its own, big slow
+  // stains, rain runs down the walls, and grime rising from the street. The per-block shade and the runs fade out with distance.
+  vec3 vp=floor(vWorld-n*.5+.001);
+  float hv=mix(hash12(vp.xz+vp.y*17.3),.5,fine);
+  float hb=mix(hash12(floor(vp.xz/4.)+floor(vp.y/3.)*7.1),.5,smoothstep(1.8,5.,px));
+  float tone=.86+.2*hv+.08*hb;
+  vec2 wc=abs(n.x)>.5?vec2(vWorld.z,vWorld.y):(abs(n.z)>.5?vec2(vWorld.x,vWorld.y):vWorld.xz);
+  float stain=vnoise(wc/11.)*.6+vnoise(wc/3.7)*.4;
+  stain=mix(stain,.5,smoothstep(2.,6.,px));
+  tone*=mix(.66,1.1,stain);
+  if(abs(n.y)<.5&&!ground){
+    float streak=mix(vnoise(vec2(wc.x/1.7,wc.y/15.)),.5,smoothstep(.6,1.6,px));
+    tone*=mix(.76,1.04,streak);
+  }
+  col*=tone;
+  if(abs(n.y)<.5&&!ground) col*=vec3(.94,.96,.9);
+  float low=smoothstep(26.,12.,vWorld.y);
+  col*=mix(1.,.84,low);
+  col=mix(col,col*vec3(.92,.95,.8),low*.4);
   // Glass, dark with the rooms behind it, catching a little of the sky; at night it goes darker.
-  vec3 glass=mix(glassC,uHorizon*.55,.14);
+  vec3 glass=mix(mix(glassC*.6,vec3(.02,.03,.05),.55),uHorizon*.55,.08);
   float dark=clamp(uNightGlow,0.,1.);
   glass=mix(glass,vec3(dot(glass,vec3(.3,.5,.2))),dark*.8)*mix(1.,.4,dark);
-  vec3 alb=mix(mix(col,trimC,trim),glass,win);
+  vec3 alb=mix(mix(col,trimC*tone,trim),glass,win);
   float windows=win;
-  float ndl=max(dot(n,uSunDir),0.);
-  float sh=ndl>0.?sampleShadow(vWorld,n,dist):0.;
-  vec3 amb=mix(uGroundCol,uSkyCol,n.y*.5+.5);
-  vec3 c=alb*.78*(amb*.8+uSunCol*ndl*sh)+alb*(cityLight(vWorld)+floodLit(vWorld,n));
+  // Lit as the built blocks are lit (shade() with open sky): ambient from above and below, and the sun where it reaches.
+  float sh=sampleShadow(vWorld,n,dist);
+  vec3 light;
+  float stepSide=0.;   // how much of this is the sides of steps (they do not hold a puddle)
+  if(ground&&!inside&&n.y<.995){
+    // Ground on a slope is built in steps, a block at a time: flat tops lit from above and the risers between them facing down the hill.
+    // As stripes while the steps are big enough to see, then their average.
+    float slope=sqrt(max(0.,1.-n.y*n.y))/max(n.y,.05);
+    vec3 down=normalize(vec3(n.x,0.,n.z)+1e-5);
+    // The edge of each step shows as a thin line, a little more of it the steeper the ground: earth and stone under the grass.
+    float riser=clamp(.03+slope*.3,.0,.32)*smoothstep(.03,.25,slope);
+    float r=stripe(vWorld.y,fwidth(vWorld.y)*1.25,1.,0.,riser);
+    // Each step sits in the corner of the one above it, so the steeper ground is a little darker all over (the built ones' AO).
+    float occ=mix(1.,.8,smoothstep(.15,1.2,slope));
+    vec3 lt=(uSkyCol+uSunCol*max(uSunDir.y,0.)*sh)*occ;
+    vec3 ls=(mix(uGroundCol,uSkyCol,.5)+uSunCol*max(dot(down,uSunDir),0.)*sh)*.85*occ;
+    vec3 side=mix(alb,vec3(.05,.047,.042)*tone,.5);
+    // On steep ground most of what you see is the sides of the steps: blended in smoothly by how steep it is, so a cliff reads as one,
+    // with the thin line at each step's edge on top.
+    float face=clamp(slope/(1.+slope),0.,.85);
+    alb=mix(mix(alb,side,face*.7),side*.62,r);
+    stepSide=max(r,face*.6);
+    light=mix(mix(lt,ls,face),ls,r);
+  } else {
+    float ndl=max(dot(n,uSunDir),0.);
+    light=mix(uGroundCol,uSkyCol,n.y*.5+.5)*(inside?.45:1.)+uSunCol*ndl*sh*(inside?0.:1.);
+  }
+  vec3 c=alb*light+alb*(cityLight(vWorld)+floodLit(vWorld,n));
+  float wet=inside?0.:farWet();
+  if(wet>.01){
+    if(n.y>.5) c=wetTop(c,vWorld,n,wet,dist,1.-stepSide*.9);
+    else c*=mix(1.,.66,wet);
+  }
   if(windows>0.)c+=vec3(1.,.72,.36)*lit*windows*uNightGlow*.5;
   outCol=vec4(applyFog(c,vWorld),1.);
 }`;
@@ -796,6 +870,8 @@ flat in float vShade;
 uniform sampler2D uTreeTex;
 uniform vec3 uLeaf[3];
 uniform vec3 uBark;
+uniform float uCols;
+uniform float uNightGlow;
 layout(location=0) out vec4 outCol;
 void main(){
   vec4 t=texture(uTreeTex,vUV);
@@ -803,10 +879,93 @@ void main(){
   vec3 leaf=vLeaf<.5?uLeaf[0]:vLeaf<1.5?uLeaf[1]:uLeaf[2];
   vec3 albedo=(t.g>.5?uBark:leaf*(.88+vShade*.24))*(.22+t.r*.82);
   float dist=length(vWorld-uCam);
-  // Lit as the side of a crown is, not the top of one, and in its own shade: a stand of trees is darker than the sky over it, and as
-  // dark as the voxel trees it carries on from.
-  vec3 n=normalize(vec3(0.,.35,0.)+normalize(vec3(uCam.x-vWorld.x,0.,uCam.z-vWorld.z))*.9);
-  vec3 c=shade(albedo,vWorld,n,1.,.62,dist);
+  // Lit the way a real crown of leaves is, whatever the hour: its top, open to the sky and the sun overhead, and the side of it turned to
+  // you, mixed by how much of each you see (more of the top the more you look down on it). Lit as one flat side only, a stand of them
+  // came out lighter or darker than the real trees next to it depending on where the sun was.
+  vec3 to=uCam-vWorld;
+  float up=clamp(.42+to.y/max(length(to),1.)*1.4,.35,.85);
+  vec3 side=normalize(vec3(to.x,0.,to.z)+vec3(1e-4,0.,0.));
+  // Its top is not all in the sun, either: a real crown is half in its own shade, so at midday, with the sun straight down on it, only
+  // part of that reaches what you see of it. (The side turned to you takes the sun as it comes.)
+  float sh=sampleShadow(vWorld,vec3(0.,1.,0.),dist);
+  vec3 top=(uSkyCol*.74+uSunCol*max(uSunDir.y,0.)*sh*.42)*albedo+albedo*dynLights(vWorld,vec3(0.,1.,0.));
+  vec3 c=mix(shade(albedo,vWorld,side,1.,.74,dist),top,up);
+  // In the rain the leaves go dark with it and shine: the sky caught in them, brightest at a glancing angle, and a glint of the sun
+  // through a break in it. Drying off again as the ground does.
+  // Mostly how hard it is raining now: leaves shed the water and dry long before the ground does, so once it clears they lose the shine
+  // within a minute or so, not over the half hour the streets take.
+  float wet=clamp(uRainNow*1.4+uWet*.15,0.,1.);
+  if(wet>.01){
+    vec3 n=normalize(side*.55+vec3(0.,.85,0.)), V=normalize(to);
+    vec3 Rf=reflect(-V,n);
+    float fr=pow(1.-max(dot(n,V),0.),4.), dk=clamp(uNightGlow,0.,1.);
+    // Not one flat shine, and not specks either: some leaves catch more of it than others, softly, in blocks the size of the picture's.
+    float leafy=.55+.45*hash12(floor(vUV*vec2(uCols*9.,13.))+floor(vWorld.xz*.37));
+    vec3 env=mix(uHorizon,uSkyCol*1.1,clamp(Rf.y*1.5+.2,0.,1.))*(1.-.8*dk)+cityLight(vWorld)*.6;
+    // A soft sheen of the grey sky over the crowns, a little stronger at a glancing angle, and only a faint glint of the sun.
+    c=c*mix(1.,.86,wet)+env*wet*(.05+.12*fr)*leafy*mix(.6,1.,up)+uSunCol*pow(max(dot(Rf,uSunDir),0.),24.)*wet*.08*leafy*sh;
+  }
+  outCol=vec4(applyFog(c,vWorld),1.);
+}`;
+
+// --- The far horde: a picture of each of the dead out past the real ones, turned to face you ---------------------------------------
+export const HORDE_VS = COMMON + FRAME_UNIFORMS + /* glsl */`
+layout(location=0) in vec2 aCorner;   // across (-.5 to .5) and up (0 to 1)
+layout(location=1) in vec4 iPos;      // feet, and which picture (0 reaching, 2 slumped)
+layout(location=2) in vec4 iDim;      // shirt, trousers, phase, a shade of its own
+uniform float uCols;
+uniform float uNearR;
+out vec3 vWorld;
+out vec2 vUV;
+flat out vec3 vShirt;
+flat out vec3 vPants;
+flat out float vShade;
+flat out float vFade;
+const vec3 SHIRTS[8]=vec3[8](vec3(.05,.045,.04),vec3(.07,.03,.025),vec3(.03,.04,.06),vec3(.045,.055,.035),vec3(.11,.1,.085),vec3(.035,.035,.04),vec3(.08,.06,.035),vec3(.05,.035,.05));
+const vec3 PANTS[8]=vec3[8](vec3(.025,.03,.045),vec3(.02,.02,.022),vec3(.05,.045,.035),vec3(.035,.03,.025),vec3(.03,.035,.03),vec3(.06,.05,.04),vec3(.025,.025,.03),vec3(.04,.04,.045));
+void main(){
+  float ph=iDim.z;
+  // Shuffling to and fro on their own patch of street, a couple of blocks each way, never anywhere much.
+  vec2 dir=vec2(cos(ph),sin(ph));
+  float t=uTime*.07+ph*2.;
+  float walk=(abs(fract(t)-.5)*4.-1.)*1.6;
+  vec3 feet=iPos.xyz+vec3(dir.x,0.,dir.y)*walk;
+  vec3 to=uCam-feet; to.y=0.;
+  float d=length(to)+1e-4;
+  vec3 right=vec3(to.z,0.,-to.x)/d;
+  float sway=sin(uTime*1.3+ph*5.)*.06;
+  vec3 wp=feet+right*(aCorner.x*1.4+sway*aCorner.y)+vec3(0.,aCorner.y*3.1,0.);
+  vWorld=wp;
+  // Which foot is forward, swapping as they go.
+  float step=mod(floor(uTime*1.4+ph*3.),2.);
+  vUV=vec2((aCorner.x+.5+iPos.w+step)/uCols,1.-aCorner.y);
+  vShirt=SHIRTS[int(iDim.x)]; vPants=PANTS[int(iDim.y)]; vShade=iDim.w;
+  // Inside the real horde's reach they are real: these give way, fading in just past it.
+  vFade=smoothstep(uNearR,uNearR+25.,d);
+  gl_Position=vFade<=0.?vec4(2.,2.,2.,1.):uViewProj*vec4(wp,1.);
+}`;
+
+export const HORDE_FS = COMMON + FRAME_UNIFORMS + LIGHTING + /* glsl */`
+in vec3 vWorld;
+in vec2 vUV;
+flat in vec3 vShirt;
+flat in vec3 vPants;
+flat in float vShade;
+flat in float vFade;
+uniform sampler2D uHordeTex;
+layout(location=0) out vec4 outCol;
+void main(){
+  vec4 t=texture(uHordeTex,vUV);
+  if(t.a<.5) discard;
+  // Faded in a speck at a time, so there is no line where they start.
+  if(hash12(floor(gl_FragCoord.xy))>vFade) discard;
+  vec3 skin=vec3(.13,.15,.1)*(.85+vShade*.3), hair=vec3(.025,.02,.018);
+  vec3 alb=t.g<.17?skin:t.g<.5?vShirt:t.g<.83?vPants:hair;
+  alb*=(.25+t.r*.9)*(.85+vShade*.3);
+  float dist=length(vWorld-uCam);
+  vec3 to=uCam-vWorld;
+  vec3 side=normalize(vec3(to.x,0.,to.z)+vec3(1e-4,0.,0.));
+  vec3 c=mix(shade(alb,vWorld,side,1.,.8,dist),shade(alb,vWorld,vec3(0.,1.,0.),1.,.8,dist),.35);
   outCol=vec4(applyFog(c,vWorld),1.);
 }`;
 
@@ -926,6 +1085,18 @@ bool coastal(sampler2D cm,vec2 p,vec2 ws){
   }
   return false;
 }
+uniform float uNightGlow;
+// Wet with the rain, out where nothing is built: darker for being soaked, and on anything facing up a gloss that holds the sky,
+// stronger the flatter you look across it, puddled in patches. Walls just soak dark. (The built blocks do this their own way: CHUNK_FS.)
+float farWet(){ return clamp(max(uRainNow*1.3,uWet),0.,1.); }
+vec3 wetTop(vec3 c,vec3 wp,vec3 n,float wet,float dist,float gloss){
+  // The surface is flat for the reflection even where the stand-in tilts: a step's top, or the street, faces straight up.
+  vec3 up=vec3(0.,1.,0.), V=normalize(uCam-wp), Rf=reflect(-V,up);
+  float fr=pow(1.-max(V.y,0.),3.), dk=clamp(uNightGlow,0.,1.);
+  float pud=smoothstep(.35,.65,vnoise(wp.xz/7.)*.65+vnoise(wp.xz/2.3)*.35);
+  vec3 env=mix(uHorizon,uSkyCol*1.1,clamp(Rf.y*1.4+.15,0.,1.))*(1.-.8*dk)+cityLight(wp)*.8;
+  return c*mix(1.,.58,wet*mix(.7,1.,pud))+env*wet*gloss*(.06+.75*fr)*mix(.55,1.,pud);
+}
 void main(){
   vec2 uv=vWorld.xz/uWorldSize;
   if(texture(uLoadMask,uv).r>.5) discard;
@@ -936,6 +1107,8 @@ void main(){
   vec3 n=vec3(0.,1.,0.);
   float sh=sampleShadow(vWorld,n,dist);
   vec3 c=pow(m.rgb,vec3(2.2))*.7*(uSkyCol*.8+uSunCol*max(uSunDir.y,0.)*sh+cityLight(vWorld));
+  float wet=farWet();
+  if(wet>.01) c=wetTop(c,vWorld,n,wet,dist,1.);
   outCol=vec4(applyFog(c,vWorld),1.);
 }`;
 
@@ -1188,10 +1361,13 @@ void main(){
   if(!dog){
   float seed=float(variant)*.37;
   float swing=sin(phase);
-  // States: 0 idle, .7 walk, 1 chase, 2 attack, 3 aim, 4 talk, 5 sit, 6 work, 6.5 work kneeling, 7 asleep, 8 falling, 10+ dead.
+  // States: 0 idle, .7 walk, 1 chase, 2 attack, 3 aim, 4 talk, 5 sit, 5.5 riding a motorbike, 6 work, 6.5 work kneeling, 7 asleep,
+  // 8 falling, 10+ dead.
   float dead=state>=10.?min((state-10.)*1.9,1.):0.;
   vDead=dead;
-  bool sitting=state==5.;
+  // On a motorbike: sat astride it, leaning forward over the tank with both hands out on the grips.
+  bool riding=abs(state-5.5)<.01;
+  bool sitting=state==5.||riding;
   bool kneel=human&&abs(state-6.5)<.01;
   bool asleep=state==7.;
   bool falling=state==8.&&!human;
@@ -1245,6 +1421,7 @@ void main(){
       float raise;
       if(human){
         if(asleep) raise=.0;
+        else if(riding) raise=-1.02+sin(uTime*2.1+seed+float(limb))*.02;
         else if(sitting) raise=-.55;
         else if((state==3.||(aiming&&weapon>0&&weapon<8))&&!freeArm) raise=-1.5;
         else if(state==4.&&limb==2) raise=-.7+sin(uTime*2.6+seed)*.36;
@@ -1256,7 +1433,7 @@ void main(){
       }
       // Arms thrown up and out, clawing at the air.
       if(falling) raise=-2.35+sin(uTime*8.3+seed+float(limb)*1.7)*.3;
-      float inward=falling?(limb==2?.42:-.42):(human&&limb==2&&!freeArm&&(state==3.||(aiming&&weapon>0&&weapon<8)||(twoHand&&state!=4.)))?.42:(limb==2?.08:-.08);
+      float inward=riding?(limb==2?-.16:.16):falling?(limb==2?.42:-.42):(human&&limb==2&&!freeArm&&(state==3.||(aiming&&weapon>0&&weapon<8)||(twoHand&&state!=4.)))?.42:(limb==2?.08:-.08);
       if(held){
         if(limb==3){ raise=aiming?.3:0.; inward=aiming?-1.3:-.08; }
         else { raise=lh.x; inward=lh.y; }
@@ -1274,6 +1451,7 @@ void main(){
         else if(limb==3&&weapon>0) joint=0.;
         else if(aimArms&&!freeArm) joint=.12;
         else if(asleep) joint=.1;
+        else if(riding) joint=.42;
         else if(sitting) joint=.75;
         else if(state==4.) joint=limb==2?.95+sin(uTime*3.3+seed)*.3:.22;
         else if(state==6.||kneel) joint=limb==3?.7+sin(uTime*6.+seed)*.55:.5+sin(uTime*2.+seed)*.2;
@@ -1340,6 +1518,8 @@ void main(){
   if(human&&state<10.&&!asleep){
     p.y+=sin(uTime*1.5+seed)*.008*clamp(p.y-.9,0.,2.);
     if(!sitting&&!walking&&limb!=4&&limb!=5){ mat3 W=rotZ(sin(uTime*.27+seed*1.3)*.022); p=W*(p-vec3(0,1.2,0))+vec3(0,1.2,0); n=W*n; }
+    // Riding: the whole upper body over the tank, the arms going with it out to the bars.
+    if(riding&&limb!=4&&limb!=5){ mat3 W=rotX(.3); vec3 h=vec3(0,1.2,0); p=W*(p-h)+h; n=W*n; }
     // Upper body only: tilting the legs as well would lift a foot off the ground.
     if(walking&&limb!=4&&limb!=5){ mat3 W=rotZ(sin(phase)*.02)*rotX(.04); vec3 h=vec3(0,1.2,0); p=W*(p-h)+h; n=W*n; }
     // Into the swing with the whole body: turned away and leaning back on the wind-up, then over and round on the blow.
@@ -1549,8 +1729,10 @@ flat out float vBuilt;  // part of something built (a bike): it gets wet
 flat out float vSeed;
 flat out float vSpeed;
 flat out vec3 vMPos;
+flat out float vBlock;  // a piece of a block: weathered the way the blocks are
 void main(){
   float a=iCol.a, c=cos(a), s=sin(a);
+  vBlock=iGlow<-.1&&iGlow>-.5?(iGlow<-.32?2.:1.):0.;
   // A bike's voxel carries where on the bike it is in the last places of its size: a seed that goes where the bike goes.
   // The tag in the last places of a bike voxel's size: whether it is the bike being ridden, and where on the bike this voxel is.
   float tg=max(0.,iPos.w-.125125), rd=tg>4.9e-4?1.:0., id=floor((tg-rd*5e-4)/3e-8+.5);
@@ -1573,7 +1755,7 @@ void main(){
     bg=0.; bm=0.;
   }
   vec3 p=R*(aPos*sc)+iPos.xyz;
-  vWorld=p; vNormal=R*aNormal; vCol=iCol.rgb; vGlow=built?bg-bm*4.:iGlow; vMetal=built?bm:0.; vBuilt=built&&iGlow>-999.?1.:0.;
+  vWorld=p; vNormal=R*aNormal; vCol=iCol.rgb; vGlow=built?bg-bm*4.:vBlock>.5?0.:iGlow; vMetal=built?bm:0.; vBuilt=built&&iGlow>-999.?1.:0.;
   gl_Position=uViewProj*vec4(p,1.);
 }`;
 
@@ -1589,7 +1771,9 @@ flat in float vBuilt;
 flat in float vSeed;
 flat in float vSpeed;
 flat in vec3 vMPos;
+flat in float vBlock;
 uniform float uRideSpeed;
+uniform float uNightGlow;
 uniform sampler2D uRainMap;
 uniform vec3 uRainMapO;
 layout(location=0) out vec4 outCol;
@@ -1604,7 +1788,32 @@ void main(){
   vec3 col=pow(vCol,vec3(2.2));
   float dist=length(vWorld-uCam);
   vec3 N=normalize(vNormal);
-  vec3 c=shade(col,vWorld,N,1.,.9,dist)+col*vGlow;
+  float ao=.9, sky=1.;
+  if(vBlock>.5){
+    // A piece of a wall or a floor, coming down: shaded as it was where it stood (see CHUNK_FS), with the weather it had on it, the
+    // stains and the grime, at about the same depth on average; and a faint mottle of it on each face, fixed to the piece so it turns
+    // over with it rather than crawling across it.
+    vec2 fc=abs(vLocN.x)>.5?vLoc.zy:abs(vLocN.z)>.5?vLoc.xy:vLoc.xz;
+    float st=vnoise(fc*2.3+vLocN.xz*7.+vec2(3.1,1.7));
+    col*=.84*mix(.9,1.06,st);
+    col*=vec3(.97,.98,.95);
+    ao=.82;
+    // And lit by as much sky as it can see, the way a block is: under a roof or deep in an alley the open sky is a small part of what
+    // is round it, so it is as dim there as the walls it came from. Worked out from the rain map: is it under cover, and how much of the
+    // ground round it is open to the sky rather than built over.
+    float o=0.;
+    for(int k=0;k<8;k++){ float an=float(k)*.785; vec3 d=vec3(cos(an),0.,sin(an)); o+=underSky(vWorld+d*2.5,1.)+underSky(vWorld+d*6.,1.); }
+    o/=16.;
+    sky=underSky(vWorld+vec3(0.,.6,0.),1.)*mix(.12,1.,smoothstep(.15,.85,o));
+  }
+  vec3 c=shade(col,vWorld,N,sky,ao,dist)+col*vGlow;
+  if(vBlock>1.5){
+    // A pane coming down: the sky in it as it turns, the way the glass in the wall shows it, not the dark of the glass itself.
+    vec3 V=normalize(uCam-vWorld), Rf=reflect(-V,N);
+    float fr=pow(1.-max(dot(N,V),0.),3.), dk=clamp(uNightGlow,0.,1.);
+    vec3 skyR=mix(uHorizon,uSkyCol*1.1,clamp(Rf.y*1.4+.15,0.,1.))*(1.-.75*dk);
+    c=mix(c*.6,skyR*mix(.4,1.,sky),.3+.6*fr)+uSunCol*pow(max(dot(Rf,uSunDir),0.),120.)*3.*sampleShadow(vWorld,N,dist);
+  }
   // Metal: less of its own colour, more of the sky and the ground caught in it, tinted by it, and a hard glint of the sun.
   if(vMetal>.5){
     float k=vMetal/3.;
@@ -1615,6 +1824,19 @@ void main(){
     float sp=pow(max(dot(Rf,uSunDir),0.),24.+40.*k)*sh;
     vec3 tint=mix(vec3(1.),col*1.6,.55);
     c=c*(1.-.45*k)+env*tint*(.25+.55*k)*(.6+.4*fres)+uSunCol*tint*sp*(.5+1.6*k);
+  }
+  // A piece of a wall or a pane coming down in the rain is as wet as the wall was: soaked darker, with a sheen of the sky on it at a
+  // glancing angle and a glint of the sun. Only out under the sky: anything falling under a roof is as dry as the room it was in.
+  if(vBlock>.5&&(uWet>.01||uRainNow>.01)){
+    float w=clamp(max(uWet,uRainNow*1.2),0.,1.)*underSky(vWorld+vec3(0.,.6,0.),1.);
+    if(w>.01){
+      vec3 V=normalize(uCam-vWorld), Rf=reflect(-V,N);
+      vec3 env=Rf.y>0.?mix(uHorizon,uSkyCol,clamp(Rf.y*1.6,0.,1.)):uGroundCol*.5;
+      float fres=pow(1.-max(dot(N,V),0.),3.);
+      c*=mix(1.,.62,w);
+      c+=env*(.03+.4*fres)*w*.5*(1.-.75*clamp(uNightGlow,0.,1.));
+      c+=uSunCol*pow(max(dot(Rf,uSunDir),0.),90.)*sampleShadow(vWorld,N,dist)*w*.5;
+    }
   }
   // Out in the rain, a bike gets wet the way a gun or a coat does: everything darker, a hard wet shine that gives back whatever light
   // there is (the sky by day, the lamps and the headlamp by night), and drops of water on it, each with its own life: landing, sitting a

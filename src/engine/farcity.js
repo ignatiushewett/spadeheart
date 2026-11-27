@@ -5,7 +5,8 @@ import { PALETTE, M } from '../shared/materials.js';
 import { STYLES, P, PROP_STRIDE } from '../shared/layout.js';
 import { aabbInFrustum } from './math.js';
 
-const CELL = 4;
+// Two blocks to a cell: near enough to the real footprints that alleys and setbacks stay where they are.
+const CELL = 2;
 const BUCKET = 512;
 
 const srgb = (id, k) => {
@@ -24,9 +25,10 @@ export class FarCity {
     // Which style a cell is, and how that building's windows sit on it: how far along (from its seed) and how far up (from the ground it
     // stands on), so its stand-in has its windows where the real one has them. Cells only merge with ones that match in all of it.
     const C = new Uint16Array(W * D), BLD = [];
+    if (STYLES.length > 62) throw new Error('FarCity: the style no longer fits in its six bits');
     const { height, lot, buildings, ground, terr } = L;
     for (let z = 0; z < D; z++) for (let x = 0; x < W; x++) {
-      const i = (z * CELL + 2) * WX + x * CELL + 2;
+      const i = (z * CELL + (CELL >> 1)) * WX + x * CELL + (CELL >> 1);
       const h = height[i];
       if (h && lot[i]) {
         const b = buildings[lot[i] - 1];
@@ -93,7 +95,9 @@ export class FarCity {
     // The country: one quad to every sixteen blocks, tilted to the slope, and lifted where the forest stands on it.
     {
       const T = 16, mark = L.mark;
-      const at = (x, z) => { const i = Math.min(WZ - 1, z) * WX + Math.min(WX - 1, x); return ground[i] === G.WATER ? -4 : terr[i]; };
+      // Over the tunnel (marked 32) the ground is the hill on top of it, not the road underneath: otherwise the ridge has a canyon in it.
+      const overTunnel = (i) => (mark[i] & 32) && L.height[i] > 0;
+      const at = (x, z) => { const i = Math.min(WZ - 1, z) * WX + Math.min(WX - 1, x); return ground[i] === G.WATER ? -4 : overTunnel(i) ? L.height[i] - STREET_Y : terr[i]; };
       const grass = srgb(M.GRASS, 1), wood = srgb(M.LEAF, .8), rock = srgb(M.SCHIST, 1), snow = srgb(M.SNOW, 1), field = srgb(M.GRASS_DRY, 1);
       const GC = { [G.ROAD]: srgb(M.ASPHALT, 1), [G.WALK]: srgb(M.WALK, 1), [G.LOT]: srgb(M.WALK2, 1), [G.PLAZA]: srgb(M.WALK2, 1), [G.ALLEY]: srgb(M.ALLEYWAY, 1), [G.CAMP]: srgb(M.GRAVEL, 1),
         [G.SAND]: srgb(M.SAND, 1), [G.DIRT]: srgb(M.PATH, 1), [G.FIELD]: srgb(M.SOIL, 1), [G.PROM]: srgb(M.WOOD, 1), [G.PARK]: grass, [G.ROCK]: rock, [G.WATER]: grass };
@@ -101,7 +105,7 @@ export class FarCity {
       const patch = (x, z) => {
         const c = [0, 0, 0];
         for (let k = 0; k < 4; k++) {
-          const sx = Math.min(WX - 1, x + 2 + (k & 1) * 8), sz = Math.min(WZ - 1, z + 2 + (k >> 1) * 8), g = ground[sz * WX + sx];
+          const sx = Math.min(WX - 1, x + 2 + (k & 1) * 8), sz = Math.min(WZ - 1, z + 2 + (k >> 1) * 8), g = overTunnel(sz * WX + sx) ? G.PARK : ground[sz * WX + sx];
           const fm = g === G.FIELD ? mark[sz * WX + sx] : 0, q = fm === 2 ? srgb(M.CORN, .8) : fm === 1 || fm === 3 || fm === 5 ? srgb(M.LEAF2, .75) : fm === 6 ? srgb(M.GRASS_DRY, 1) : GC[g] || grass;
           c[0] += q[0] / 4; c[1] += q[1] / 4; c[2] += q[2] / 4;
         }
@@ -121,7 +125,7 @@ export class FarCity {
         }
         if (coast && dry) {
           const Q = 4;
-          const hq = (qx, qz) => { const sx = x + qx * Q + 2, sz = z + qz * Q + 2; return wet(sx, sz) ? null : Math.max(STREET_Y - 1 + terr[sz * WX + sx], WATER_Y + .35); };
+          const hq = (qx, qz) => { const sx = x + qx * Q + 2, sz = z + qz * Q + 2; return wet(sx, sz) ? null : Math.max(STREET_Y + terr[sz * WX + sx], WATER_Y + .35); };
           const bk = tverts[Math.min(tverts.length - 1, Math.floor(z / BUCKET))], sea = WATER_Y - 2;
           for (let qz = 0; qz < T / Q; qz++) for (let qx = 0; qx < T / Q; qx++) {
             const h = hq(qx, qz);
@@ -146,7 +150,8 @@ export class FarCity {
         const ta = canopy(x, z), tb = canopy(x + T, z), tc = canopy(x, z + T), te = canopy(x + T, z + T), trees = (ta + tb + tc + te) / 4;
         const col = g === G.ROCK ? rock : trees > 4 ? wood : patch(x, z);
         // The ground only: the trees on it are drawn as pictures (FarTrees), so the forest floor is not raised into a slab.
-        const y = (t) => STREET_Y - 1 + Math.max(t, -1);
+        // At the height of the real ground (its surface is STREET_Y + terr), so the two meet level at the join.
+        const y = (t) => STREET_Y + Math.max(t, -1);
         const nx = (a + c - b - e) / 2, nz = (a + b - c - e) / 2, nl = Math.hypot(nx, T, nz);
         quad(tverts[Math.min(tverts.length - 1, Math.floor(z / BUCKET))], [[x, y(c, tc), z + T], [x + T, y(e, te), z + T], [x + T, y(b, tb), z], [x, y(a, ta), z]], [nx / nl, T / nl, nz / nl], col, .3);
       }
@@ -206,18 +211,51 @@ export class FarCity {
       }
     }
 
-    // Camps read from afar as a wall ring with their tallest buildings poking over it.
-    const WALL_COL = { cabs: M.TAXI, containers: M.CONT_R, palisade: M.LOG, hesco: M.SANDBAG, sheet: M.STEEL, scrap: M.RUST, white: M.CAR_W, brick: M.BRICK_R, stone: M.GRANITE };
+    // Settlements, from afar: the wall round them in what it is really built of, and everything inside it big enough to see over a
+    // street (the shacks, the tents, the stalls, the halls, the towers, the church) as a block of its own walls under its own roof, where
+    // it really stands. Benches, fire pits, lamp posts and the like are too small to matter from out there.
+    const WALL_COL = { cabs: M.TAXI, containers: M.CONT_R, palisade: M.LOG, hesco: M.SANDBAG, sheet: M.STEEL, scrap: M.RUST, white: M.CAR_W, brick: M.BRICK_R, stone: M.GRANITE, qz: M.CONCRETE };
+    const SKIP = new Set(['bench', 'firepit', 'lights', 'flag', 'flood', 'table', 'well', 'alarm', 'smokers', 'graves', 'crops', 'garden', 'mural', 'racks', 'goods', 'bonfire', 'court', 'divider', 'wreck', 'humvee', 'arch', 'windmill', 'crane', 'range']);
+    const PLANK = { wall: M.PLANK, roof: M.ROOF_TAR };
+    const LOOK = {
+      tower: { wall: M.WOOD, roof: M.PLANK }, stall: { wall: M.PLANK, roof: M.AWN_R }, clinic: { wall: M.TENT_W, roof: M.TENT_W }, greenhouse: { wall: M.GLASS_C, roof: M.GLASS_C },
+      tank: { wall: M.STEEL, roof: M.STEEL }, keep: { wall: M.GRANITE, roof: M.ROOF_GRAVEL }, cloister: { wall: M.LIMESTONE, roof: M.ROOF_TAR }, ferry: { wall: M.CAR_W, roof: M.STEEL },
+    };
+    const num = (v) => (typeof v === 'number' && v > 0 && v < 256 ? v : 0);
     for (const c of L.camps) {
-      const col = srgb(c.wall === 'stone' ? M.GRANITE : c.wall === 'qz' ? M.CONCRETE : M.WOOD, 1);
+      const col = srgb(WALL_COL[c.wall] || M.WOOD, 1);
       const top = STREET_Y + c.H;
       const edges = [[c.x0, c.z0, c.x1, c.z0 + 2], [c.x0, c.z1 - 2, c.x1, c.z1], [c.x0, c.z0, c.x0 + 2, c.z1], [c.x1 - 2, c.z0, c.x1, c.z1]];
       for (const [a, b, e, f] of edges) {
         for (let z = b; z < f; z += BUCKET) this.box(verts[Math.floor(z / BUCKET)], a, 3, z, e, top, Math.min(f, z + BUCKET), col, quad);
       }
       for (const p of c.parts) {
-        if (p.h < 12 || p.t === 'flag') continue;
-        this.box(verts[Math.floor(p.z0 / BUCKET)], p.x0, STREET_Y, p.z0, p.x1, STREET_Y + p.h, p.z1, srgb(p.far || M.CONCRETE_D, 1), quad);
+        if (SKIP.has(p.t) || p.h < 3 || (p.x1 - p.x0 + 1) * (p.z1 - p.z0 + 1) < 4) continue;
+        if (p.t === 'hallchurch') {
+          // The church: a long board nave under a pitched roof, stepped in towards the ridge, and the square tower over the door (the
+          // east end) with its spire.
+          const B = verts[Math.floor(p.z0 / BUCKET)], wallC = srgb(M.PLANK, 1), roofC = srgb(M.SHINGLE_R, 1);
+          const zm = (p.z0 + p.z1 + 1) / 2, Wd = p.z1 - p.z0 + 1;
+          this.box(B, p.x0, STREET_Y - 1, p.z0, p.x1 - 2, STREET_Y + 10, p.z1 + 1, wallC, quad, roofC, { glass: srgb(M.GLASS_T, 1), trim: srgb(M.WOOD_D, 1), p: 5, w: 2, cast: 0, phase: 1, lift: 0, house: false, blank: false });
+          for (const [inset, top] of [[Wd * .22, 14], [Wd * .4, 18]]) this.box(B, p.x0, STREET_Y + 10, p.z0 + inset, p.x1 - 2, STREET_Y + top, p.z1 + 1 - inset, roofC, quad);
+          this.box(B, p.x1 - 8, STREET_Y - 1, zm - 3.5, p.x1 - 2, STREET_Y + 23, zm + 3.5, wallC, quad, roofC);
+          this.box(B, p.x1 - 6, STREET_Y + 23, zm - 1.5, p.x1 - 4, STREET_Y + 27, zm + 1.5, roofC, quad);
+          continue;
+        }
+        const look = LOOK[p.t] || PLANK;
+        // What it is made of, where the plan says: a shack's sheeting, a row house's brick, a tent's canvas.
+        const wall = num(p.far) || num(p.mat) || num(p.col) || look.wall, roof = num(p.roof) || num(p.col) || look.roof;
+        // Tents and shelters slope to a ridge: drawn a little lower than their peak, about where most of them is.
+        const cloth = p.t === 'tent' || p.t === 'bunk' || p.t === 'shelter' || p.t === 'bigtent';
+        const h = cloth ? Math.max(2, Math.round(p.h * .75)) : p.h;
+        // Their walls drawn the way the city's are, so they are buildings and not plain blocks: a row house's windows up every storey,
+        // a shack's or a hall's small ones, a tower's or a tank's bands; canvas only its seams.
+        const glass = srgb(M.GLASS_K, 1), dark = srgb(M.WOOD_D, 1), ph = (p.x0 + p.z0) & 7;
+        const face = p.t === 'rowhouse' ? { glass, trim: srgb(num(p.roof) || M.CONCRETE_D, 1), p: 3, w: 1, cast: 0, phase: ph, lift: 0, house: false, blank: false }
+          : cloth ? { glass, trim: srgb(wall, .7), p: 3, w: 0, cast: 1, phase: ph, lift: 0, house: true, blank: false }
+          : p.t === 'tower' || p.t === 'tank' || p.t === 'keep' || p.t === 'ferry' ? { glass, trim: dark, p: 4, w: 0, cast: 0, phase: 0, lift: 0, house: false, blank: true }
+          : { glass, trim: dark, p: 4, w: 1, cast: 0, phase: ph, lift: 0, house: true, blank: false };
+        this.box(verts[Math.floor(p.z0 / BUCKET)], p.x0, STREET_Y - 1, p.z0, p.x1 + 1, STREET_Y + h, p.z1 + 1, srgb(wall, 1), quad, srgb(roof, 1), face);
       }
     }
 
@@ -266,12 +304,13 @@ export class FarCity {
     }
   }
 
-  box(out, x0, y0, z0, x1, y1, z1, col, quad) {
-    quad(out, [[x0, y1, z1], [x1, y1, z1], [x1, y1, z0], [x0, y1, z0]], [0, 1, 0], col, 0);
-    quad(out, [[x0, y0, z0], [x0, y0, z1], [x0, y1, z1], [x0, y1, z0]], [-1, 0, 0], col, 0);
-    quad(out, [[x1, y0, z1], [x1, y0, z0], [x1, y1, z0], [x1, y1, z1]], [1, 0, 0], col, 0);
-    quad(out, [[x1, y0, z0], [x0, y0, z0], [x0, y1, z0], [x1, y1, z0]], [0, 0, -1], col, 0);
-    quad(out, [[x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]], [0, 0, 1], col, 0);
+  box(out, x0, y0, z0, x1, y1, z1, col, quad, top = col, face = null) {
+    const k = face ? 1 : 0, f = face || undefined;
+    quad(out, [[x0, y1, z1], [x1, y1, z1], [x1, y1, z0], [x0, y1, z0]], [0, 1, 0], top, 0);
+    quad(out, [[x0, y0, z0], [x0, y0, z1], [x0, y1, z1], [x0, y1, z0]], [-1, 0, 0], col, k, f);
+    quad(out, [[x1, y0, z1], [x1, y0, z0], [x1, y1, z0], [x1, y1, z1]], [1, 0, 0], col, k, f);
+    quad(out, [[x1, y0, z0], [x0, y0, z0], [x0, y1, z0], [x1, y1, z0]], [0, 0, -1], col, k, f);
+    quad(out, [[x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]], [0, 0, 1], col, k, f);
   }
 
   draw(gl, planes, shadow = false) {

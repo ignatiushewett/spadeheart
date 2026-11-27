@@ -230,6 +230,9 @@ export class World {
     this.columns = list.map((v) => v & 0xffff);
     this.wantedSet = new Set(this.columns);
     this.scan = 0;
+    // Only what is drawn counts as built: a column left behind (still loaded, not yet let go, but no longer drawn) goes back to the
+    // stand-in, or there is a hole there down to nothing.
+    for (let col = 0; col < COL; col++) if (this.loadMask[col] && !this.wantedSet.has(col)) { this.loadMask[col] = 0; this.maskDirty = true; }
     this.unloadFar(pcx, pcz, R + 2);
   }
 

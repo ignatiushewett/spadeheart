@@ -115,7 +115,8 @@ export function makeMesher(L) {
         const top = height[i];
         for (let y = -1; y <= CS; y++) {
           const k = (x + 1) + (y + 1) * P + (z + 1) * PP;
-          if (data[k] === 0 && oy + y < top && oy + y >= STREET_Y) data[k] = M.GLASS_K;
+          // The dark of the room behind, not a pane catching the sky: from far off a hole or an empty frame reads as a hole.
+          if (data[k] === 0 && oy + y < top && oy + y >= STREET_Y) data[k] = M.SHADOWED;
         }
       }
     }

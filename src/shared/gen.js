@@ -1,7 +1,7 @@
 // Turns the city plan into voxels, one 32^3 chunk at a time. Pure function of position:
 // chunks can be dropped and rebuilt freely; player edits are stored separately.
 import { CS, CS3, WX, WZ, CW, STREET_Y, WATER_Y, FLOOR_H, G, STATUE_LAMPS } from './constants.js';
-import { M, CRACKED } from './materials.js';
+import { M, CRACKED, isGlass } from './materials.js';
 import { h3, r2, r3, h2, noise2 } from './rng.js';
 import { STYLES, P } from './layout.js';
 import { stampCamp } from './camps.js';
@@ -208,10 +208,104 @@ export function makeGenerator(L) {
   // Always the way up from the street, and every so often further up, in the buildings that were held.
   const stairsBarred = (b, fl, top) => !b.house && isSealed(b) && (fl <= 8 || top < 80) && (fl === 0 || h2(b.id + 21, fl) % 3 === 0);
 
+  // Where the fighting went through the city in the first weeks: a rocket or a charge through the side of a building, out in the streets
+  // (never near a settlement), at street level or up on some floor. Each is a round hole about the size an M72 leaves, through the wall
+  // and into the floor and the room behind, with the edge of it scorched. Laid out once for each building from its own seed, so every
+  // chunk agrees where they are, and they are the same in every game.
+  const holeCache = new Map();
+  const nearCamp = (b) => {
+    for (const c of camps) if (b.x1 > c.x0 - 32 && b.x0 < c.x1 + 32 && b.z1 > c.z0 - 32 && b.z0 < c.z1 + 32) return true;
+    return false;
+  };
+  function holesOf(b) {
+    let hs = holeCache.get(b.id);
+    if (hs) return hs;
+    hs = [];
+    const roll = h2(b.id * 31 + 7, b.seed & 1023) % 100;
+    const front = Math.max(b.x1 - b.x0, b.z1 - b.z0);
+    const n = b.name || b.gone || nearCamp(b) ? 0 : Math.min(7, 1 + Math.floor(front / 20) + (roll < 55 ? 1 : 0) + (roll < 20 ? 1 : 0));
+    // And the taller ones took more higher up: up to two more, always on some floor above the street.
+    const storeys = b.tiers ? Math.floor((b.tiers[b.tiers.length - 1] - STREET_Y - b.lift) / FLOOR_H) : 1, roll2 = h2(b.seed & 4095, b.id * 17 + 3) % 100;
+    const extra = !n || storeys < 3 ? 0 : (roll2 < 55 ? 1 : 0) + (roll2 < 22 && storeys >= 5 ? 1 : 0);
+    for (let k = 0; k < n + extra; k++) {
+      const q = h2(b.id + k * 977, b.seed + 31);
+      const side = q % 4, w = b.x1 - b.x0, dpt = b.z1 - b.z0;
+      if ((side < 2 ? w : dpt) < 6) continue;
+      // From out in the street, straight in until the wall is met: the hole goes where the building actually stands, not the lot line.
+      const along = 2 + ((q >> 3) % Math.max(1, (side < 2 ? w : dpt) - 4));
+      let x = side === 0 || side === 1 ? b.x0 + along : side === 2 ? b.x0 - 1 : b.x1 + 1;
+      let z = side === 2 || side === 3 ? b.z0 + along : side === 0 ? b.z0 - 1 : b.z1 + 1;
+      const dx = side === 2 ? 1 : side === 3 ? -1 : 0, dz = side === 0 ? 1 : side === 1 ? -1 : 0;
+      let hit = -1;
+      for (let s = 0; s < 16; s++, x += dx, z += dz) {
+        if (x < 1 || z < 1 || x >= WX - 1 || z >= WZ - 1) break;
+        const j = z * WX + x;
+        if (lot[j] === b.id && height[j]) { hit = j; break; }
+      }
+      if (hit < 0) continue;
+      // Only on an outside wall: the cell before it, in the street, is open.
+      const o = (z - dz) * WX + (x - dx);
+      if (height[o] || ground[o] === G.WATER) continue;
+      const top = height[hit], floors = Math.max(1, Math.floor((top - (STREET_Y + b.lift)) / FLOOR_H));
+      // Most at street level, where the fighting was; the rest up on some floor.
+      const fl = floors < 2 || (k < n && (q >> 7) % 3 !== 0) ? 0 : 1 + ((q >> 9) % (floors - 1));
+      // The floor of that storey (the first block of air over its slab), and the blast a little above it.
+      const floorY = STREET_Y + b.lift + fl * FLOOR_H, y = floorY + 3;
+      if (y > top - 3) continue;
+      const r = 5 + ((q >> 13) % 16) * .1;
+      // Its middle just outside the wall, so it takes the wall and bites into what is behind.
+      hs.push({ x: x + .5 - dx * .8, y, z: z + .5 - dz * .8, r, floorY, fl });
+    }
+    holeCache.set(b.id, hs);
+    return hs;
+  }
+
+  // Every hole in the city, in a coarse grid, for the rubble out in the street in front of them.
+  let holeGrid = null;
+  const holesNear = (x, z) => {
+    if (!holeGrid) {
+      holeGrid = new Map();
+      for (const b of buildings) for (const h of holesOf(b)) {
+        for (let gz = Math.floor((h.z - 10) / 16); gz <= Math.floor((h.z + 10) / 16); gz++) for (let gx = Math.floor((h.x - 10) / 16); gx <= Math.floor((h.x + 10) / 16); gx++) {
+          const k = gx + gz * 4096, a = holeGrid.get(k);
+          if (a) a.push(h); else holeGrid.set(k, [h]);
+        }
+      }
+    }
+    return holeGrid.get((x >> 4) + (z >> 4) * 4096);
+  };
+  function streetRubble(x, z, y0, y1) {
+    const near = holesNear(x, z);
+    if (!near) return;
+    const i = z * WX + x;
+    if (height[i] || ground[i] === G.WATER) return;
+    let pile = 0;
+    for (const h of near) {
+      if (h.fl) continue;
+      const ex = x + .5 - h.x, ez = z + .5 - h.z, dh = Math.sqrt(ex * ex + ez * ez), reach = h.r * 1.35;
+      if (dh > reach) continue;
+      // A fan of it out from the foot of the wall: deep close in, thinning to scattered lumps; less from a hole high up, which threw it wider.
+      const k = 1 - dh / reach, hgt = (h.fl ? 1.3 : 2.6) * k + (r3(x, 3, z) - .5) * 1.6;
+      pile = Math.max(pile, Math.round(hgt));
+    }
+    if (pile <= 0) return;
+    const base = STREET_Y + terr[i];
+    for (let y = Math.max(y0, base); y <= Math.min(y1, base + pile - 1); y++) {
+      d[(x - ox) | ((y - oy) << 5) | ((z - oz) << 10)] = r3(x, y, z) < .25 ? M.CONCRETE_D : M.RUBBLE;
+      any = true;
+    }
+  }
+
   function building(i, x, z, y0, y1, b) {
     const top = height[i];
     if (!top) return;
     const S = STYLES[b.style];
+    // Any blast hole near this column.
+    let holes = null;
+    for (const h of holesOf(b)) {
+      const ddx = x + .5 - h.x, ddz = z + .5 - h.z;
+      if (ddx * ddx + ddz * ddz < (h.r + 1.3) * (h.r + 1.3)) (holes || (holes = [])).push(h);
+    }
     // A house's walls stop at the eaves, and the roof climbs from there.
     const wallTop = b.house ? b.tiers[1] : top;
     const hN = height[i - WX], hS = height[i + WX], hW = height[i - 1], hE = height[i + 1];
@@ -280,10 +374,10 @@ export function makeGenerator(L) {
             const hiRange = S.cast === 2 ? lv >= 1 : b.house ? lv >= 2 && lv <= 3 : lv >= 2 && lv <= 4;
             if (hit && hiRange) {
               const r = r3(x, y, z);
-              if (r < .085) id = 0;
+              if (r < .13) id = 0;
               else if (r < .0705 + (S.cast === 2 ? 0 : .0008)) id = M.WIN_LIT;
               // Some panes went to cracks a long time ago and are still hanging in the frame.
-              else id = h2(b.id * 13 + (((t + (b.seed & 7)) / pitch) | 0), fl + 40) % 100 < 17 ? (CRACKED[S.glass] || S.glass) : S.glass;
+              else id = h2(b.id * 13 + (((t + (b.seed & 7)) / pitch) | 0), fl + 40) % 100 < 33 ? (CRACKED[S.glass] || S.glass) : S.glass;
             } else id = S.cast === 1 && (t % pitch === pitch - 1) ? S.trim : S.wall;
             if (b.ad && ((oN || oS) === b.ad.alongX)) {
               const px = adPixel(b, t, y, x, z);
@@ -314,6 +408,30 @@ export function makeGenerator(L) {
       } else {
         id = interior(b, S, x, y, z, lv, fl, e, top);
       }
+      // Blown out: nothing left inside the hole (the stairs aside, so the way up still goes up), and the edge of it burnt, with no glass.
+      if (holes && !inShaft) {
+        for (const h of holes) {
+          const ex = x + .5 - h.x, ey = y + .5 - h.y, ez = z + .5 - h.z;
+          // Ragged, as a blast leaves it: each block near the edge stays or goes on its own.
+          const d2 = ex * ex + ey * ey * 1.9 + ez * ez, rr = h.r + (r3(x, y, z) - .5) * 1.6;
+          if (d2 < rr * rr) {
+            // What it brought down lies in a heap on the floor of the room, deepest under the middle of the hole.
+            const dh = Math.sqrt(ex * ex + ez * ez), heap = h.fl ? 0 : 2.4 * (1 - dh / h.r) + (r3(z, y, x) - .5) * 1.4;
+            id = y >= h.floorY && y < h.floorY + heap ? (r3(x, z, y) < .2 ? M.CONCRETE_D : M.RUBBLE) : 0;
+            break;
+          }
+          // The edge: the wall's own stuff, cracked through, with some of it broken down to rubble. (Not burnt black: it was a long time ago.)
+          // Round the edge: at street level half of it broken to rubble; anywhere, the wall darkened with smoke, thick at the lip and
+          // thinning out a couple of blocks away from it.
+          if (id && d2 < (rr + 2.6) * (rr + 2.6)) {
+            const out = (Math.sqrt(d2) - rr) / 2.6, roll = r3(z, x, y);
+            if (isGlass(id)) { if (out < .45) id = 0; }
+            else if (!h.fl && out < .45 && roll < .5) id = M.RUBBLE;
+            else if (roll < .75 * (1 - out)) id = M.SCORCH;
+            break;
+          }
+        }
+      }
       if (id) { d[lx | ((y - oy) << 5) | (lz << 10)] = id; any = true; }
     }
 
@@ -336,16 +454,7 @@ export function makeGenerator(L) {
           for (let y = Math.max(y0, top); y <= Math.min(y1, top + ht - 1); y++) { d[lx | ((y - oy) << 5) | (lz << 10)] = M.ALUM; any = true; }
         }
       }
-      if (b.tank && top === b.top) {
-        const dx = x - b.cx - 9, dz = z - b.cz + 8;
-        const dist2 = dx * dx + dz * dz;
-        if (dist2 < 11 && !head) {
-          const start = top + 3, stop = top + 8;
-          for (let y = Math.max(y0, start); y <= Math.min(y1, stop); y++) { d[lx | ((y - oy) << 5) | (lz << 10)] = M.TANK; any = true; }
-          if (dist2 < 3 && top + 9 >= y0 && top + 9 <= y1) { d[lx | ((top + 9 - oy) << 5) | (lz << 10)] = M.TANK; any = true; }
-          if (Math.abs(dx) === 2 && Math.abs(dz) === 2) for (let y = Math.max(y0, top); y <= Math.min(y1, top + 2); y++) { d[lx | ((y - oy) << 5) | (lz << 10)] = M.IRON; any = true; }
-        }
-      }
+      // (No water tanks on the roofs any more.)
     }
   }
 
@@ -684,7 +793,7 @@ export function makeGenerator(L) {
     const col = cx + cz * CW;
     const y0 = oy, y1 = oy + CS - 1;
     if (y0 <= chunkTop[col]) {
-      for (let z = oz; z < oz + CS; z++) for (let x = ox; x < ox + CS; x++) column(x, z, y0, y1);
+      for (let z = oz; z < oz + CS; z++) for (let x = ox; x < ox + CS; x++) { column(x, z, y0, y1); streetRubble(x, z, y0, y1); }
       for (let k = binStart[col]; k < binStart[col + 1]; k++) prop(binData[k]);
     }
     for (const s of structs) {

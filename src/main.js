@@ -1,5 +1,6 @@
 // Game shell: boot, state machine, main loop, saving and the glue between systems.
 import { FarTrees } from './engine/fartrees.js';
+import { FarHorde } from './engine/farhorde.js';
 import { Renderer, QUALITY } from './engine/renderer.js';
 import { World } from './engine/world.js';
 import { FarCity, buildCityMap } from './engine/farcity.js';
@@ -266,14 +267,16 @@ class Game {
     const t2 = performance.now();
     this.far = new FarCity(gl, this.layout);
     this.far.trees = new FarTrees(gl, this.layout, this.far.skirt);
+    this.far.horde = new FarHorde(gl, this.layout);
     const t3 = performance.now();
-    this.makeMapCanvas();
-    console.log(`city map ${(t2 - t1) | 0} ms, far ${(t3 - t2) | 0} ms, maps ${(performance.now() - t3) | 0} ms`);
+    console.log(`city map ${(t2 - t1) | 0} ms, far ${(t3 - t2) | 0} ms`);
     this.ui.loading('', .7, '', false, true);
     await nextFrame();
     this.world = new World(this.layout, this.renderer);
     const cores = navigator.hardwareConcurrency || 4;
+    const tw = performance.now();
     await this.world.initWorkers(Math.max(2, Math.min(8, cores - 2)));
+    console.log(`workers ${(performance.now() - tw) | 0} ms`);
     this.actors = new ActorRenderer(gl);
     this.particles = new Particles(gl, this.world);
     this.rainMap = new RainMap(this.world);
@@ -335,7 +338,18 @@ class Game {
     return [rgb[0] + (18 - rgb[0]) * fk, rgb[1] + (34 - rgb[1]) * fk, rgb[2] + (17 - rgb[2]) * fk];
   }
 
-  makeMapCanvas() {
+  // The maps (the full map and the one in the corner) are only looked at in a game, and drawing them takes a few seconds. So they are
+  // not drawn before the title screen comes up: they are drawn a few milliseconds a frame while it is up, and anything left is finished
+  // on the loading screen. Returns true once they are done.
+  makeMapCanvas(budget = Infinity) {
+    if (this.mapCanvas) return true;
+    const it = this.mapBuild || (this.mapBuild = this.mapSteps());
+    const t0 = performance.now();
+    do { if (it.next().done) { this.mapBuild = null; return true; } } while (performance.now() - t0 < budget);
+    return false;
+  }
+
+  *mapSteps() {
     const L = this.layout;
     const c = document.createElement('canvas');
     const w = WX >> 1, h = WZ >> 1;
@@ -355,6 +369,7 @@ class Game {
     const hash = mapHash;
     const WATER = { deep: [20, 42, 54], shallow: [38, 66, 74] };
     for (let z = 0; z < h; z++) for (let px = 0; px < w; px++) {
+      if (px === 0 && (z & 15) === 15) yield;
       const wx = px << 1, wz = z << 1, i = wz * WX + wx;
       const g = L.ground[i], top = L.height[i];
       let rgb;
@@ -465,10 +480,13 @@ class Game {
       x.lineWidth = 2;
       x.strokeRect((camp.x0 >> 1) + 1, (camp.z0 >> 1) + 1, (camp.x1 - camp.x0) >> 1, (camp.z1 - camp.z0) >> 1);
     }
-    this.mapCanvas = c;
+    yield;
     this.makeSeaModel();
-    this.mapSurround = this.makeMapSurround();
-    this.mapMargin = this.makeMapMargin();
+    yield;
+    this.mapSurround = yield* this.mapSurroundSteps();
+    yield;
+    this.mapMargin = yield* this.mapMarginSteps();
+    this.mapCanvas = c;
   }
 
   // The country just past the edges, for the map: drawn at the map's own detail and exactly the way the map draws its own country,
@@ -514,7 +532,7 @@ class Game {
     };
   }
 
-  makeMapMargin() {
+  *mapMarginSteps() {
     const L = this.layout, X0 = -1408, Z0 = -768, X1 = WX, Z1 = WZ + 768, w = (X1 - X0) >> 1, h = (Z1 - Z0) >> 1;
     const c = document.createElement('canvas');
     c.width = w; c.height = h; c.x0 = X0; c.z0 = Z0;
@@ -556,6 +574,7 @@ class Game {
     };
     const WATER = { deep: [20, 42, 54], shallow: [38, 66, 74] };
     for (let pz = 0; pz < h; pz++) for (let px = 0; px < w; px++) {
+      if (px === 0 && (pz & 15) === 15) yield;
       const wx = X0 + px * 2, wz = Z0 + pz * 2;
       const edgeIn = inWorld(wx, wz) ? Math.min(wx, wz, WZ - 1 - wz, WX - 1 - wx) : -1;
       if (edgeIn >= 0) continue;
@@ -627,7 +646,7 @@ class Game {
 
   // The country round the state, for the maps: the same land, the same woods, the same light, carried on past the edges at an eighth of
   // the detail, so that nothing ends in a line. The sea is wherever the coast says it is, and the two roads west run on to the horizon.
-  makeMapSurround() {
+  *mapSurroundSteps() {
     const L = this.layout, S = 4096, P = 16, n = (WX + S * 2) / P;
     const c = document.createElement('canvas');
     c.width = c.height = n; c.span = S;
@@ -646,6 +665,7 @@ class Game {
     };
     const grass = [col(M.GRASS_DRY), col(M.GRASS), col(M.GRASS2)], leaf = [col(M.LEAF), col(M.LEAF2), col(M.LEAF3)], sea = [20, 42, 54];
     for (let pz = 0; pz < n; pz++) for (let px = 0; px < n; px++) {
+      if (px === 0 && (pz & 31) === 31) yield;
       const wx = -S + px * P, wz = -S + pz * P, o = (px + pz * n) * 4;
       let rgb;
       if (this.seaAt(wx, wz)) { const sh = hash(wx * .013 + 3, wz * .013) * .15; rgb = [20 + 18 * sh, 42 + 24 * sh, 54 + 20 * sh]; }
@@ -821,7 +841,7 @@ class Game {
       ch[arg] = !ch[arg];
       document.getElementById(`dev-c-${arg}`).classList.toggle('on', ch[arg]);
       if (arg === 'spades' && ch.spades) P.scrip = Math.max(P.scrip, 999999);
-      if (arg === 'ignore') this.horde.ignorePlayer = ch.ignore;
+      if (arg === 'ignore') this.horde.ignorePlayer = ch.ignore || !!this.photoMode;
       note({ god: 'Nothing hurts you', ammo: 'Magazines never run dry', spades: 'Spades never run out', ignore: 'The dead pay you no attention' }[arg] + (ch[arg] ? ': on.' : ': off.'));
     } else if (kind === 'horde') {
       // A crowd that has your scent, coming in from out of sight on all sides but mostly from behind.
@@ -837,6 +857,15 @@ class Game {
       }
       H.nearDirty = true;
       note(`${made} of them, coming for you.`);
+    } else if (kind === 'photo') {
+      // For taking pictures: no HUD, no gun in your hands, and the dead leave you be. The dev menu stays, and F4 still opens and shuts it.
+      this.photoMode = !this.photoMode;
+      document.getElementById('hud').classList.toggle('hud-off', this.photoMode);
+      this.horde.ignorePlayer = this.photoMode || !!(this.cheats && this.cheats.ignore);
+      const b = document.getElementById('dev-photo');
+      b.textContent = this.photoMode ? 'Screenshot mode: on' : 'Screenshot mode: off';
+      b.classList.toggle('on', this.photoMode);
+      note(this.photoMode ? 'Screenshot mode: no HUD, no weapon, and the dead ignore you. F4 for this menu.' : 'Screenshot mode: off.');
     } else if (kind === 'fall') {
       this.skipToFall(note);
     } else if (kind === 'evac') {
@@ -1350,6 +1379,12 @@ class Game {
     for (let k = 0; k < removed.length; k += 4 * Math.max(1, Math.floor(removed.length / 4 / 160))) {
       const id = removed[k + 3];
       this.particles.debris(removed[k], removed[k + 1], removed[k + 2], id, 1, radius * 2.8, true);
+    }
+    // And the lumps with them: whole blocks and big pieces of them thrown out of it, more the more it took out.
+    const lumps = Math.min(140, Math.ceil(removed.length / 4 / 5));
+    for (let j = 0; j < lumps; j++) {
+      const k = 4 * Math.floor(rand() * (removed.length / 4));
+      this.particles.chunkOf(removed[k], removed[k + 1], removed[k + 2], removed[k + 3], radius * 2.2, 1);
     }
     P.voxelsBroken += removed.length / 4;
     this.audio.explosion(x, y, z, radius / 5, loud ? 320 : 90);
@@ -2060,6 +2095,12 @@ class Game {
 
   onDebrisImpact(x, y, z, r, g, b, speed) {
     const W = this.world, ix = Math.floor(x), iy = Math.floor(y), iz = Math.floor(z);
+    // A block that comes down hard breaks on landing: now and then into a couple of lumps that bounce off it, and the chips.
+    if (!this.collapseOrganic && speed > 4 && rand() < .16 && Math.hypot(x - this.player.x, z - this.player.z) < 160) {
+      const n = 1 + (rand() < .5 ? 1 : 0);
+      for (let i = 0; i < n; i++) this.particles.chunk(x - .5, y - .2, z - .5, r, g, b, Math.min(6, 1.5 + speed * .25), .55);
+      for (let i = 0; i < 3; i++) this.particles.cube(x, y, z, (rand() - .5) * 4, rand() * 3, (rand() - .5) * 4, .12 + rand() * .2, r, g, b, 1.5 + rand() * 1.5, 0, 1);
+    }
     if (!this.collapseOrganic && rand() < .08) this.particles.dust(x, y + .5, z, 1, 2.4);
     if (this.rubbleBudget > 0 && rand() < .3) {
       let py = iy + 1;
@@ -2105,7 +2146,9 @@ class Game {
 
   // --- Game flow ---------------------------------------------------------------------------------------
   enterMenu() {
+    if (!this.menuSeen) { this.menuSeen = true; console.log(`title screen at ${performance.now() | 0} ms`); }
     this.state = 'menu';
+    if (this.far && this.far.horde) this.far.horde.show = false;
     this.audio.menuMusic(true);
     // A clean slate for the people down there, whatever the last game left behind. The save already has it.
     this.campSim.reset();
@@ -2465,6 +2508,7 @@ class Game {
   updateLoading() {
     const W = this.world, P = this.player;
     W.update(P.x, P.z);
+    if (!this.mapCanvas) this.makeMapCanvas(12);
     const pcx = Math.floor(P.x) >> 5, pcz = Math.floor(P.z) >> 5;
     let total = 0, ready = 0;
     for (let dz = -3; dz <= 3; dz++) for (let dx = -3; dx <= 3; dx++) {
@@ -2477,6 +2521,7 @@ class Game {
     const pct = total ? ready / total : 1;
     this.ui.loading(this.loadTitle, pct, `${ready} of ${total} blocks ready`, false);
     if (pct >= 1 || performance.now() - this.loadStart > 25000) {
+      this.makeMapCanvas();
       this.state = 'play';
       if (this.spawnPending) {
         this.horde.fillAround(P.x, P.z);
@@ -2891,7 +2936,7 @@ class Game {
     if (this.world && this.state !== 'loading' && this.world.viewRadius !== wantView) { this.world.viewRadius = wantView; this.world.lastCX = -999; }
     // Off the title screen before it had finished building: the black goes with it.
     if (this.state !== 'menu' && this.menuVeilT !== -1e9 && this.menuVeilT !== undefined) { document.getElementById('menu-veil').className = ''; this.menuVeilT = -1e9; }
-    if (this.state === 'menu') this.updateMenu(dt);
+    if (this.state === 'menu') { this.updateMenu(dt); if (!this.mapCanvas) this.makeMapCanvas(5); }
     else if (this.state === 'play' && !paused) this.updatePlay(dt);
     else if (this.state === 'play') this.world.update(this.player.x, this.player.z);
     r.setTimeOfDay(this.tod);
@@ -3029,7 +3074,10 @@ class Game {
     this.world.update(cam.x + Math.sin(cam.yaw) * ahead, cam.z - Math.cos(cam.yaw) * ahead);
     const W = this.world, built = W.columns && W.columns.length ? (W.scan || 0) / W.columns.length : 0;
     this.menuVeilT = (this.menuVeilT || 0) + dt;
-    if (this.menuVeilT >= 0 && (built > .985 || this.menuVeilT > MENU_VEIL_MAX)) {
+    // Up as soon as the ground near the shot is built (the columns go nearest first): the distance has its stand-ins now, which look
+    // like the real thing, so there is no need to wait for every block out to the edge of the view before showing any of it.
+    const nearPart = Math.min(.985, (220 / Math.max(220, this.world.viewRadius)) ** 2);
+    if (this.menuVeilT >= 0 && (built > nearPart || this.menuVeilT > MENU_VEIL_MAX)) {
       this.menuVeilT = -1e9;
       const veil = document.getElementById('menu-veil');
       if (veil.classList.contains('on')) { veil.classList.add('out'); veil.classList.remove('on'); }
@@ -3119,6 +3167,8 @@ class Game {
     this.bloodCols = new Map(); this.bloodDirty = true;
     this.cheats = {};
     this.horde.ignorePlayer = false;
+    this.photoMode = false;
+    { const b = document.getElementById('dev-photo'); if (b) b.textContent = 'Screenshot mode: off'; }
     if (this.player) this.player.fly = false;
     if (this.devOpen) this.toggleDev(false);
     document.querySelectorAll('#devmenu button.on').forEach((b) => b.classList.remove('on'));
@@ -3181,6 +3231,8 @@ class Game {
     // Each part of the world runs on its own: one going wrong must not stop the rest. Before this, one bad frame in the people code left
     // everybody frozen mid-step and unkillable for the rest of the session.
     if (!guest) this.guard('horde', () => H.update(dt, { x: P.x, y: P.y, z: P.z, stealth, alive: P.alive, sanctuary: P.sanctuary, campId: shelter ? shelter.id : -1 }));
+    // The crowds out past the real ones, laid out again now and then from where the horde's count has them.
+    if (this.far.horde) { this.far.horde.show = true; this.guard('farhorde', () => this.far.horde.update(P.x, P.z, H, this.settings.quality, H.settings.radius, this.time)); }
     this.frameDt = dt;
     if (!guest && P.interact && P.interact.kind === 'breach' && this.input.keys.KeyE && this.locked && !this.sleepFx && P.alive) this.campSim.handRepair(P.interact.breach, dt);
     if (!guest) this.guard('director', () => this.director.update(dt));
@@ -3610,7 +3662,7 @@ class Game {
           ex = this.cubeMix; en += pn;
         }
         this.particles.drawCubes(g, r, ex, en);
-        if (this.state === 'play') this.viewModel.drawThrown(g, r, P);
+        if (this.state === 'play' && !this.photoMode) this.viewModel.drawThrown(g, r, P);
       },
       (g) => { this.particles.drawSprites(g, r); r.drawBeams(); r.drawRain(); });
 
@@ -3627,7 +3679,7 @@ class Game {
       // Noticeable in a drizzle, stronger in a downpour, by day only, and weaker indoors.
       rainTint: (this.weather.rain > .04 ? .3 + .45 * Math.min(1, Math.max(0, (this.weather.rain - .2) / .7)) : this.weather.rain / .04 * .3) * (1 - this.renderer.sky.night),   // the grey-blue light of a wet day comes in through the windows too: no less of it indoors
     };
-    const drawVM = isPlay && P.alive && !this.wakeFx && !this.bikes.ride && modal !== 'dialog' && !(P.ads > .85 && P.weapon && ITEMS[P.weapon].scope);
+    const drawVM = isPlay && P.alive && !this.photoMode && !this.wakeFx && !this.bikes.ride && modal !== 'dialog' && !(P.ads > .85 && P.weapon && ITEMS[P.weapon].scope);
     r.post(drawVM ? (g) => this.viewModel.draw(g, r, P, paused ? 0 : dt) : null, fx);
     r.lightCount = 0;
     r.spotN = 0;

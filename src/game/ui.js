@@ -329,7 +329,7 @@ export class UI {
     this.prevModal.length = 0;
   }
 
-  showHUD(on) { $('hud').classList.toggle('on', on); if (!on) { $('hud').classList.remove('hud-off'); $('scope').style.display = 'none'; } }
+  showHUD(on) { $('hud').classList.toggle('on', on); if (!on) { $('hud').classList.remove('hud-off'); $('scope').style.display = 'none'; } else if (this.g.photoMode) $('hud').classList.add('hud-off'); }
 
   loading(title, pct, sub = '', soft = false, boot = false) {
     if (this.modal !== 'loading') this.open('loading', false);
@@ -1256,7 +1256,7 @@ export class UI {
     if (sur) x.drawImage(sur, -P.x - sur.span, -P.z - sur.span, sur.width * 16, sur.height * 16);
     const mg = g.mapMargin;
     if (mg) x.drawImage(mg, mg.x0 - P.x, mg.z0 - P.z, mg.width * 2, mg.height * 2);
-    x.drawImage(g.mapCanvas, -P.x, -P.z, WX, WZ);
+    if (g.mapCanvas) x.drawImage(g.mapCanvas, -P.x, -P.z, WX, WZ);
     const H = g.horde;
     const rim = cx / scale, range = rim * 1.42;
     // Every one of them in range: this close in there are few enough to draw, and thinning them out hid half a crowd.
@@ -2848,7 +2848,7 @@ export class UI {
     if (sur) { x.imageSmoothingEnabled = true; x.drawImage(sur, -sur.span, -sur.span, sur.width * 16, sur.height * 16); x.imageSmoothingEnabled = s > 1 ? false : true; }
     const mg = g.mapMargin;
     if (mg) x.drawImage(mg, mg.x0, mg.z0, mg.width * 2, mg.height * 2);
-    x.drawImage(g.mapCanvas, 0, 0, WX, WZ);
+    if (g.mapCanvas) x.drawImage(g.mapCanvas, 0, 0, WX, WZ);
     x.setTransform(1, 0, 0, 1, 0, 0);
     const P = g.player;
     const tx = (px) => c.width / 2 + (px - v.x) * s, tz = (pz) => c.height / 2 + (pz - v.z) * s;

@@ -568,7 +568,7 @@ export class Coop {
       this.fxOut.push(e);
     };
     const wrap = (obj, key, k, n) => { const f = obj[key]; this.hook(obj, key, function (...a) { rec(k, a, n); return f.apply(this, a); }); };
-    wrap(fx, 'blood', 'b', 8); wrap(fx, 'gore', 'g', 4); wrap(fx, 'explosion', 'x', 4); wrap(fx, 'debris', 'd', 7);
+    wrap(fx, 'blood', 'b', 8); wrap(fx, 'gore', 'g', 4); wrap(fx, 'explosion', 'x', 4); wrap(fx, 'debris', 'd', 7); wrap(fx, 'chunk', 'C', 9);
     wrap(fx, 'tracer', 't', 6); wrap(fx, 'spark', 'k', 7); wrap(fx, 'muzzle', 'M', 7);
     wrap(au, 'explosion', 'X', 5); wrap(au, 'moan', 'm', 4); wrap(au, 'bodyFall', 'f', 4);
     const gun = au.gun, simple = au.simple;
@@ -1607,13 +1607,14 @@ export class Coop {
   playFx(list) {
     const g = this.g, fx = g.particles, au = g.audio;
     for (const e of list || []) {
-      const [k, x, y, z, a, b, c, d, f] = e;
+      const [k, x, y, z, a, b, c, d, f, h] = e;
       switch (k) {
         case 'b': fx.blood(x, y, z, a, b, c, d, f); break;
         case 'g': fx.gore(x, y, z, a); break;
         case 'M': fx.muzzle(x, y, z, a, b, c, d || 1); g.tempLights.push({ x, y, z, r: 16, cr: 7, cg: 4.2, cb: 1.6, t: .07, max: .07 }); break;
         case 'x': fx.explosion(x, y, z, a); g.tempLights.push({ x, y: y + 1, z, r: a * 10, cr: 22, cg: 12, cb: 4, t: .55, max: .55 }); break;
         case 'd': fx.debris(x, y, z, a, b, c, !!d); break;
+        case 'C': fx.chunk(x, y, z, a, b, c, d, f, h); break;
         case 't': fx.tracer(x, y, z, a, b, c); break;
         case 'k': fx.spark(x, y, z, a, b, c, d); break;
         case 'X': au.explosion(x, y, z, a, b); { const P = g.player, dd = Math.hypot(P.x - x, P.y + 1.2 - y, P.z - z); g.explFlash = Math.max(g.explFlash, Math.min(1, 25 / (dd * dd + 5))); P.shake = Math.min(1.4, P.shake + Math.min(1, a * 35 / (dd + 2))); } break;

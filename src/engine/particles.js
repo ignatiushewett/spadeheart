@@ -3,6 +3,10 @@ import { PALETTE } from '../shared/materials.js';
 
 const BLOOD_SCALE = 2.4, GORE_SCALE = 2;   // everything that bleeds goes through these
 const CUBE_CAP = 14000;
+// The glow given to a piece of a block (a falling one, a lump, a chip): read by the shader as "weather this like a wall", not as light.
+const BLOCK = -.25, BLOCK_GLASS = -.4;
+// Which of the two a block's pieces get: glass catches the sky, anything else is weathered like a wall.
+const tagOf = (id) => (PALETTE[id * 4 + 3] & 2 ? BLOCK_GLASS : BLOCK);
 const SPRITE_CAP = 10000;
 const CUBE_STRIDE = 9;
 const SPRITE_STRIDE = 15;
@@ -123,10 +127,22 @@ export class Particles {
     const r = PALETTE[id * 4] / 255, g = PALETTE[id * 4 + 1] / 255, b = PALETTE[id * 4 + 2] / 255, c = this.c;
     for (let i = 0; i < n; i++) {
       const s = .12 + rand() * .22;
-      if (!whole) { this.cube(x + rand(), y + rand(), z + rand(), (rand() - .5) * power, rand() * power, (rand() - .5) * power, s, r, g, b, 2 + rand() * 2.5, 0, 1); continue; }
-      const k = this.cube(x + .5, y + .5, z + .5, (rand() - .5) * power, rand() * power, (rand() - .5) * power, 1, r, g, b, 2 + rand() * 2.5, 0, 1);
+      if (!whole) { this.cube(x + rand(), y + rand(), z + rand(), (rand() - .5) * power, rand() * power, (rand() - .5) * power, s, r, g, b, 2 + rand() * 2.5, tagOf(id), 1); continue; }
+      const k = this.cube(x + .5, y + .5, z + .5, (rand() - .5) * power, rand() * power, (rand() - .5) * power, 1, r, g, b, 2 + rand() * 2.5, tagOf(id), 1);
       if (k >= 0) { c[k + 10] = 0; c[k + 15] = s; c[k + 16] = 0; }
     }
+  }
+
+  // A real piece of what came down: a whole block or a good part of one, thrown out and tumbling, that stays that size until it lands.
+  // Thrown along with the chips when something big goes, so a wall coming apart has lumps in it, not only gravel.
+  chunk(x, y, z, r, g, b, power = 4, up = 1, tag = BLOCK) {
+    if (this.cn >= CUBE_CAP * .8) return;
+    const s = .45 + rand() * .5, k = this.cube(x + .5, y + .5, z + .5, (rand() - .5) * power, (.3 + rand() * .7) * power * up, (rand() - .5) * power, s, r, g, b, 2.2 + rand() * 2, tag, 1);
+    if (k >= 0) this.c[k + 11] *= .45;   // big pieces turn over slower than chips
+  }
+
+  chunkOf(x, y, z, id, power, up) {
+    this.chunk(x, y, z, PALETTE[id * 4] / 255, PALETTE[id * 4 + 1] / 255, PALETTE[id * 4 + 2] / 255, power, up, tagOf(id));
   }
 
   // Shards of glass: small, pale, catching the light, and quick to be gone.
@@ -239,7 +255,7 @@ export class Particles {
   falling(x, y, z, id, delay, vx = 0, vz = 0) {
     const r = PALETTE[id * 4] / 255, g = PALETTE[id * 4 + 1] / 255, b = PALETTE[id * 4 + 2] / 255;
     const life = 3.5 + rand() * 1.5;
-    this.cube(x + .5, y + .5, z + .5, vx + (rand() - .5) * .35, -rand() * .6 - delay, vz + (rand() - .5) * .35, .98, r, g, b, life, 0, 2);
+    this.cube(x + .5, y + .5, z + .5, vx + (rand() - .5) * .35, -rand() * .6 - delay, vz + (rand() - .5) * .35, .98, r, g, b, life, tagOf(id), 2);
   }
 
   update(dt) {
@@ -260,7 +276,8 @@ export class Particles {
         c[k + 6] = 1 + (c[k + 15] - 1) * t * (2 - t);
         if (t >= 1) c[k + 15] = 0;
       }
-      c[k + 4] -= (flags === 2 ? 18 : 16) * dt;
+      // A block coming down off a building falls a little slower than a chip does, so a collapse can be watched as it goes.
+      c[k + 4] -= (flags === 2 ? 14.5 : 16) * dt;
       c[k] += c[k + 3] * dt; c[k + 1] += c[k + 4] * dt; c[k + 2] += c[k + 5] * dt;
       c[k + 10] += c[k + 11] * dt * (flags === 2 ? .15 : 1);
       if (w.solid(Math.floor(c[k]), Math.floor(c[k + 1]), Math.floor(c[k + 2]))) {

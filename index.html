@@ -674,6 +674,8 @@ body.talking #hud > *:not(#caption) { visibility: hidden; }
 #boot-veil.on { display: flex; }
 /* Black over the title screen until the view behind it has been built, then a slow fade up into it. */
 #menu-veil { position: fixed; inset: 0; z-index: 99; background: #000; opacity: 0; pointer-events: none; }
+/* The title screen's buttons sit over the black while the view behind them builds: the menu is there at once, and the city fades in under it. */
+#menu.screen.on { z-index: 100; }
 #menu-veil.on { opacity: 1; pointer-events: auto; }
 #menu-veil.out { opacity: 0; pointer-events: none; transition: opacity 2.2s ease; }
 #boot-veil.out { opacity: 0; pointer-events: none; }
@@ -741,7 +743,7 @@ body.talking #hud > *:not(#caption) { visibility: hidden; }
   <div class="dev-label">Time</div>
   <div class="dev-row"><button data-dev="t:.27">Morning</button><button data-dev="t:.4">Day</button><button data-dev="t:.5">Noon</button><button data-dev="t:.74">Dusk</button><button data-dev="t:.9">Night</button><button data-dev="day">Next day</button></div>
   <div class="dev-label">Player</div>
-  <div class="dev-row"><button data-dev="s:100">+100 &#9824;</button><button data-dev="s:1000">+1000 &#9824;</button><button data-dev="fly" id="dev-fly">Fly: off</button><button data-dev="bike">Motorbike</button></div>
+  <div class="dev-row"><button data-dev="s:100">+100 &#9824;</button><button data-dev="s:1000">+1000 &#9824;</button><button data-dev="fly" id="dev-fly">Fly: off</button><button data-dev="bike">Motorbike</button><button data-dev="photo" id="dev-photo">Screenshot mode: off</button></div>
   <div class="dev-label">Cheats</div>
   <div class="dev-row"><button data-dev="c:god" id="dev-c-god">God</button><button data-dev="c:ammo" id="dev-c-ammo">Infinite ammo</button><button data-dev="c:spades" id="dev-c-spades">Infinite spades</button><button data-dev="c:ignore" id="dev-c-ignore">Zombies ignore you</button></div>
   <div class="dev-label">World</div>

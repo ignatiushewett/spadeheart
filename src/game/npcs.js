@@ -4533,7 +4533,7 @@ export class NPCs {
       // reads the same from any distance.
       const lean = b.lean || 0, rx = Math.cos(b.yaw), rz = Math.sin(b.yaw), side = Math.sin(lean) * 1.15;
       n.x = b.x - fx * .65 + rx * side; n.z = b.z - fz * .65 + rz * side; n.y = b.sy + .85 - (1 - Math.cos(lean)) * 1.2; n.yaw = n.ys = Math.atan2(fx, fz);
-      n.state = 5; n.aim = 0;
+      n.state = 5.5; n.aim = 0;   // riding: the seated pose with the hands out on the grips (ACTOR_VS)
       return;
     }
     // Thrown by a blast: through the air, down, a moment on the ground, and only then back to whatever they were doing.
@@ -5801,7 +5801,7 @@ export class NPCs {
       const extra = wid * 2 + (n.kid ? 32 : 0) + faction * 64 + lit + Math.min(7, Math.round(n.wet * 8)) * 4096 + q * 32768 + (ready ? 2097152 : 0);
       // A blade or a bat is swung, not pointed: from the moment of the blow, the shader is told how far through the swing they are.
       let st = cranking && n.aim <= 0 ? 6 : n.state || 0;
-      if (wid >= 8 && (st === 3 || n.swingAt !== undefined) && st !== 7 && st !== 5) {
+      if (wid >= 8 && (st === 3 || n.swingAt !== undefined) && st !== 7 && st !== 5 && st !== 5.5) {
         const s = n.swingAt !== undefined ? .22 + (now - n.swingAt) / .5 : 1;   // the blow lands as the swing comes down
         if (s >= 0 && s < 1) st = 9 + s * .99;
         else if (st === 3) st = 0;

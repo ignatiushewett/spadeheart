@@ -134,5 +134,11 @@ for (const k of ['PAINT_Y', 'PAINT_K', 'BARN_R', 'CONT_G', 'RUST', 'STAINED', 'C
   FLAGS[id] = FLAGS[src] | F_CLOTH | F_FLAG;
   FLAG_OF[src] = id;
 }
+// Added last, so every id before it stays where it was in the saves: the smoke-darkened wall round an old blast, a dark grey, not
+// burnt black.
+m('SCORCH', 0x4a443e, 8);
+// Only ever in the far, simplified chunks, never placed: what a hole in a wall or an empty window frame shows from a long way off, the
+// dark of the rooms behind it.
+m('SHADOWED', 0x24272c, 8);
 export const isLoot = (id) => (FLAGS[id] & F_LOOT) !== 0;
 export const isBed = (id) => id === M.BEDROLL || id === M.MATTRESS || id === M.PILLOW || id === M.BLANKET_G || id === M.BLANKET_R || id === M.BLANKET_B || id === M.BLANKET_C;

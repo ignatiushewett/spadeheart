@@ -69,6 +69,7 @@ export class Renderer {
     this.pFarShadow = P(SH.FAR_SHADOW_VS, SH.SHADOW_FS, 'farShadow');
     this.pFar = P(SH.FAR_VS, SH.FAR_FS, 'far');
     this.pTree = P(SH.TREE_VS, SH.TREE_FS, 'tree');
+    this.pHorde = P(SH.HORDE_VS, SH.HORDE_FS, 'farhorde');
     this.pGrass = P(SH.GRASS_VS, SH.GRASS_FS, 'grass');
     this.pGround = P(SH.GROUND_VS, SH.GROUND_FS, 'ground');
     this.pWater = P(SH.WATER_VS, SH.WATER_FS, 'water');
@@ -737,7 +738,10 @@ export class Renderer {
       this.frameUniforms(pf);
       gl.uniform1i(pf.u.uLoadMask, 2);
       gl.uniform2f(pf.u.uWorldSize, WX, WZ);
+      // Both sides: where the built blocks have taken over half of something, the inside of the rest shows through the cut.
+      gl.disable(gl.CULL_FACE);
       far.draw(gl, this.planes);
+      gl.enable(gl.CULL_FACE);
       // The trees out there, as pictures, wherever the real ones are not built yet.
       if (far.trees) {
         const pt = this.pTree.use();
@@ -746,12 +750,19 @@ export class Renderer {
         gl.uniform2f(pt.u.uWorldSize, WX, WZ);
         far.trees.draw(gl, pt);
       }
+      // And the dead out there, past the real ones.
+      if (far.horde && far.horde.count && far.horde.show) {
+        const ph = this.pHorde.use();
+        this.frameUniforms(ph);
+        far.horde.draw(gl, ph);
+      }
       const pg = this.pGround.use();
       this.frameUniforms(pg);
       gl.uniform1i(pg.u.uLoadMask, 2);
       gl.uniform1i(pg.u.uCityMap, 3);
       gl.uniform2f(pg.u.uWorldSize, WX, WZ);
-      gl.uniform1f(pg.u.uY, STREET_Y - .5);
+      // At the street, where the built street is, so the two meet level.
+      gl.uniform1f(pg.u.uY, STREET_Y - .04);
       gl.bindVertexArray(this.landVAO);
       gl.disable(gl.CULL_FACE);
       gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
@@ -800,7 +811,12 @@ export class Renderer {
       }
       gl.bindVertexArray(this.planeVAO);
       gl.disable(gl.CULL_FACE);
+      // Pulled a little towards you in the depth test, more the flatter you look across it: a long way off, the sand a hand under the
+      // surface and the surface itself come out at the same depth, and they flickered between each other.
+      gl.enable(gl.POLYGON_OFFSET_FILL);
+      gl.polygonOffset(-2, -8);
       gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
+      gl.disable(gl.POLYGON_OFFSET_FILL);
       gl.enable(gl.CULL_FACE);
     }
 
